@@ -1,4 +1,5 @@
-const KeyMap = {
+// Make KeyMap available globally
+window.KeyMap = {
     "Escape" : 0x01,
     "Digit1" : 0x02,
     "Digit2" : 0x03,
@@ -89,4 +90,9 @@ const KeyMap = {
     "ArrowLeft" : 0x4B,
     "ArrowRight" : 0x4D,
     "ArrowDown" : 0x50,
+    "Delete" : 0x53,
+    "End" : 0x4F,
+    "ScrollLock" : 0x46,
+    "MetaLeft" : 0x5B,  // Windows key
+    "MetaRight" : 0x5C, // Windows key
 };

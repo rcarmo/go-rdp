@@ -50,6 +50,10 @@ func (p *Protocol) Receive() (uint16, io.Reader, error) {
 	}
 
 	if resp.Application != SendDataIndication {
+		// Log what we actually received for debugging
+		if resp.Application == disconnectProviderUltimatum {
+			return 0, nil, ErrDisconnectUltimatum
+		}
 		return 0, nil, ErrUnknownDomainApplication
 	}
 

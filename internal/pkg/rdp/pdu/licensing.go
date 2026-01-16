@@ -63,13 +63,18 @@ type ServerLicenseError struct {
 	ValidClientMessage LicensingErrorMessage
 }
 
-func (pdu *ServerLicenseError) Deserialize(wire io.Reader) error {
+// Deserialize parses the server license response.
+// Note: XRDP sends security header even with TLS, so we always expect it.
+func (pdu *ServerLicenseError) Deserialize(wire io.Reader, useEnhancedSecurity bool) error {
+	// Always expect security header for XRDP compatibility.
+	// XRDP sends SEC_LICENSE_PKT | SEC_LICENSE_ENCRYPT_CS (0x0280) even with TLS.
 	securityFlag, err := headers.UnwrapSecurityFlag(wire)
 	if err != nil {
 		return err
 	}
 
-	if securityFlag != 0x0080 { // SEC_LICENSE_PKT
+	// SEC_LICENSE_PKT = 0x0080, may be combined with SEC_LICENSE_ENCRYPT_CS = 0x0200
+	if securityFlag&0x0080 == 0 { // SEC_LICENSE_PKT
 		return errors.New("bad license header")
 	}
 

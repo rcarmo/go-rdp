@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/gorilla/websocket"
 
+	"github.com/kulaginds/rdp-html5/internal/pkg/config"
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp"
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp/fastpath"
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp/pdu"
@@ -31,7 +33,7 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 		ReadBufferSize:  webSocketReadBufferSize,
 		WriteBufferSize: webSocketWriteBufferSize,
 		CheckOrigin: func(r *http.Request) bool {
-			return true // TODO: SECURITY: проверить хост
+			return isAllowedOrigin(r.Header.Get("Origin"))
 		},
 	}
 	protocol := r.Header.Get("Sec-Websocket-Protocol")
@@ -80,6 +82,23 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rdpClient.Close()
 
+	// Set TLS configuration from server config (use global config if available)
+	cfg := config.GetGlobalConfig()
+	if cfg == nil {
+		// Fallback to loading config if global config not available (for testing)
+		var err error
+		cfg, err = config.Load()
+		if err != nil {
+			log.Printf("Failed to load config for TLS settings: %v", err)
+			cfg = &config.Config{}
+		}
+	}
+
+	rdpClient.SetTLSConfig(cfg.Security.SkipTLSValidation, cfg.Security.TLSServerName)
+
+	// Set NLA configuration - enable NLA by default for servers that require it
+	rdpClient.SetUseNLA(cfg.Security.UseNLA)
+
 	// TODO: implement
 	//rdpClient.SetRemoteApp("C:\\agent\\agent.exe", ".\\Downloads\\cbct1.zip", "C:\\Users\\Doc")
 	//rdpClient.SetRemoteApp("explore", "", "")
@@ -90,17 +109,12 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("begin proxying")
-
 	go wsToRdp(ctx, wsConn, rdpClient, cancel)
 	rdpToWs(ctx, rdpClient, wsConn)
 }
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) {
-	defer func() {
-		log.Println("wsToRdp done")
-		cancel()
-	}()
+	defer cancel()
 
 	for {
 		select {
@@ -129,10 +143,6 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
 }
 
 func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
-	defer func() {
-		log.Println("rdpToWs done")
-	}()
-
 	var (
 		update *fastpath.UpdatePDU
 		err    error
@@ -149,8 +159,6 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
 		switch {
 		case err == nil: // pass
 		case errors.Is(err, pdu.ErrDeactiateAll):
-			log.Println("deactivate all")
-
 			return
 
 		default:
@@ -161,8 +169,6 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
 
 		if err = wsConn.WriteMessage(websocket.BinaryMessage, update.Data); err != nil {
 			if err == websocket.ErrCloseSent {
-				log.Println("sent to closed websocket")
-
 				return
 			}
 
@@ -171,4 +177,41 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
 			return
 		}
 	}
+}
+
+func isAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+
+	normalized := strings.TrimPrefix(strings.TrimPrefix(origin, "http://"), "https://")
+	normalized = strings.TrimSuffix(normalized, "/")
+
+	allowed := os.Getenv("ALLOWED_ORIGINS")
+	if allowed == "" {
+		return strings.HasPrefix(normalized, "localhost") || strings.HasPrefix(normalized, "127.0.0.1")
+	}
+
+	// Always allow localhost-style origins for development, even when a list is provided
+	if strings.HasPrefix(normalized, "localhost") || strings.HasPrefix(normalized, "127.0.0.1") {
+		return true
+	}
+
+	for _, entry := range strings.Split(allowed, ",") {
+		candidate := strings.TrimSpace(entry)
+		if candidate == "" {
+			continue
+		}
+
+		// Support allow-list entries with or without scheme
+		if candidate == origin || candidate == normalized {
+			return true
+		}
+
+		if strings.TrimPrefix(candidate, "http://") == normalized || strings.TrimPrefix(candidate, "https://") == normalized {
+			return true
+		}
+	}
+
+	return false
 }

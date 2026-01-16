@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp/per"
 )
@@ -75,13 +74,9 @@ func (p *Protocol) JoinChannels(userID uint16, channelIDMap map[string]uint16) e
 			},
 		}
 
-		log.Printf("MCS: Channel Join Request: %s\n", channelName)
-
 		if err := p.x224Conn.Send(req.Serialize()); err != nil {
 			return fmt.Errorf("client MCS channel join request for channel=%s: %w", channelName, err)
 		}
-
-		log.Printf("MCS: Channel Join Confirm: %s\n", channelName)
 
 		wire, err := p.x224Conn.Receive()
 		if err != nil {

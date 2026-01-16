@@ -7,6 +7,7 @@ import (
 )
 
 func TestNewClientInfoPDU_Serialize(t *testing.T) {
+	// Test with standard RDP security (includes security header)
 	req := NewClientInfo("192.168.1.2", "User", "p@$$w0rd")
 	req.InfoPacket.Flags = 0x00010153
 	req.InfoPacket.ExtraInfo.PerformanceFlags = 0x0
@@ -31,7 +32,11 @@ func TestNewClientInfoPDU_Serialize(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}
 
-	actual := req.Serialize()
-
+	// false = standard RDP security (with header)
+	actual := req.Serialize(false)
 	require.Equal(t, expected, actual)
+
+	// true = enhanced security (TLS) - no header, so 4 bytes shorter
+	actualTLS := req.Serialize(true)
+	require.Equal(t, expected[4:], actualTLS) // Skip the 4-byte security header
 }

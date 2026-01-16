@@ -123,6 +123,7 @@ type CapabilitySet struct {
 	BitmapCodecsCapabilitySet           *BitmapCodecsCapabilitySet
 	RailCapabilitySet                   *RailCapabilitySet
 	WindowListCapabilitySet             *WindowListCapabilitySet
+	FrameAcknowledgeCapabilitySet       *FrameAcknowledgeCapabilitySet
 }
 
 func (set *CapabilitySet) Serialize() []byte {
@@ -173,6 +174,8 @@ func (set *CapabilitySet) Serialize() []byte {
 		data = set.RailCapabilitySet.Serialize()
 	case CapabilitySetTypeWindow:
 		data = set.WindowListCapabilitySet.Serialize()
+	case CapabilitySetTypeFrameAcknowledge:
+		data = set.FrameAcknowledgeCapabilitySet.Serialize()
 	}
 
 	buf := new(bytes.Buffer)
@@ -289,6 +292,10 @@ func (set *CapabilitySet) Deserialize(wire io.Reader) error {
 		set.SoundCapabilitySet = &SoundCapabilitySet{}
 
 		return set.SoundCapabilitySet.Deserialize(wire)
+	case CapabilitySetTypeFrameAcknowledge:
+		set.FrameAcknowledgeCapabilitySet = &FrameAcknowledgeCapabilitySet{}
+
+		return set.FrameAcknowledgeCapabilitySet.Deserialize(wire)
 	}
 
 	data := make([]byte, lengthCapability-4)
@@ -297,6 +304,30 @@ func (set *CapabilitySet) Deserialize(wire io.Reader) error {
 	}
 
 	return nil
+}
+
+// Frame Acknowledge Capability Set - for RDP 8.0+
+type FrameAcknowledgeCapabilitySet struct {
+	MaxUnacknowledgedFrames uint32
+}
+
+func (s *FrameAcknowledgeCapabilitySet) Serialize() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, s.MaxUnacknowledgedFrames)
+	return buf.Bytes()
+}
+
+func (s *FrameAcknowledgeCapabilitySet) Deserialize(wire io.Reader) error {
+	return binary.Read(wire, binary.LittleEndian, &s.MaxUnacknowledgedFrames)
+}
+
+func NewFrameAcknowledgeCapabilitySet() CapabilitySet {
+	return CapabilitySet{
+		CapabilitySetType: CapabilitySetTypeFrameAcknowledge,
+		FrameAcknowledgeCapabilitySet: &FrameAcknowledgeCapabilitySet{
+			MaxUnacknowledgedFrames: 2, // Default value for better performance
+		},
+	}
 }
 
 type ServerDemandActive struct {
@@ -397,6 +428,7 @@ func NewClientConfirmActive(shareID uint32, userId, desktopWidth, desktopHeight 
 			NewVirtualChannelCapabilitySet(),
 			NewSoundCapabilitySet(),
 			NewMultifragmentUpdateCapabilitySet(),
+			NewFrameAcknowledgeCapabilitySet(),
 		},
 	}
 

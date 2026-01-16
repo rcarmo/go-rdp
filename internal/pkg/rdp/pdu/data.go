@@ -281,6 +281,10 @@ func (pdu *Data) Deserialize(wire io.Reader) error {
 		return pdu.ErrorInfoPDUData.Deserialize(wire)
 	case pdu.ShareDataHeader.PDUType2.IsSaveSessionInfo(): // ignore
 		return nil
+	case pdu.ShareDataHeader.PDUType2.IsUpdate(): // slow-path graphics update, handled via fastpath
+		return nil
+	case pdu.ShareDataHeader.PDUType2.IsPointer(): // pointer update, ignore for now
+		return nil
 	}
 
 	return fmt.Errorf("unknown data pdu: %d", pdu.ShareDataHeader.PDUType2)

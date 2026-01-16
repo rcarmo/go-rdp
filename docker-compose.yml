@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  rdp-html5:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - LOG_LEVEL=info
+      - LOG_FORMAT=text
+      - MAX_CONNECTIONS=100
+      - ENABLE_RATE_LIMIT=true
+      - RATE_LIMIT_PER_MINUTE=60
+      - RDP_DEFAULT_WIDTH=1024
+      - RDP_DEFAULT_HEIGHT=768
+      - RDP_MAX_WIDTH=3840
+      - RDP_MAX_HEIGHT=2160
+      - RDP_BUFFER_SIZE=65536
+      - RDP_TIMEOUT=10s
+    volumes:
+      - ./web:/app/web:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - rdp-network
+
+  # Optional: Redis for session storage (if needed in future)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - rdp-network
+  #   restart: unless-stopped
+
+networks:
+  rdp-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local

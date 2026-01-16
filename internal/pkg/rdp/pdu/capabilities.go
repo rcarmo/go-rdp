@@ -18,8 +18,11 @@ func NewGeneralCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeGeneral,
 		GeneralCapabilitySet: &GeneralCapabilitySet{
-			OSMajorType: 0x0008,                   // Chrome OS platform
-			ExtraFlags:  0x0001 | 0x0004 | 0x0400, // required: FASTPATH_OUTPUT_SUPPORTED, LONG_CREDENTIALS_SUPPORTED, NO_BITMAP_COMPRESSION_HDR
+			OSMajorType:           0x000A,                                     // Windows 10+ platform
+			OSMinorType:           0x0000,                                     // Latest version
+			ExtraFlags:            0x0001 | 0x0004 | 0x0400 | 0x0080 | 0x0100, // Enhanced features: FASTPATH_OUTPUT_SUPPORTED, LONG_CREDENTIALS_SUPPORTED, NO_BITMAP_COMPRESSION_HDR, DYNAMIC_DST_SUPPORTED, TILE_SUPPORT
+			RefreshRectSupport:    1,                                          // We support Refresh Rect PDU
+			SuppressOutputSupport: 1,                                          // We support Suppress Output PDU
 		},
 	}
 }
@@ -124,12 +127,13 @@ func NewBitmapCapabilitySet(desktopWidth, desktopHeight uint16) CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeBitmap,
 		BitmapCapabilitySet: &BitmapCapabilitySet{
-			PreferredBitsPerPixel: 0x0018, // HIGH_COLOR_24BPP
+			PreferredBitsPerPixel: 0x0020, // HIGH_COLOR_32BPP (32-bit color support)
 			Receive1BitPerPixel:   0x0001,
 			Receive4BitsPerPixel:  0x0001,
 			Receive8BitsPerPixel:  0x0001,
 			DesktopWidth:          desktopWidth,
 			DesktopHeight:         desktopHeight,
+			DesktopResizeFlag:     0x0001, // Support dynamic resizing
 		},
 	}
 }

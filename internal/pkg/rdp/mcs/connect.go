@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp/asn1"
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp/ber"
@@ -197,13 +196,9 @@ func (p *Protocol) Connect(userData []byte) (io.Reader, error) {
 		ClientConnectInitial: NewClientMCSConnectInitial(userData),
 	}
 
-	log.Println("MCS: Connect Initial")
-
 	if err := p.x224Conn.Send(req.Serialize()); err != nil {
 		return nil, fmt.Errorf("client MCS connect initial request: %w", err)
 	}
-
-	log.Println("MCS: Connect Response")
 
 	wire, err := p.x224Conn.Receive()
 	if err != nil {

@@ -44,6 +44,13 @@ type client struct {
 	skipChannelJoin        bool
 	shareID                uint32
 	userID                 uint16
+
+	// TLS configuration
+	skipTLSValidation bool
+	tlsServerName     string
+
+	// NLA configuration
+	useNLA bool
 }
 
 const (
@@ -64,6 +71,9 @@ func NewClient(
 		desktopHeight: uint16(desktopHeight),
 
 		selectedProtocol: pdu.NegotiationProtocolSSL,
+		// Default TLS configuration - can be overridden with SetTLSConfig
+		skipTLSValidation: false,
+		tlsServerName:     "",
 	}
 
 	var err error
@@ -81,4 +91,20 @@ func NewClient(
 	c.fastPath = fastpath.New(&c)
 
 	return &c, nil
+}
+
+// SetTLSConfig allows setting TLS configuration for the RDP client
+func (c *client) SetTLSConfig(skipValidation bool, serverName string) {
+	c.skipTLSValidation = skipValidation
+	c.tlsServerName = serverName
+}
+
+// SetUseNLA enables or disables Network Level Authentication
+func (c *client) SetUseNLA(useNLA bool) {
+	c.useNLA = useNLA
+	if useNLA {
+		c.selectedProtocol = pdu.NegotiationProtocolHybrid
+	} else {
+		c.selectedProtocol = pdu.NegotiationProtocolSSL
+	}
 }

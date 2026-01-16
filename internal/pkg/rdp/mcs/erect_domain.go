@@ -3,7 +3,6 @@ package mcs
 import (
 	"bytes"
 	"fmt"
-	"log"
 
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp/per"
 )
@@ -24,8 +23,6 @@ func (p *Protocol) ErectDomain() error {
 		Application:              erectDomainRequest,
 		ClientErectDomainRequest: &ClientErectDomainRequest{},
 	}
-
-	log.Println("MCS: Erect Domain")
 
 	if err := p.x224Conn.Send(req.Serialize()); err != nil {
 		return fmt.Errorf("client MCS erect domain request: %w", err)

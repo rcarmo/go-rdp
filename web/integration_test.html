@@ -1,0 +1,368 @@
+//go:build js && wasm
+
+package main
+
+import (
+	"syscall/js"
+	"testing"
+	"time"
+)
+
+// TestClientInitialization tests the client initialization in browser environment
+func TestClientInitialization(t *testing.T) {
+	// This test would run in a browser environment with WASM
+	// For now, we'll test the basic structure
+	
+	// Mock DOM elements
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	// Test that required elements exist
+	canvas := doc.Call("getElementById", "canvas")
+	if canvas.IsNull() || canvas.IsUndefined() {
+		t.Error("Canvas element not found")
+	}
+
+	hostInput := doc.Call("getElementById", "host")
+	if hostInput.IsNull() || hostInput.IsUndefined() {
+		t.Error("Host input element not found")
+	}
+
+	userInput := doc.Call("getElementById", "user")
+	if userInput.IsNull() || userInput.IsUndefined() {
+		t.Error("User input element not found")
+	}
+
+	passwordInput := doc.Call("getElementById", "password")
+	if passwordInput.IsNull() || passwordInput.IsUndefined() {
+		t.Error("Password input element not found")
+	}
+}
+
+// TestWebSocketConnection tests WebSocket connection establishment
+func TestWebSocketConnection(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	// Test WebSocket availability
+	wsConstructor := js.Global().Get("WebSocket")
+	if wsConstructor.IsNull() || wsConstructor.IsUndefined() {
+		t.Error("WebSocket not available in this environment")
+	}
+
+	// Test protocol detection
+	location := js.Global().Get("location")
+	if !location.IsNull() && !location.IsUndefined() {
+		protocol := location.Get("protocol").String()
+		if protocol == "https:" {
+			// Should use WSS
+			expectedProtocol := "wss://"
+			actualProtocol := js.Global().Call("eval", "(window.location.protocol === 'https:') ? 'wss://' : 'ws://'").String()
+			if actualProtocol != expectedProtocol {
+				t.Errorf("Expected protocol %s, got %s", expectedProtocol, actualProtocol)
+			}
+		}
+	}
+}
+
+// TestInputValidation tests client-side input validation
+func TestInputValidation(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	// Test hostname validation
+	testCases := []struct {
+		hostname string
+		valid    bool
+	}{
+		{"example.com", true},
+		{"192.168.1.1", true},
+		{"server.example.com:3389", true},
+		{"", false},
+		{"invalid hostname", false},
+		{"<script>alert('xss')</script>", false},
+	}
+
+	for _, tc := range testCases {
+		// Simulate validation function
+		isValid := validateHostnameJS(tc.hostname)
+		if isValid != tc.valid {
+			t.Errorf("Hostname %s: expected valid=%t, got valid=%t", tc.hostname, tc.valid, isValid)
+		}
+	}
+}
+
+// TestSessionStorage tests session persistence functionality
+func TestSessionStorage(t *testing.T) {
+	storage := js.Global().Get("localStorage")
+	if storage.IsNull() || storage.IsUndefined() {
+		t.Skip("localStorage not available - running in non-browser environment")
+		return
+	}
+
+	// Test saving session
+	testSession := map[string]interface{}{
+		"host":      "test.example.com",
+		"user":      "testuser",
+		"timestamp":  time.Now().UnixMilli(),
+		"sessionId":  "test_session_123",
+	}
+
+	storage.Call("setItem", "rdp_session", "test_session_data")
+
+	// Test loading session
+	stored := storage.Call("getItem", "rdp_session")
+	if stored.IsNull() || stored.IsUndefined() {
+		t.Error("Session data not found in localStorage")
+	}
+
+	// Clean up
+	storage.Call("removeItem", "rdp_session")
+}
+
+// TestHotCornerMenu tests hot corner menu functionality
+func TestHotCornerMenu(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	// Test hot corner element exists
+	hotCorner := doc.Call("getElementById", "hot-corner")
+	if hotCorner.IsNull() || hotCorner.IsUndefined() {
+		t.Error("Hot corner element not found")
+	}
+
+	// Test menu element exists
+	menu := doc.Call("getElementById", "hot-corner-menu")
+	if menu.IsNull() || menu.IsUndefined() {
+		t.Error("Hot corner menu element not found")
+	}
+
+	// Test menu items exist
+	menuItems := []string{
+		"menu-settings",
+		"menu-special-keys",
+		"menu-fullscreen",
+		"menu-disconnect",
+	}
+
+	for _, itemID := range menuItems {
+		item := doc.Call("getElementById", itemID)
+		if item.IsNull() || item.IsUndefined() {
+			t.Errorf("Menu item %s not found", itemID)
+		}
+	}
+}
+
+// TestSpecialKeysModal tests special keys modal functionality
+func TestSpecialKeysModal(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	// Test modal element exists
+	modal := doc.Call("getElementById", "special-keys-modal")
+	if modal.IsNull() || modal.IsUndefined() {
+		t.Error("Special keys modal element not found")
+	}
+
+	// Test special key buttons exist
+	buttons := doc.Call("querySelectorAll", ".special-key-btn")
+	if buttons.IsNull() || buttons.IsUndefined() {
+		t.Error("Special key buttons not found")
+	}
+
+	// Test that we have the expected number of special keys
+	length := buttons.Get("length").Int()
+	expectedKeys := []string{
+		"Ctrl+Alt+Del", "Ctrl+Alt+End", "Alt+Tab", "Alt+Esc",
+		"Ctrl+Esc", "Ctrl+Shift+Esc", "Win+R", "Win+E",
+		"Win+L", "Win+D", "Win+M", "PrtScn",
+		"ScrollLock", "Pause", "F1", "F2", "F3", "F4",
+		"F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+	}
+
+	if length != len(expectedKeys) {
+		t.Errorf("Expected %d special key buttons, got %d", len(expectedKeys), length)
+	}
+}
+
+// TestCanvasInteraction tests canvas event handling
+func TestCanvasInteraction(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	canvas := doc.Call("getElementById", "canvas")
+	if canvas.IsNull() || canvas.IsUndefined() {
+		t.Error("Canvas element not found")
+		return
+	}
+
+	// Test canvas context
+	ctx := canvas.Call("getContext", "2d")
+	if ctx.IsNull() || ctx.IsUndefined() {
+		t.Error("Could not get 2D context from canvas")
+	}
+
+	// Test canvas dimensions
+	width := canvas.Get("width").Int()
+	height := canvas.Get("height").Int()
+
+	if width <= 0 || height <= 0 {
+		t.Errorf("Invalid canvas dimensions: %dx%d", width, height)
+	}
+
+	// Test expected default dimensions
+	if width != 1024 || height != 768 {
+		t.Logf("Canvas dimensions %dx%d, expected 1024x768 (but this might be intentional)", width, height)
+	}
+}
+
+// TestErrorHandling tests error display and handling
+func TestErrorHandling(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	// Test status element exists
+	status := doc.Call("getElementById", "status")
+	if status.IsNull() || status.IsUndefined() {
+		t.Error("Status element not found")
+	}
+
+	// Test error message elements exist
+	errorElements := []string{"host-error", "user-error", "password-error"}
+	for _, errorID := range errorElements {
+		errorEl := doc.Call("getElementById", errorID)
+		if errorEl.IsNull() || errorEl.IsUndefined() {
+			t.Errorf("Error element %s not found", errorID)
+		}
+	}
+}
+
+// TestAccessibility tests accessibility features
+func TestAccessibility(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	// Test ARIA labels on form inputs
+	inputs := map[string]string{
+		"host":     "RDP Server Address",
+		"user":     "Username",
+		"password": "Password",
+	}
+
+	for inputID, expectedLabel := range inputs {
+		input := doc.Call("getElementById", inputID)
+		if input.IsNull() || input.IsUndefined() {
+			t.Errorf("Input %s not found", inputID)
+			continue
+		}
+
+		ariaLabel := input.Get("aria-label").String()
+		if ariaLabel != expectedLabel {
+			t.Errorf("Input %s: expected aria-label '%s', got '%s'", inputID, expectedLabel, ariaLabel)
+		}
+
+		ariaRequired := input.Get("aria-required").Bool()
+		if !ariaRequired {
+			t.Errorf("Input %s should have aria-required=true", inputID)
+		}
+	}
+
+	// Test role attributes on error messages
+	errorElements := []string{"host-error", "user-error", "password-error"}
+	for _, errorID := range errorElements {
+		errorEl := doc.Call("getElementById", errorID)
+		if errorEl.IsNull() || errorEl.IsUndefined() {
+			continue
+		}
+
+		role := errorEl.Get("role").String()
+		if role != "alert" {
+			t.Errorf("Error element %s should have role='alert'", errorID)
+		}
+	}
+}
+
+// TestMobileSupport tests mobile device compatibility
+func TestMobileSupport(t *testing.T) {
+	doc := js.Global().Get("document")
+	if doc.IsNull() || doc.IsUndefined() {
+		t.Skip("DOM not available - running in non-browser environment")
+		return
+	}
+
+	canvas := doc.Call("getElementById", "canvas")
+	if canvas.IsNull() || canvas.IsUndefined() {
+		t.Error("Canvas element not found")
+		return
+	}
+
+	// Test touch event support
+	// In a real test environment, we would simulate touch events
+	// For now, we just check that the element exists
+
+	// Test viewport meta tag
+	viewport := doc.Call("querySelector", "meta[name='viewport']")
+	if viewport.IsNull() || viewport.IsUndefined() {
+		t.Error("Viewport meta tag not found")
+	} else {
+		content := viewport.Get("content").String()
+		expectedContent := "width=device-width, initial-scale=1.0, user-scalable=no"
+		if content != expectedContent {
+			t.Errorf("Viewport meta: expected '%s', got '%s'", expectedContent, content)
+		}
+	}
+}
+
+// Helper functions for testing
+func validateHostnameJS(hostname string) bool {
+	// Simulate JavaScript validation
+	if hostname == "" {
+		return false
+	}
+	
+	// Check for dangerous characters
+	if containsJS(hostname, "<") || containsJS(hostname, ">") || containsJS(hostname, "'") || containsJS(hostname, "\"") {
+		return false
+	}
+	
+	// Check length
+	if len(hostname) > 253 {
+		return false
+	}
+	
+	return true
+}
+
+func containsJS(s, substr string) bool {
+	// Simulate JavaScript String.prototype.contains
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

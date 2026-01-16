@@ -1,6 +1,10 @@
-<html lang="eu">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Web RDP Solution</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Secure HTML5 RDP Client">
+    <title>Secure RDP HTML5 Client</title>
     <script src="js/binary.js"></script>
     <script src="js/rle/ms-rle-wasm.js"></script>
     <script src="js/update/header.js"></script>
@@ -13,28 +17,1171 @@
     <script src="js/client.js"></script>
     <script src="js/color.js"></script>
     <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger-color: #dc2626;
+            --danger-hover: #b91c1c;
+            --background: #f3f4f6;
+            --surface: #ffffff;
+            --text: #111827;
+            --border: #d1d5db;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #6b7280;
+            font-size: 1rem;
+        }
+        
+        .connection-panel {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .form-group input.error {
+            border-color: var(--danger-color);
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+        
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: var(--danger-hover);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .status-indicator {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .status-connected {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        
+        .status-disconnected {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        
+        .status-connecting {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+        
+        .canvas-container {
+            display: none;
+        }
+        
+        .canvas-container.active {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            z-index: 1000;
+            padding: 0;
+            margin: 0;
+            border-radius: 0;
+        }
+        
+        #canvas {
+            display: block !important;
+            /* Do not use percentage - use explicit dimensions set by JavaScript */
+            border-radius: 0;
+            background: #000;
+        }
+        
+        #pointer-cache {
+            display: none;
+        }
+        
         .pointer-cache-null {cursor: none}
         .pointer-cache-default {cursor: default}
+        
+        .connection-info {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 16px;
+            font-size: 14px;
+        }
+        
+        .error-message {
+            color: var(--danger-color);
+            font-size: 14px;
+            margin-top: 4px;
+            display: none;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            max-width: 400px;
+        }
+        
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .toast.success {
+            border-left: 4px solid #059669;
+        }
+        
+        .toast.error {
+            border-left: 4px solid var(--danger-color);
+        }
+        
+        .toast.info {
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .toast-message {
+            font-size: 14px;
+            color: var(--text);
+        }
+        
+        .toast-close {
+            float: right;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .toast-close:hover {
+            color: var(--text);
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .file-transfer-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .file-upload-area {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        
+        .file-status {
+            font-size: 12px;
+            color: var(--text);
+            opacity: 0.8;
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .canvas-container.drag-over {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.4) !important;
+        }
+        
+        .monitor-controls {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .monitor-select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            min-width: 200px;
+        }
+        
+        .monitor-info {
+            margin-top: 12px;
+            padding: 8px;
+            background: #e5f3ff;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #374151;
+        }
+        
+        .cycle-monitor-btn {
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+        
+        .audio-controls {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .mic-control-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .mic-status {
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .mic-levels {
+            margin-top: 12px;
+        }
+        
+        .level-indicator {
+            height: 40px;
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        
+        .level-bars {
+            display: flex;
+            align-items: flex-end;
+            height: 30px;
+            gap: 2px;
+        }
+        
+        .level-bar {
+            width: 6px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            transition: all 0.1s ease;
+            transform-origin: bottom;
+            transform: scale(1);
+        }
+        
+        .level-bar.active {
+            background: #10b981;
+            box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .hot-corner-menu {
+                right: 5px;
+                top: 5px;
+                min-width: 150px;
+            }
+            
+            .file-transfer-controls {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin-bottom: 10px;
+                justify-content: center;
+            }
+        }
+        
+        .hot-corner {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 50px;
+            height: 50px;
+            z-index: 1000;
+            cursor: pointer;
+        }
+        
+        .hot-corner-menu {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 8px 0;
+            min-width: 200px;
+            z-index: 1001;
+            display: none;
+        }
+        
+        .hot-corner-menu.show {
+            display: block;
+        }
+        
+        .menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .menu-item:hover {
+            background: var(--background);
+        }
+        
+        .menu-item.danger {
+            color: var(--danger-color);
+        }
+        
+        .menu-separator {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+        
+        .menu-shortcut {
+            margin-left: auto;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        
+        .special-keys-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 1002;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .special-keys-modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .close-btn:hover {
+            color: var(--text);
+        }
+        
+        .special-keys-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .special-key-btn {
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .special-key-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .special-key-btn:active {
+            transform: scale(0.95);
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .hot-corner-menu {
+                right: 5px;
+                top: 5px;
+                min-width: 150px;
+            }
+        }
     </style>
 </head>
 <body>
-<div>
-    <form onsubmit="client.connect(); return false">
-        <input type="text" id="host" name="host" placeholder="host:port" />
-        <input type="text" id="user" name="user" placeholder="user" />
-        <input type="password" id="password" name="password" placeholder="password" />
-        <button type="submit">Connect</button>
-        <button type="button" onclick="client.disconnect()">Disconnect</button>
-    </form>
-</div>
+    <div class="container">
+        <header class="header">
+            <h1>Secure RDP Client</h1>
+            <p>Modern HTML5 Remote Desktop Protocol Client</p>
+        </header>
 
-<div>
-    <canvas id="canvas" width="1024" height="768"></canvas>
-    <canvas id="pointer-cache" width="32" height="32" style="display: none"></canvas>
-</div>
+        <div class="connection-panel">
+            <div id="status" class="status-indicator"></div>
+            
+            <form id="connection-form">
+                <div class="form-group">
+                    <label for="host">RDP Server Address</label>
+                    <input type="text" id="host" name="host" placeholder="example.com or example.com:3389" required 
+                           aria-label="RDP Server Address" 
+                           aria-describedby="host-error"
+                           aria-required="true"
+                           autocomplete="off">
+                    <div id="host-error" class="error-message" role="alert"></div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="user">Username</label>
+                        <input type="text" id="user" name="user" placeholder="username" required
+                               aria-label="Username" 
+                               aria-describedby="user-error"
+                               aria-required="true"
+                               autocomplete="username">
+                        <div id="user-error" class="error-message" role="alert"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="password" required
+                               aria-label="Password" 
+                               aria-describedby="password-error"
+                               aria-required="true"
+                               autocomplete="current-password">
+                        <div id="password-error" class="error-message" role="alert"></div>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button type="submit" id="connect-btn" class="btn btn-primary">Connect</button>
+                    <button type="button" id="disconnect-btn" class="btn btn-danger" disabled>Disconnect</button>
+                </div>
+                
+                <div id="connection-info" class="connection-info" style="display: none;">
+                    <strong>Connection Security:</strong> TLS 1.2+ encrypted connection<br>
+                    <strong>Protocol Support:</strong> RDP 10.x with enhanced features
+                </div>
+            </form>
+        </div>
 
-<script>
-    const client = new Client("ws://" + window.location.host + "/connect", "canvas", "host", "user", "password");
-</script>
+    </div>
+    
+    <!-- Canvas container OUTSIDE .container so it's visible when form is hidden -->
+    <div id="canvas-container" class="canvas-container">
+        <canvas id="canvas" width="1024" height="768"></canvas>
+        <canvas id="pointer-cache" width="32" height="32"></canvas>
+    </div>
+    
+    <!-- Toast container for notifications -->
+    <div class="toast-container" id="toast-container"></div>
+    
+    <!-- Hot Corner Menu -->
+    <div class="hot-corner" id="hot-corner"></div>
+    
+    <div class="hot-corner-menu" id="hot-corner-menu">
+        <button class="menu-item" id="menu-settings">
+            ⚙️ Settings
+        </button>
+        <button class="menu-item" id="menu-special-keys">
+            ⌨️ Special Keys
+            <span class="menu-shortcut">Ctrl+Alt+S</span>
+        </button>
+        <button class="menu-item" id="menu-file-transfer">
+            📁 File Transfer
+        </button>
+        <div class="menu-separator"></div>
+        <button class="menu-item" id="menu-fullscreen">
+            🔳 Fullscreen
+            <span class="menu-shortcut">F11</span>
+        </button>
+        <button class="menu-item danger" id="menu-disconnect">
+            🔌 Disconnect
+            <span class="menu-shortcut">Ctrl+Alt+D</span>
+        </button>
+    </div>
+    
+    <!-- Special Keys Modal -->
+    <div class="special-keys-modal" id="special-keys-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Special Keys</h3>
+                <button class="close-btn" id="close-modal">×</button>
+            </div>
+            <div class="special-keys-grid">
+                <button class="special-key-btn" data-key="Ctrl+Alt+Del">Ctrl+Alt+Del</button>
+                <button class="special-key-btn" data-key="Ctrl+Alt+End">Ctrl+Alt+End</button>
+                <button class="special-key-btn" data-key="Alt+Tab">Alt+Tab</button>
+                <button class="special-key-btn" data-key="Alt+Esc">Alt+Esc</button>
+                <button class="special-key-btn" data-key="Ctrl+Esc">Ctrl+Esc</button>
+                <button class="special-key-btn" data-key="Ctrl+Shift+Esc">Ctrl+Shift+Esc</button>
+                <button class="special-key-btn" data-key="Win+R">Win+R</button>
+                <button class="special-key-btn" data-key="Win+E">Win+E</button>
+                <button class="special-key-btn" data-key="Win+L">Win+L</button>
+                <button class="special-key-btn" data-key="Win+D">Win+D</button>
+                <button class="special-key-btn" data-key="Win+M">Win+M</button>
+                <button class="special-key-btn" data-key="PrtScn">PrtScn</button>
+                <button class="special-key-btn" data-key="ScrollLock">Scroll Lock</button>
+                <button class="special-key-btn" data-key="Pause">Pause/Break</button>
+                <button class="special-key-btn" data-key="F1">F1</button>
+                <button class="special-key-btn" data-key="F2">F2</button>
+                <button class="special-key-btn" data-key="F3">F3</button>
+                <button class="special-key-btn" data-key="F4">F4</button>
+                <button class="special-key-btn" data-key="F5">F5</button>
+                <button class="special-key-btn" data-key="F6">F6</button>
+                <button class="special-key-btn" data-key="F7">F7</button>
+                <button class="special-key-btn" data-key="F8">F8</button>
+                <button class="special-key-btn" data-key="F9">F9</button>
+                <button class="special-key-btn" data-key="F10">F10</button>
+                <button class="special-key-btn" data-key="F11">F11</button>
+                <button class="special-key-btn" data-key="F12">F12</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const client = new Client(
+            ((window.location.protocol === "https:") ? "wss://" : "ws://") + window.location.host + "/connect", 
+            "canvas", 
+            "host", 
+            "user", 
+            "password"
+        );
+        
+        // Enhanced UI interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            const connectBtn = document.getElementById('connect-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            const status = document.getElementById('status');
+            const canvasContainer = document.getElementById('canvas-container');
+            const connectionInfo = document.getElementById('connection-info');
+            const form = document.getElementById('connection-form');
+            
+            // Prevent form submission - use WebSocket instead
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                client.connect();
+            });
+            
+            // Clear all error messages
+            function clearErrors() {
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.style.display = 'none';
+                    el.textContent = '';
+                });
+                document.querySelectorAll('.form-group input').forEach(el => {
+                    el.classList.remove('error');
+                });
+            }
+            
+            // Show error for specific field
+            function showFieldError(fieldId, message) {
+                const field = document.getElementById(fieldId);
+                const errorEl = document.getElementById(fieldId + '-error');
+                field.classList.add('error');
+                errorEl.textContent = message;
+                errorEl.style.display = 'block';
+            }
+            
+            // Update UI based on connection state
+            function updateConnectionState(state, errorMsg = null) {
+                status.style.display = 'block';
+                clearErrors();
+                
+                switch(state) {
+                    case 'connecting':
+                        status.className = 'status-indicator status-connecting';
+                        status.textContent = 'Connecting to server...';
+                        connectBtn.disabled = true;
+                        disconnectBtn.disabled = true;
+                        break;
+                        
+                    case 'connected':
+                        status.style.display = 'none';
+                        document.querySelector('.container').style.display = 'none';
+                        canvasContainer.classList.add('active');
+                        // Force canvas container to be visible with inline styles
+                        canvasContainer.style.display = 'block';
+                        canvasContainer.style.position = 'fixed';
+                        canvasContainer.style.top = '0';
+                        canvasContainer.style.left = '0';
+                        canvasContainer.style.width = '100vw';
+                        canvasContainer.style.height = '100vh';
+                        canvasContainer.style.zIndex = '9999';
+                        canvasContainer.style.background = '#000';
+                        console.log("INDEX.HTML: canvas container should now be visible");
+                        // Canvas is already resized in client.js before connect
+                        break;
+                        
+                    case 'disconnected':
+                        status.style.display = 'block';
+                        status.className = 'status-indicator status-disconnected';
+                        status.textContent = 'Disconnected from server';
+                        connectBtn.disabled = false;
+                        disconnectBtn.disabled = true;
+                        document.querySelector('.container').style.display = 'block';
+                        canvasContainer.classList.remove('active');
+                        break;
+                        
+                    case 'error':
+                        status.className = 'status-indicator status-disconnected';
+                        status.textContent = errorMsg || 'Connection failed. Please check your credentials and try again.';
+                        connectBtn.disabled = false;
+                        disconnectBtn.disabled = true;
+                        break;
+                }
+            }
+
+            // Keep UI in sync with client lifecycle events
+            document.addEventListener('rdp:connected', function() {
+                console.log("INDEX.HTML: rdp:connected event received!");
+                console.log("INDEX.HTML: canvasContainer before:", canvasContainer.className);
+                updateConnectionState('connected');
+                console.log("INDEX.HTML: canvasContainer after:", canvasContainer.className);
+                console.log("INDEX.HTML: canvasContainer display:", getComputedStyle(canvasContainer).display);
+            });
+            document.addEventListener('rdp:disconnected', function() {
+                console.log("INDEX.HTML: rdp:disconnected event received!");
+                updateConnectionState('disconnected');
+            });
+            document.addEventListener('rdp:error', function(e) {
+                const detail = e.detail || {};
+                updateConnectionState('error', detail.message || null);
+            });
+            
+            // Attach event listeners
+            disconnectBtn.addEventListener('click', function() {
+                client.disconnect();
+                updateConnectionState('disconnected');
+            });
+            
+            // Extend client to notify UI of state changes
+            const originalConnect = client.connect.bind(client);
+            client.connect = function() {
+                clearErrors();
+                
+                const host = document.getElementById('host').value.trim();
+                const user = document.getElementById('user').value.trim();
+                const password = document.getElementById('password').value;
+                
+                // Enhanced validation with specific error messages
+                if (!host) {
+                    showFieldError('host', 'Server address is required');
+                    return false;
+                }
+                
+                if (!user) {
+                    showFieldError('user', 'Username is required');
+                    return false;
+                }
+                
+                if (!password) {
+                    showFieldError('password', 'Password is required');
+                    return false;
+                }
+                
+                // Remove redundant hostname:port validation - let server handle it
+                // Auto-add default port if not specified
+                if (!host.includes(':')) {
+                    document.getElementById('host').value = host + ':3389';
+                }
+                
+                updateConnectionState('connecting');
+                return originalConnect();
+            };
+            
+            // Add error handling
+            const originalDisconnect = client.disconnect.bind(client);
+            client.disconnect = function() {
+                updateConnectionState('disconnected');
+                return originalDisconnect();
+            };
+            
+            // Remove WebSocket override - it causes connection issues
+            // Error handling is now done through the client's socket.onerror and socket.onclose
+            
+            // Add input event listeners to clear errors on user input
+            ['host', 'user', 'password'].forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                field.addEventListener('input', function() {
+                    if (this.classList.contains('error')) {
+                        this.classList.remove('error');
+                        document.getElementById(fieldId + '-error').style.display = 'none';
+                    }
+                });
+            });
+            
+            // Security: Clear sensitive data when leaving page
+            window.addEventListener('beforeunload', function() {
+                document.getElementById('password').value = '';
+                client.disconnect();
+            });
+            
+            // Hot corner menu functionality
+            const hotCorner = document.getElementById('hot-corner');
+            const hotCornerMenu = document.getElementById('hot-corner-menu');
+            const specialKeysModal = document.getElementById('special-keys-modal');
+            const closeModal = document.getElementById('close-modal');
+            
+            let menuTimeout;
+            let isMenuVisible = false;
+            
+            // Show menu when hovering over hot corner
+            hotCorner.addEventListener('mouseenter', function() {
+                clearTimeout(menuTimeout);
+                hotCornerMenu.classList.add('show');
+                isMenuVisible = true;
+            });
+            
+            // Hide menu when leaving hot corner (with delay)
+            hotCorner.addEventListener('mouseleave', function() {
+                menuTimeout = setTimeout(function() {
+                    if (!hotCornerMenu.matches(':hover')) {
+                        hotCornerMenu.classList.remove('show');
+                        isMenuVisible = false;
+                    }
+                }, 300);
+            });
+            
+            // Keep menu open when hovering over it
+            hotCornerMenu.addEventListener('mouseenter', function() {
+                clearTimeout(menuTimeout);
+            });
+            
+            hotCornerMenu.addEventListener('mouseleave', function() {
+                menuTimeout = setTimeout(function() {
+                    hotCornerMenu.classList.remove('show');
+                    isMenuVisible = false;
+                }, 300);
+            });
+            
+            // Menu item handlers
+            document.getElementById('menu-settings').addEventListener('click', function() {
+                // Show settings - for now, just scroll to connection panel
+                document.querySelector('.connection-panel').scrollIntoView({ behavior: 'smooth' });
+                hotCornerMenu.classList.remove('show');
+                if (window.showToast) {
+                    window.showToast('Settings panel opened', 'info', 'Settings', 3000);
+                }
+            });
+            
+            document.getElementById('menu-special-keys').addEventListener('click', function() {
+                specialKeysModal.classList.add('show');
+                hotCornerMenu.classList.remove('show');
+                if (window.showToast) {
+                    window.showToast('Special keys panel opened', 'info', 'Special Keys', 3000);
+                }
+            });
+            
+            document.getElementById('menu-file-transfer').addEventListener('click', function() {
+                if (client && client.showFileUpload) {
+                    client.showFileUpload();
+                }
+                hotCornerMenu.classList.remove('show');
+            });
+            
+            document.getElementById('menu-fullscreen').addEventListener('click', function() {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                    if (window.showToast) {
+                        window.showToast('Entered fullscreen mode', 'success', 'Fullscreen', 3000);
+                    }
+                } else {
+                    document.exitFullscreen();
+                    if (window.showToast) {
+                        window.showToast('Exited fullscreen mode', 'info', 'Fullscreen', 3000);
+                    }
+                }
+                hotCornerMenu.classList.remove('show');
+            });
+            
+            document.getElementById('menu-disconnect').addEventListener('click', function() {
+                if (window.showToast) {
+                    window.showToast('Disconnecting from session...', 'info', 'Disconnecting', 2000);
+                }
+                client.disconnect();
+                updateConnectionState('disconnected');
+                hotCornerMenu.classList.remove('show');
+            });
+            
+            // Modal handlers
+            closeModal.addEventListener('click', function() {
+                specialKeysModal.classList.remove('show');
+            });
+            
+            specialKeysModal.addEventListener('click', function(e) {
+                if (e.target === specialKeysModal) {
+                    specialKeysModal.classList.remove('show');
+                }
+            });
+            
+            // Special key handlers
+            document.querySelectorAll('.special-key-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    sendSpecialKey(this.dataset.key);
+                });
+            });
+            
+            // Function to send special keys
+            function sendSpecialKey(keyCombo) {
+                if (!client || !client.connected) {
+                    console.warn('Cannot send special keys: not connected');
+                    return;
+                }
+                
+                // Parse the key combination and send individual events
+                const keys = keyCombo.split('+');
+                const modifiers = [];
+                let finalKey = '';
+                
+                keys.forEach(key => {
+                    const trimmedKey = key.trim();
+                    switch(trimmedKey) {
+                        case 'Ctrl':
+                        case 'Control':
+                            modifiers.push('ControlLeft');
+                            break;
+                        case 'Alt':
+                            modifiers.push('AltLeft');
+                            break;
+                        case 'Shift':
+                            modifiers.push('ShiftLeft');
+                            break;
+                        case 'Win':
+                        case 'Meta':
+                            modifiers.push('MetaLeft');
+                            break;
+                        case 'Del':
+                        case 'Delete':
+                            finalKey = 'Delete';
+                            break;
+                        case 'Esc':
+                        case 'Escape':
+                            finalKey = 'Escape';
+                            break;
+                        case 'End':
+                            finalKey = 'End';
+                            break;
+                        case 'PrtScn':
+                        case 'PrintScreen':
+                            finalKey = 'PrintScreen';
+                            break;
+                        case 'ScrollLock':
+                            finalKey = 'ScrollLock';
+                            break;
+                        case 'Pause':
+                        case 'Break':
+                            finalKey = 'Pause';
+                            break;
+                        default:
+                            if (trimmedKey.startsWith('F') && trimmedKey.length > 1) {
+                                finalKey = trimmedKey;
+                            } else if (trimmedKey.length === 1) {
+                                finalKey = trimmedKey.toUpperCase();
+                            }
+                            break;
+                    }
+                });
+                
+                // Send key down events for modifiers
+                modifiers.forEach(modifier => {
+                    const event = new KeyboardEventKeyDown(modifier);
+                    if (event.keyCode !== undefined) {
+                        client.socket.send(event.serialize());
+                    }
+                });
+                
+                // Send key down event for the final key
+                if (finalKey) {
+                    const keyEvent = new KeyboardEventKeyDown(finalKey);
+                    if (keyEvent.keyCode !== undefined) {
+                        client.socket.send(keyEvent.serialize());
+                    }
+                    
+                    // Send key up event for the final key (short delay)
+                    setTimeout(() => {
+                        const upEvent = new KeyboardEventKeyUp(finalKey);
+                        if (upEvent.keyCode !== undefined) {
+                            client.socket.send(upEvent.serialize());
+                        }
+                    }, 50);
+                }
+                
+                // Send key up events for modifiers (short delay)
+                setTimeout(() => {
+                    modifiers.forEach(modifier => {
+                        const upEvent = new KeyboardEventKeyUp(modifier);
+                        if (upEvent.keyCode !== undefined) {
+                            client.socket.send(upEvent.serialize());
+                        }
+                    });
+                }, 100);
+            }
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.altKey) {
+                    switch(e.key) {
+                        case 's':
+                        case 'S':
+                            e.preventDefault();
+                            document.getElementById('menu-special-keys').click();
+                            break;
+                        case 'd':
+                        case 'D':
+                            e.preventDefault();
+                            if (client && client.connected) {
+                                document.getElementById('menu-disconnect').click();
+                            }
+                            break;
+                        case 'Delete':
+                            e.preventDefault();
+                            sendSpecialKey('Ctrl+Alt+Del');
+                            break;
+                        case 'End':
+                            e.preventDefault();
+                            sendSpecialKey('Ctrl+Alt+End');
+                            break;
+                    }
+                } else if (e.key === 'F11') {
+                    e.preventDefault();
+                    document.getElementById('menu-fullscreen').click();
+                }
+            });
+            
+            // Close menu when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!hotCorner.contains(e.target) && !hotCornerMenu.contains(e.target)) {
+                    hotCornerMenu.classList.remove('show');
+                    isMenuVisible = false;
+                }
+            });
+            
+            // Enhanced toast notification system
+            function showToast(message, type = 'info', title = null, duration = 5000) {
+                const container = document.getElementById('toast-container');
+                if (!container) return;
+                
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                let content = '';
+                if (title) {
+                    content += `<div class="toast-title">${title}</div>`;
+                }
+                content += `<div class="toast-message">${message}</div>`;
+                content += `<button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
+                
+                toast.innerHTML = content;
+                container.appendChild(toast);
+                
+                // Auto-remove after duration
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                }, duration);
+            }
+            
+            // Make showToast available globally for client
+            window.showToast = showToast;
+        });
+    </script>
 </body>
 </html>

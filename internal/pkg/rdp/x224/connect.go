@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 )
 
 type ConnectionRequest struct {
@@ -102,13 +101,9 @@ func (p *Protocol) Connect(userData []byte) (io.Reader, error) {
 		UserData:     userData,
 	}
 
-	log.Println("X224: Client Connection Request")
-
 	if err = p.tpktConn.Send(req.Serialize()); err != nil {
 		return nil, fmt.Errorf("client connection request: %w", err)
 	}
-
-	log.Println("X224: Server Connection Confirm")
 
 	wire, err = p.tpktConn.Receive()
 	if err != nil {

@@ -3,7 +3,6 @@ package mcs
 import (
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/kulaginds/rdp-html5/internal/pkg/rdp/per"
 )
@@ -42,13 +41,9 @@ func (p *Protocol) AttachUser() (uint16, error) {
 		ClientAttachUserRequest: &ClientAttachUserRequest{},
 	}
 
-	log.Println("MCS: Attach User Request")
-
 	if err := p.x224Conn.Send(req.Serialize()); err != nil {
 		return 0, fmt.Errorf("client MCS attach user request: %w", err)
 	}
-
-	log.Println("MCS: Attach User Confirm")
 
 	wire, err := p.x224Conn.Receive()
 	if err != nil {

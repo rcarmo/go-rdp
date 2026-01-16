@@ -52,6 +52,12 @@ type ClientCoreData struct {
 	ConnectionType         uint8
 	Pad1octet              uint8
 	ServerSelectedProtocol uint32
+	// Optional extended fields (MS-RDPBCGR 2.2.1.3.2)
+	DesktopPhysicalWidth  uint32
+	DesktopPhysicalHeight uint32
+	DesktopOrientation    uint16
+	DesktopScaleFactor    uint32
+	DeviceScaleFactor     uint32
 }
 
 func newClientCoreData(selectedProtocol uint32, desktopWidth, desktopHeight uint16) *ClientCoreData {
@@ -78,6 +84,13 @@ func newClientCoreData(selectedProtocol uint32, desktopWidth, desktopHeight uint
 		ConnectionType:         0x00,
 		Pad1octet:              0x00,
 		ServerSelectedProtocol: selectedProtocol,
+		// Physical dimensions (in millimeters) - assume standard 96 DPI monitor
+		// desktopWidth pixels * 25.4mm/inch / 96 DPI
+		DesktopPhysicalWidth:  uint32(float64(desktopWidth) * 25.4 / 96.0),
+		DesktopPhysicalHeight: uint32(float64(desktopHeight) * 25.4 / 96.0),
+		DesktopOrientation:    0,   // ORIENTATION_LANDSCAPE
+		DesktopScaleFactor:    100, // 100% scaling
+		DeviceScaleFactor:     100, // 100% scaling
 	}
 
 	copy(data.ClientName[:], utf16.Encode(projectName))
@@ -146,7 +159,11 @@ func NewClientUserDataSet(selectedProtocol uint32,
 }
 
 func (data ClientCoreData) Serialize() []byte {
-	const dataLen uint16 = 216
+	// Updated dataLen to include optional extended fields:
+	// Base: 216 bytes (header + fields up to ServerSelectedProtocol)
+	// + DesktopPhysicalWidth (4) + DesktopPhysicalHeight (4) + DesktopOrientation (2)
+	// + DesktopScaleFactor (4) + DeviceScaleFactor (4) = 234 bytes
+	const dataLen uint16 = 234
 
 	buf := new(bytes.Buffer)
 
@@ -175,6 +192,12 @@ func (data ClientCoreData) Serialize() []byte {
 	binary.Write(buf, binary.LittleEndian, data.ConnectionType)
 	binary.Write(buf, binary.LittleEndian, data.Pad1octet)
 	binary.Write(buf, binary.LittleEndian, data.ServerSelectedProtocol)
+	// Optional extended fields (MS-RDPBCGR 2.2.1.3.2)
+	binary.Write(buf, binary.LittleEndian, data.DesktopPhysicalWidth)
+	binary.Write(buf, binary.LittleEndian, data.DesktopPhysicalHeight)
+	binary.Write(buf, binary.LittleEndian, data.DesktopOrientation)
+	binary.Write(buf, binary.LittleEndian, data.DesktopScaleFactor)
+	binary.Write(buf, binary.LittleEndian, data.DeviceScaleFactor)
 
 	return buf.Bytes()
 }

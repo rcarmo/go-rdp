@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+LICENSE
+
+# CI/CD
+.github
+
+# Build artifacts
+bin/
+*.exe
+*.wasm
+coverage.out
+coverage.html
+
+# Go
+*.mod
+*.sum
+vendor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.log
+*~
+
+# Testing
+*.test
+test-results/

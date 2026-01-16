@@ -1,10 +1,11 @@
 const FASTPATH_INPUT_KBDFLAGS_RELEASE = 0x01;
 
-function KeyboardEventKeyDown(code) {
+// Make functions available globally
+window.KeyboardEventKeyDown = function KeyboardEventKeyDown(code) {
     this.keyCode = KeyMap[code];
-}
+};
 
-KeyboardEventKeyDown.prototype.serialize = function () {
+window.KeyboardEventKeyDown.prototype.serialize = function () {
     const data = new ArrayBuffer(3);
     const w = new BinaryWriter(data);
 
@@ -19,11 +20,11 @@ KeyboardEventKeyDown.prototype.serialize = function () {
     return data;
 };
 
-function KeyboardEventKeyUp(code) {
+window.KeyboardEventKeyUp = function KeyboardEventKeyUp(code) {
     this.keyCode = KeyMap[code];
-}
+};
 
-KeyboardEventKeyUp.prototype.serialize = function () {
+window.KeyboardEventKeyUp.prototype.serialize = function () {
     const data = new ArrayBuffer(3);
     const w = new BinaryWriter(data);
 

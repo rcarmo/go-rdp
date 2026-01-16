@@ -75,7 +75,7 @@ function parseBitmapUpdate(r) {
     const update = new BitmapUpdate();
 
     // updateType
-    r.uint16(true);
+    const updateType = r.uint16(true);
 
     update.numberRectangles = r.uint16(true);
 

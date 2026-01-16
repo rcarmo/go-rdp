@@ -238,7 +238,10 @@ const (
 func NewClientInfo(domain, username, password string) *ClientInfo {
 	return &ClientInfo{
 		InfoPacket: ClientInfoPacket{
-			Flags:     InfoFlagMouse | InfoFlagUnicode | InfoFlagAutoLogon | InfoFlagDisableCtrlAltDel | InfoFlagEnableWindowsKey,
+			// Match FreeRDP's default flags for maximum compatibility
+			// INFO_AUTOLOGON is REQUIRED for automatic login without showing the login dialog
+			Flags: InfoFlagMouse | InfoFlagUnicode | InfoFlagDisableCtrlAltDel | InfoFlagEnableWindowsKey |
+				InfoFlagLogonErrors | InfoFlagMaximizeShell | InfoFlagMouseHasWheel | InfoFlagAutoLogon,
 			Domain:    domain,
 			Username:  username,
 			Password:  password,
@@ -251,9 +254,18 @@ func NewClientInfo(domain, username, password string) *ClientInfo {
 	}
 }
 
-func (pdu *ClientInfo) Serialize() []byte {
+// Serialize serializes the Client Info PDU.
+// Per MS-RDPBCGR 2.2.1.11.1.1, with Enhanced RDP Security (TLS), no security header should be present.
+// However, XRDP expects SEC_INFO_PKT security header even with TLS for compatibility.
+// FreeRDP also always sends SEC_INFO_PKT.
+func (pdu *ClientInfo) Serialize(useEnhancedSecurity bool) []byte {
+	infoData := pdu.InfoPacket.Serialize()
+
+	// Always include SEC_INFO_PKT security header for XRDP compatibility.
+	// XRDP's xrdp_sec_recv expects a security header even with TLS,
+	// and checks for SEC_INFO_PKT before processing logon info.
 	return headers.WrapSecurityFlag(
 		0x0040, // SEC_INFO_PKT
-		pdu.InfoPacket.Serialize(),
+		infoData,
 	)
 }
