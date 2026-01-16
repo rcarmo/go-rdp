@@ -6,6 +6,12 @@
 
 A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssembly.
 
+## Why
+
+I was getting _really_ tired of not having a modern RDP client that works in a browser without extraneous dependencies and overhead (yes, I am looking at you, Guacamole), so I found this project and decided to modernize it
+
+This project aims to provide a simple, open-source RDP client that has a minimal footprint, can replace Guacamole for most basic use cases, and should run in any modern web browser without plugins.
+
 ## Features
 
 - **TLS Support**: TLS 1.2+ encryption for transport security

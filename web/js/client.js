@@ -541,6 +541,9 @@ Client.prototype.initialize = function () {
     this.canvas.addEventListener('mousedown', this.handleMouseDown);
     this.canvas.addEventListener('mouseup', this.handleMouseUp);
     this.canvas.addEventListener('contextmenu', this.handleMouseUp);
+    
+    // Ensure canvas gets focus on click for keyboard input
+    this.canvas.addEventListener('click', () => this.canvas.focus());
     this.canvas.addEventListener('wheel', this.handleWheel);
     
     // Add touch support for mobile devices
@@ -569,6 +572,11 @@ Client.prototype.initialize = function () {
     
     // Force canvas to be visible with explicit pixel dimensions
     this.canvas.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; position: absolute !important; top: 0 !important; left: 0 !important; width: ' + this.canvas.width + 'px !important; height: ' + this.canvas.height + 'px !important;';
+    
+    // Make canvas focusable and set focus for keyboard input
+    this.canvas.setAttribute('tabindex', '0');
+    this.canvas.style.outline = 'none'; // Hide focus outline
+    this.canvas.focus();
     
     // Force a reflow
     void this.canvas.offsetHeight;
