@@ -710,27 +710,35 @@ Client.prototype.handleMessage = function (arrayBuffer) {
         // Not JSON, handle as binary RDP data
     }
     
-    // Handle binary RDP data
+    // Handle binary RDP data - may contain multiple updates
     const r = new BinaryReader(arrayBuffer);
+    
+    // Process all updates in this message
+    while (!r.eof()) {
+        this.processUpdate(r);
+    }
+};
+
+// Process a single fastpath update from the reader
+Client.prototype.processUpdate = function (r) {
     const header = parseUpdateHeader(r);
     
     Logger.debug('[RDP] Update received, code:', header.updateCode, 'isPointer:', header.isPointer());
 
     if (header.isCompressed()) {
         console.warn("compressing is not supported");
-
+        // Skip compressed data
+        r.skip(header.size);
         return;
     }
 
     if (header.isBitmap()) {
         this.handleBitmap(r);
-
         return;
     }
 
     if (header.isPointer()) {
         this.handlePointer(header, r);
-
         return;
     }
 
@@ -747,28 +755,23 @@ Client.prototype.handleMessage = function (arrayBuffer) {
     if (header.isOrders()) {
         // Primary drawing orders - complex to implement fully
         // For now, skip and rely on bitmap updates for screen content
-        // Most modern RDP servers send bitmaps rather than orders
         Logger.debug('[RDP] Received orders update, skipping (size:', header.size, 'bytes)');
+        r.skip(header.size);
         return;
     }
 
     if (header.isPalette()) {
         // Palette updates - rarely used with modern color depths
         Logger.debug('[RDP] Received palette update, skipping');
+        r.skip(header.size);
         return;
     }
 
     console.warn("unknown update:", header.updateCode, "raw header byte would be:", header.updateCode | (header.fragmentation << 4) | (header.compression << 6));
     
-    // Log first few bytes of remaining data for debugging
-    const remaining = r.length - r.offset;
-    if (remaining > 0) {
-        const preview = Math.min(remaining, 32);
-        const bytes = [];
-        for (let i = 0; i < preview; i++) {
-            bytes.push(r.data.getUint8(r.offset + i).toString(16).padStart(2, '0'));
-        }
-        console.warn("  remaining bytes:", remaining, "preview:", bytes.join(' '));
+    // Skip unknown update data
+    if (header.size > 0) {
+        r.skip(header.size);
     }
 };
 
