@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/kulaginds/rdp-html5/internal/pkg/config"
+	"github.com/rcarmo/rdp-html5/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -380,4 +382,353 @@ func TestMainFunction(t *testing.T) {
 
 	// This would normally call os.Exit, so we can't test it directly
 	// Instead, we'll test the parsing logic separately
+}
+
+func TestCorsMiddlewareOptionsRequest(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	middleware := corsMiddleware(testHandler, []string{"https://example.com"})
+
+	// Test OPTIONS preflight request
+	req := httptest.NewRequest(http.MethodOptions, "/", nil)
+	req.Header.Set("Origin", "https://example.com")
+	rr := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rr, req)
+
+	// OPTIONS should return 200 immediately without calling next handler
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "https://example.com", rr.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "GET, POST, OPTIONS", rr.Header().Get("Access-Control-Allow-Methods"))
+	// Body should be empty for OPTIONS
+	assert.Empty(t, rr.Body.String())
+}
+
+func TestCorsMiddlewareEmptyOrigin(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	middleware := corsMiddleware(testHandler, []string{"https://example.com"})
+
+	// Test request with no Origin header
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rr, req)
+
+	// Should NOT set CORS headers when origin is empty
+	assert.Empty(t, rr.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "OK", rr.Body.String())
+}
+
+func TestIsOriginAllowed(t *testing.T) {
+	tests := []struct {
+		name           string
+		origin         string
+		allowedOrigins []string
+		host           string
+		expected       bool
+	}{
+		{
+			name:           "empty origin returns false",
+			origin:         "",
+			allowedOrigins: []string{"https://example.com"},
+			host:           "localhost",
+			expected:       false,
+		},
+		{
+			name:           "origin in allowed list",
+			origin:         "https://example.com",
+			allowedOrigins: []string{"https://example.com"},
+			host:           "localhost",
+			expected:       true,
+		},
+		{
+			name:           "origin not in allowed list",
+			origin:         "https://malicious.com",
+			allowedOrigins: []string{"https://example.com"},
+			host:           "localhost",
+			expected:       false,
+		},
+		{
+			name:           "empty allowed list allows all (dev mode)",
+			origin:         "https://any-origin.com",
+			allowedOrigins: []string{},
+			host:           "localhost",
+			expected:       true,
+		},
+		{
+			name:           "origin with whitespace in allowed list",
+			origin:         "https://example.com",
+			allowedOrigins: []string{" https://example.com "},
+			host:           "localhost",
+			expected:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isOriginAllowed(tt.origin, tt.allowedOrigins, tt.host)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestApplySecurityMiddlewareNilConfig(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Test with nil config
+	middleware := applySecurityMiddleware(testHandler, nil)
+	require.NotNil(t, middleware)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://any-origin.com")
+	rr := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rr, req)
+
+	// Should still have security headers
+	assert.Equal(t, "nosniff", rr.Header().Get("X-Content-Type-Options"))
+	assert.Equal(t, "DENY", rr.Header().Get("X-Frame-Options"))
+	// Nil config means dev mode, all origins allowed
+	assert.Equal(t, "https://any-origin.com", rr.Header().Get("Access-Control-Allow-Origin"))
+}
+
+func TestApplySecurityMiddlewareRateLimitDisabled(t *testing.T) {
+	cfg := &config.Config{
+		Security: config.SecurityConfig{
+			AllowedOrigins:  []string{"https://example.com"},
+			EnableRateLimit: false,
+		},
+	}
+
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	middleware := applySecurityMiddleware(testHandler, cfg)
+	require.NotNil(t, middleware)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Origin", "https://example.com")
+	rr := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "https://example.com", rr.Header().Get("Access-Control-Allow-Origin"))
+}
+
+func TestRequestLoggingMiddleware(t *testing.T) {
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	middleware := requestLoggingMiddleware(testHandler)
+	require.NotNil(t, middleware)
+
+	req := httptest.NewRequest("GET", "/test-path", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	rr := httptest.NewRecorder()
+
+	middleware.ServeHTTP(rr, req)
+
+	// Verify the request was processed
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "OK", rr.Body.String())
+}
+
+func TestStartServerNilServer(t *testing.T) {
+	cfg := &config.Config{}
+	err := startServer(nil, cfg)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "server is nil")
+}
+
+func TestStartServerInvalidAddress(t *testing.T) {
+	cfg := &config.Config{}
+
+	// Create server with invalid address to trigger an error
+	server := &http.Server{
+		Addr: "invalid-addr:-1",
+	}
+
+	err := startServer(server, cfg)
+	assert.Error(t, err)
+}
+
+func TestStartServerAlreadyInUse(t *testing.T) {
+	cfg := &config.Config{}
+
+	// Start first server on a specific port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	// Try to start second server on same port
+	server := &http.Server{
+		Addr: addr,
+	}
+
+	err = startServer(server, cfg)
+	assert.Error(t, err)
+}
+
+func TestParsedArgsStruct(t *testing.T) {
+	// Test parsedArgs struct fields are accessible
+	args := parsedArgs{
+		host:          "localhost",
+		port:          "8080",
+		logLevel:      "debug",
+		skipTLS:       true,
+		tlsServerName: "example.com",
+		useNLA:        true,
+	}
+
+	assert.Equal(t, "localhost", args.host)
+	assert.Equal(t, "8080", args.port)
+	assert.Equal(t, "debug", args.logLevel)
+	assert.True(t, args.skipTLS)
+	assert.Equal(t, "example.com", args.tlsServerName)
+	assert.True(t, args.useNLA)
+}
+
+func TestRunWithValidConfig(t *testing.T) {
+	// Start a listener to determine a free port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	args := parsedArgs{
+		host:     "127.0.0.1",
+		port:     fmt.Sprintf("%d", port),
+		logLevel: "info",
+	}
+
+	// Run in goroutine since it blocks
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- run(args)
+	}()
+
+	// Give server time to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Server should be running, so we need to force stop it
+	// The test passes if we got this far without error
+	select {
+	case err := <-errCh:
+		// If error occurred immediately, check it
+		if err != nil {
+			t.Logf("run error (may be expected): %v", err)
+		}
+	default:
+		// Server is running, test passed
+	}
+}
+
+func TestRunWithServerError(t *testing.T) {
+	// Occupy a port first
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+	port := listener.Addr().(*net.TCPAddr).Port
+
+	args := parsedArgs{
+		host:     "127.0.0.1",
+		port:     fmt.Sprintf("%d", port), // Port already in use
+		logLevel: "info",
+	}
+
+	// run should fail because port is already in use
+	err = run(args)
+	assert.Error(t, err)
+}
+
+func TestParseFlagsWithArgs(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		expectedAction string
+		checkArgs      func(t *testing.T, args parsedArgs)
+	}{
+		{
+			name:           "no args returns empty args",
+			args:           []string{},
+			expectedAction: "",
+			checkArgs: func(t *testing.T, args parsedArgs) {
+				assert.Empty(t, args.host)
+				assert.Empty(t, args.port)
+			},
+		},
+		{
+			name:           "host and port args",
+			args:           []string{"-host", "localhost", "-port", "9090"},
+			expectedAction: "",
+			checkArgs: func(t *testing.T, args parsedArgs) {
+				assert.Equal(t, "localhost", args.host)
+				assert.Equal(t, "9090", args.port)
+			},
+		},
+		{
+			name:           "all flags",
+			args:           []string{"-host", "0.0.0.0", "-port", "8080", "-log-level", "debug", "-skip-tls-verify", "-tls-server-name", "server.local", "-nla"},
+			expectedAction: "",
+			checkArgs: func(t *testing.T, args parsedArgs) {
+				assert.Equal(t, "0.0.0.0", args.host)
+				assert.Equal(t, "8080", args.port)
+				assert.Equal(t, "debug", args.logLevel)
+				assert.True(t, args.skipTLS)
+				assert.Equal(t, "server.local", args.tlsServerName)
+				assert.True(t, args.useNLA)
+			},
+		},
+		{
+			name:           "help flag returns help action",
+			args:           []string{"-help"},
+			expectedAction: "help",
+			checkArgs:      func(t *testing.T, args parsedArgs) {},
+		},
+		{
+			name:           "version flag returns version action",
+			args:           []string{"-version"},
+			expectedAction: "version",
+			checkArgs:      func(t *testing.T, args parsedArgs) {},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Capture stdout for help/version tests
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			args, action := parseFlagsWithArgs(tt.args)
+
+			os.Stdout = oldStdout
+			w.Close()
+			r.Close()
+
+			assert.Equal(t, tt.expectedAction, action)
+			if tt.checkArgs != nil {
+				tt.checkArgs(t, args)
+			}
+		})
+	}
 }

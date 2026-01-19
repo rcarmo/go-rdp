@@ -7,11 +7,12 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/kulaginds/rdp-html5/internal/pkg/config"
-	"github.com/kulaginds/rdp-html5/internal/pkg/handler"
+	"github.com/rcarmo/rdp-html5/internal/config"
+	"github.com/rcarmo/rdp-html5/internal/handler"
 )
 
 const (
@@ -20,39 +21,79 @@ const (
 )
 
 func main() {
-	hostFlag := flag.String("host", "", "RDP HTML5 server host")
-	portFlag := flag.String("port", "", "RDP HTML5 server port")
-	logLevelFlag := flag.String("log-level", "", "log level (debug, info, warn, error)")
-	skipTLS := flag.Bool("skip-tls-verify", false, "skip TLS certificate validation")
-	tlsServerName := flag.String("tls-server-name", "", "override TLS server name")
-	useNLA := flag.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
-	helpFlag := flag.Bool("help", false, "show help")
-	versionFlag := flag.Bool("version", false, "show version")
+	args, action := parseFlags()
+	if action != "" {
+		return
+	}
+	if err := run(args); err != nil {
+		log.Fatalln(err)
+	}
+}
 
-	flag.Parse()
+// parsedArgs holds the parsed command line arguments
+type parsedArgs struct {
+	host          string
+	port          string
+	logLevel      string
+	skipTLS       bool
+	tlsServerName string
+	useNLA        bool
+}
+
+// parseFlags parses command line flags and returns the parsed args.
+// Returns action string if help/version was shown (caller should return early).
+func parseFlags() (parsedArgs, string) {
+	return parseFlagsWithArgs(os.Args[1:])
+}
+
+// parseFlagsWithArgs parses the given arguments and returns the parsed args.
+func parseFlagsWithArgs(args []string) (parsedArgs, string) {
+	fs := flag.NewFlagSet("server", flag.ContinueOnError)
+	hostFlag := fs.String("host", "", "RDP HTML5 server host")
+	portFlag := fs.String("port", "", "RDP HTML5 server port")
+	logLevelFlag := fs.String("log-level", "", "log level (debug, info, warn, error)")
+	skipTLS := fs.Bool("skip-tls-verify", false, "skip TLS certificate validation")
+	tlsServerName := fs.String("tls-server-name", "", "override TLS server name")
+	useNLA := fs.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
+	helpFlag := fs.Bool("help", false, "show help")
+	versionFlag := fs.Bool("version", false, "show version")
+
+	_ = fs.Parse(args)
 
 	if *helpFlag {
 		showHelp()
-		return
+		return parsedArgs{}, "help"
 	}
 
 	if *versionFlag {
 		showVersion()
-		return
+		return parsedArgs{}, "version"
 	}
 
+	return parsedArgs{
+		host:          strings.TrimSpace(*hostFlag),
+		port:          strings.TrimSpace(*portFlag),
+		logLevel:      strings.TrimSpace(*logLevelFlag),
+		skipTLS:       *skipTLS,
+		tlsServerName: strings.TrimSpace(*tlsServerName),
+		useNLA:        *useNLA,
+	}, ""
+}
+
+// run starts the server with the given arguments
+func run(args parsedArgs) error {
 	opts := config.LoadOptions{
-		Host:              strings.TrimSpace(*hostFlag),
-		Port:              strings.TrimSpace(*portFlag),
-		LogLevel:          strings.TrimSpace(*logLevelFlag),
-		SkipTLSValidation: *skipTLS,
-		TLSServerName:     strings.TrimSpace(*tlsServerName),
-		UseNLA:            *useNLA,
+		Host:              args.host,
+		Port:              args.port,
+		LogLevel:          args.logLevel,
+		SkipTLSValidation: args.skipTLS,
+		TLSServerName:     args.tlsServerName,
+		UseNLA:            args.useNLA,
 	}
 
 	cfg, err := config.LoadWithOverrides(opts)
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	setupLogging(cfg.Logging)
@@ -61,8 +102,9 @@ func main() {
 	log.Printf("starting server on %s:%s (TLS=%t)", cfg.Server.Host, cfg.Server.Port, cfg.Security.EnableTLS)
 
 	if err := startServer(server, cfg); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalln(err)
+		return err
 	}
+	return nil
 }
 
 func createServer(cfg *config.Config) *http.Server {

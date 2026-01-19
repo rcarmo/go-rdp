@@ -5,19 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="description" content="Secure HTML5 RDP Client">
     <title>RDP Client</title>
-    <script src="js/logger.js"></script>
-    <script src="js/connection-history.js"></script>
-    <script src="js/binary.js"></script>
-    <script src="js/rle/ms-rle-wasm.js"></script>
-    <script src="js/update/header.js"></script>
-    <script src="js/update/bitmap.js"></script>
-    <script src="js/update/pointer.js"></script>
-    <script src="js/input/header.js"></script>
-    <script src="js/input/keymap.js"></script>
-    <script src="js/input/keyboard.js"></script>
-    <script src="js/input/mouse.js"></script>
-    <script src="js/client.js"></script>
-    <script src="js/color.js"></script>
+    <script src="js/logger.js?v=20260119k"></script>
+    <script src="js/connection-history.js?v=20260119k"></script>
+    <script src="js/binary.js?v=20260119l"></script>
+    <script src="js/rle/wasm_exec.js?v=20260119l"></script>
+    <script>
+        // Load Go WASM module for RLE decompression
+        // Falls back to 16-bit uncompressed mode if WASM unavailable
+        window.wasmReady = false;
+        
+        function disableColorDepthSelection() {
+            // Disable color depth selection and force 16-bit when WASM unavailable
+            document.addEventListener('DOMContentLoaded', function() {
+                const colorDepthSelect = document.getElementById('colorDepth');
+                if (colorDepthSelect) {
+                    colorDepthSelect.value = '16';
+                    colorDepthSelect.disabled = true;
+                    colorDepthSelect.title = 'Higher color depths require WebAssembly support';
+                    // Add a note below the select
+                    const note = document.createElement('small');
+                    note.style.color = 'var(--warning)';
+                    note.style.display = 'block';
+                    note.style.marginTop = '4px';
+                    note.textContent = 'WASM unavailable - 16-bit only';
+                    colorDepthSelect.parentNode.appendChild(note);
+                }
+            });
+        }
+        
+        if (typeof WebAssembly !== 'undefined' && typeof Go !== 'undefined') {
+            const goWasm = new Go();
+            WebAssembly.instantiateStreaming(fetch("js/rle/rle.wasm?v=20260119l"), goWasm.importObject).then((result) => {
+                goWasm.run(result.instance);
+                window.wasmReady = true;
+                console.log('[WASM] Go RLE module loaded successfully');
+            }).catch(err => {
+                console.warn("[WASM] Failed to load Go WASM module.", err);
+                disableColorDepthSelection();
+            });
+        } else {
+            console.warn("[WASM] WebAssembly not supported. Using 16-bit fallback mode.");
+            disableColorDepthSelection();
+        }
+    </script>
+    <script src="js/nscodec/decoder.js?v=20260119l"></script>
+    <script src="js/update/header.js?v=20260119l"></script>
+    <script src="js/update/bitmap.js?v=20260119l"></script>
+    <script src="js/update/pointer.js?v=20260119l"></script>
+    <script src="js/input/header.js?v=20260119l"></script>
+    <script src="js/input/keymap.js?v=20260119l"></script>
+    <script src="js/input/keyboard.js?v=20260119l"></script>
+    <script src="js/input/mouse.js?v=20260119l"></script>
+    <script src="js/client.js?v=20260119l"></script>
+    <script src="js/color.js?v=20260119l"></script>
     <style>
         :root {
             --background: #f5f5f5;

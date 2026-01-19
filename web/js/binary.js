@@ -44,6 +44,11 @@ BinaryReader.prototype.skip = function(length) {
     this.offset += length;
 };
 
+BinaryReader.prototype.remaining = function() {
+    // Return a Uint8Array of the remaining bytes
+    return new Uint8Array(this.arrayBuffer.slice(this.offset));
+};
+
 function BinaryWriter(array) {
     this.offset = 0;
     this.array = array;

@@ -107,10 +107,18 @@ build-all:
 
 .PHONY: build-wasm
 build-wasm:
-	@echo "Building WebAssembly module..."
-	@mkdir -p $(BUILD_DIR)
-	@cd web/js/rle && GOOS=js GOARCH=wasm go build -o $(BUILD_DIR)/ms-rle-wasm.wasm .
-	@echo "WebAssembly module built: $(BUILD_DIR)/ms-rle-wasm.wasm"
+	@echo "Building Go WebAssembly RLE module..."
+	GOOS=js GOARCH=wasm go build -o web/js/rle/rle.wasm ./web/wasm/
+	@# Copy wasm_exec.js from Go installation (path varies by version)
+	@GOROOT=$$(go env GOROOT); \
+	if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
+		cp "$$GOROOT/misc/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
+	elif [ -f "$$GOROOT/lib/wasm/wasm_exec.js" ]; then \
+		cp "$$GOROOT/lib/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
+	else \
+		echo "Warning: wasm_exec.js not found in GOROOT"; \
+	fi
+	@echo "WebAssembly module built: web/js/rle/rle.wasm"
 
 # Docker
 .PHONY: docker

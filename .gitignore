@@ -106,4 +106,20 @@ dist
 bin
 !bin/.gitkeep
 
+# Go coverage
+coverage.out
+*.coverprofile
+
+# IDE
 .idea
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib

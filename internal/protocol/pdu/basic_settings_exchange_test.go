@@ -1,0 +1,439 @@
+package pdu
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func Test_NewClientUserDataSet(t *testing.T) {
+	r := require.New(t)
+
+	input := NewClientUserDataSet(0x00000000, 1280, 1024, 16, []string{"rdpdr", "cliprdp", "rdpsnd"})
+	input.ClientCoreData.ColorDepth = 0xca01
+	input.ClientCoreData.SASSequence = 0xaa03
+	input.ClientCoreData.KeyboardLayout = 0x409
+	input.ClientCoreData.ClientBuild = 3790
+	input.ClientCoreData.ClientName = [32]byte{'E', 0x0, 'L', 0x0, 'T', 0x0, 'O', 0x0, 'N', 0x0, 'S', 0x0, '-', 0x0, 'D', 0x0, 'E', 0x0, 'V', 0x0, '2', 0x0}
+	input.ClientCoreData.PostBeta2ColorDepth = 0xca01
+	input.ClientCoreData.SupportedColorDepths = 0x0007
+	input.ClientCoreData.EarlyCapabilityFlags = 0x0001
+	input.ClientCoreData.HighColorDepth = 0x0018
+	input.ClientCoreData.ClientDigProductId = [64]byte{'6', 0x0, '9', 0x0, '7', 0x0, '1', 0x0, '2', 0x0, '-', 0x0, '7', 0x0, '8', 0x0, '3', 0x0, '-', 0x0, '0', 0x0, '3', 0x0, '5', 0x0, '7', 0x0, '9', 0x0, '7', 0x0, '4', 0x0, '-', 0x0, '4', 0x0, '2', 0x0, '7', 0x0, '1', 0x0, '4', 0x0}
+	input.ClientCoreData.ServerSelectedProtocol = 0x00000000
+	input.ClientClusterData = &ClientClusterData{Flags: 0x0000000d}
+	input.ClientSecurityData.EncryptionMethods = 0x0000001b
+	input.ClientNetworkData.ChannelCount = 3
+	input.ClientNetworkData.ChannelDefArray = []ChannelDefinitionStructure{
+		{
+			Name:    [8]byte{'r', 'd', 'p', 'd', 'r'},
+			Options: 0x80800000,
+		},
+		{
+			Name:    [8]byte{'c', 'l', 'i', 'p', 'r', 'd', 'r'},
+			Options: 0xc0a00000,
+		},
+		{
+			Name:    [8]byte{'r', 'd', 'p', 's', 'n', 'd'},
+			Options: 0xc0000000,
+		},
+	}
+
+	expected := []byte{
+		0x01, 0xc0, 0xea, 0x00, 0x04, 0x00, 0x08, 0x00, 0x00, 0x05, 0x00, 0x04,
+		0x01, 0xca, 0x03, 0xaa, 0x09, 0x04, 0x00, 0x00, 0xce, 0x0e, 0x00, 0x00, 0x45, 0x00, 0x4c, 0x00,
+		0x54, 0x00, 0x4f, 0x00, 0x4e, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x44, 0x00, 0x45, 0x00, 0x56, 0x00,
+		0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xca, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x18, 0x00, 0x07, 0x00, 0x01, 0x00, 0x36, 0x00, 0x39, 0x00, 0x37, 0x00, 0x31, 0x00, 0x32, 0x00,
+		0x2d, 0x00, 0x37, 0x00, 0x38, 0x00, 0x33, 0x00, 0x2d, 0x00, 0x30, 0x00, 0x33, 0x00, 0x35, 0x00,
+		0x37, 0x00, 0x39, 0x00, 0x37, 0x00, 0x34, 0x00, 0x2d, 0x00, 0x34, 0x00, 0x32, 0x00, 0x37, 0x00,
+		0x31, 0x00, 0x34, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x52, 0x01, 0x00, 0x00,
+		0x0e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x04, 0xc0,
+		0x0c, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xc0, 0x0c, 0x00, 0x1b, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xc0, 0x2c, 0x00, 0x03, 0x00, 0x00, 0x00, 0x72, 0x64,
+		0x70, 0x64, 0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0x63, 0x6c, 0x69, 0x70, 0x72, 0x64,
+		0x72, 0x00, 0x00, 0x00, 0xa0, 0xc0, 0x72, 0x64, 0x70, 0x73, 0x6e, 0x64, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0xc0,
+	}
+
+	r.Equal(expected, input.Serialize())
+}
+
+func TestServerCoreData_Deserialize(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		dataLen uint16
+		version uint32
+	}{
+		{
+			name:    "MinimalVersion4Only",
+			data:    []byte{0x04, 0x00, 0x08, 0x00},
+			dataLen: 4,
+			version: 0x00080004,
+		},
+		{
+			name:    "VersionAndProtocols",
+			data:    []byte{0x04, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00},
+			dataLen: 8,
+			version: 0x00080004,
+		},
+		{
+			name:    "FullData",
+			data:    []byte{0x04, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00},
+			dataLen: 12,
+			version: 0x00080004,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var d ServerCoreData
+			d.DataLen = tt.dataLen
+			err := d.Deserialize(bytes.NewReader(tt.data))
+			require.NoError(t, err)
+			require.Equal(t, tt.version, d.Version)
+		})
+	}
+}
+
+func TestServerNetworkData_Deserialize(t *testing.T) {
+	tests := []struct {
+		name         string
+		data         []byte
+		channelCount uint16
+		mcsChannelId uint16
+	}{
+		{
+			name:         "NoChannels",
+			data:         []byte{0xEB, 0x03, 0x00, 0x00},
+			channelCount: 0,
+			mcsChannelId: 0x03EB,
+		},
+		{
+			name: "TwoChannels",
+			data: []byte{
+				0xEB, 0x03, // MCSChannelId
+				0x02, 0x00, // ChannelCount
+				0xEC, 0x03, // Channel 1
+				0xED, 0x03, // Channel 2
+			},
+			channelCount: 2,
+			mcsChannelId: 0x03EB,
+		},
+		{
+			name: "OneChannelWithPadding",
+			data: []byte{
+				0xEB, 0x03, // MCSChannelId
+				0x01, 0x00, // ChannelCount (odd)
+				0xEC, 0x03, // Channel 1
+				0x00, 0x00, // Padding
+			},
+			channelCount: 1,
+			mcsChannelId: 0x03EB,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var d ServerNetworkData
+			err := d.Deserialize(bytes.NewReader(tt.data))
+			require.NoError(t, err)
+			require.Equal(t, tt.mcsChannelId, d.MCSChannelId)
+			require.Equal(t, tt.channelCount, d.ChannelCount)
+		})
+	}
+}
+
+func TestServerSecurityData_Deserialize(t *testing.T) {
+	t.Run("NoEncryption", func(t *testing.T) {
+		data := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+		var d ServerSecurityData
+		err := d.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.Equal(t, uint32(0), d.EncryptionMethod)
+		require.Equal(t, uint32(0), d.EncryptionLevel)
+	})
+
+	t.Run("WithEncryption", func(t *testing.T) {
+		data := []byte{
+			0x01, 0x00, 0x00, 0x00, // EncryptionMethod = 1
+			0x01, 0x00, 0x00, 0x00, // EncryptionLevel = 1
+			0x04, 0x00, 0x00, 0x00, // ServerRandomLen = 4
+			0x00, 0x00, 0x00, 0x00, // ServerCertLen = 0
+			0x01, 0x02, 0x03, 0x04, // ServerRandom
+		}
+		var d ServerSecurityData
+		err := d.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.Equal(t, uint32(1), d.EncryptionMethod)
+		require.Len(t, d.ServerRandom, 4)
+	})
+}
+
+func TestRSAPublicKey_Deserialize(t *testing.T) {
+	data := []byte{
+		0x52, 0x53, 0x41, 0x31, // Magic "RSA1"
+		0x08, 0x00, 0x00, 0x00, // KeyLen = 8
+		0x40, 0x00, 0x00, 0x00, // BitLen = 64
+		0x07, 0x00, 0x00, 0x00, // DataLen = 7
+		0x01, 0x00, 0x01, 0x00, // PubExp = 65537
+		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // Modulus (8 bytes)
+	}
+
+	var k RSAPublicKey
+	err := k.Deserialize(bytes.NewReader(data))
+	require.NoError(t, err)
+	require.Equal(t, uint32(0x31415352), k.Magic)
+	require.Equal(t, uint32(8), k.KeyLen)
+	require.Len(t, k.Modulus, 8)
+}
+
+func TestServerProprietaryCertificate_Deserialize(t *testing.T) {
+	data := []byte{
+		0x01, 0x00, 0x00, 0x00, // DwSigAlgId
+		0x01, 0x00, 0x00, 0x00, // DwKeyAlgId
+		0x06, 0x00,             // PublicKeyBlobType
+		0x1C, 0x00,             // PublicKeyBlobLen = 28
+		// RSAPublicKey (28 bytes):
+		0x52, 0x53, 0x41, 0x31, // Magic
+		0x08, 0x00, 0x00, 0x00, // KeyLen = 8
+		0x40, 0x00, 0x00, 0x00, // BitLen
+		0x07, 0x00, 0x00, 0x00, // DataLen
+		0x01, 0x00, 0x01, 0x00, // PubExp
+		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // Modulus (8 bytes)
+		0x08, 0x00,                                     // SignatureBlobType
+		0x04, 0x00,                                     // SignatureBlobLen
+		0xAA, 0xBB, 0xCC, 0xDD,                         // SignatureBlob
+	}
+
+	var c ServerProprietaryCertificate
+	err := c.Deserialize(bytes.NewReader(data))
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), c.DwSigAlgId)
+	require.Len(t, c.SignatureBlob, 4)
+}
+
+func TestServerCertificate_Deserialize(t *testing.T) {
+	t.Run("ProprietaryCert", func(t *testing.T) {
+		data := []byte{
+			0x01, 0x00, 0x00, 0x00, // DwVersion = 1 (proprietary)
+			0x01, 0x00, 0x00, 0x00, // DwSigAlgId
+			0x01, 0x00, 0x00, 0x00, // DwKeyAlgId
+			0x06, 0x00,             // PublicKeyBlobType
+			0x1C, 0x00,             // PublicKeyBlobLen
+			// RSAPublicKey
+			0x52, 0x53, 0x41, 0x31,
+			0x08, 0x00, 0x00, 0x00,
+			0x40, 0x00, 0x00, 0x00,
+			0x07, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x01, 0x00,
+			0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+			0x08, 0x00,
+			0x04, 0x00,
+			0xAA, 0xBB, 0xCC, 0xDD,
+		}
+
+		c := ServerCertificate{ServerCertLen: uint32(len(data))}
+		err := c.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, c.ProprietaryCert)
+	})
+
+	t.Run("X509Cert", func(t *testing.T) {
+		data := []byte{
+			0x02, 0x00, 0x00, 0x00, // DwVersion = 2 (X.509)
+			0x01, 0x02, 0x03, 0x04, // X509 data
+		}
+
+		c := ServerCertificate{ServerCertLen: uint32(len(data))}
+		err := c.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, c.X509Cert)
+		require.Len(t, c.X509Cert, 4)
+	})
+}
+
+func TestNewClientUserDataSet_ColorDepths(t *testing.T) {
+	tests := []struct {
+		name       string
+		colorDepth int
+	}{
+		{"16bit", 16},
+		{"24bit", 24},
+		{"32bit", 32},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			userData := NewClientUserDataSet(0, 1920, 1080, tt.colorDepth, nil)
+			require.NotNil(t, userData)
+			serialized := userData.Serialize()
+			require.NotEmpty(t, serialized)
+		})
+	}
+}
+
+func TestNewClientUserDataSet_NoChannels(t *testing.T) {
+	userData := NewClientUserDataSet(0, 1920, 1080, 24, nil)
+	require.NotNil(t, userData)
+	// When no channels are provided, ClientNetworkData is still created but with 0 channels
+	require.Equal(t, uint32(0), userData.ClientNetworkData.ChannelCount)
+}
+
+func TestChannelDefinitionStructure_Serialize(t *testing.T) {
+	ch := ChannelDefinitionStructure{
+		Name:    [8]byte{'r', 'd', 'p', 'd', 'r'},
+		Options: 0x80800000,
+	}
+	serialized := ch.Serialize()
+	require.Len(t, serialized, 12)
+}
+
+func TestServerUserData_Deserialize(t *testing.T) {
+	t.Run("CoreDataOnly", func(t *testing.T) {
+		data := []byte{
+			0x01, 0x0C, // Type = SC_CORE
+			0x08, 0x00, // Length = 8 (including header)
+			0x04, 0x00, 0x08, 0x00, // Version
+		}
+
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, ud.ServerCoreData)
+	})
+
+	t.Run("NetworkData", func(t *testing.T) {
+		data := []byte{
+			0x03, 0x0C, // Type = SC_NET
+			0x08, 0x00, // Length = 8
+			0xEB, 0x03, // MCSChannelId
+			0x00, 0x00, // ChannelCount = 0
+		}
+
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, ud.ServerNetworkData)
+	})
+
+	t.Run("SecurityDataNoEncryption", func(t *testing.T) {
+		data := []byte{
+			0x02, 0x0C, // Type = SC_SECURITY
+			0x0C, 0x00, // Length = 12
+			0x00, 0x00, 0x00, 0x00, // EncryptionMethod = 0
+			0x00, 0x00, 0x00, 0x00, // EncryptionLevel = 0
+		}
+
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, ud.ServerSecurityData)
+	})
+
+	t.Run("MessageChannelData", func(t *testing.T) {
+		data := []byte{
+			0x04, 0x0C, // Type = SC_MCS_MSGCHANNEL
+			0x06, 0x00, // Length = 6
+			0xF0, 0x03, // MCSChannelID
+		}
+
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, ud.ServerMessageChannelData)
+		require.Equal(t, uint16(0x03F0), ud.ServerMessageChannelData.MCSChannelID)
+	})
+
+	t.Run("MultitransportChannelData", func(t *testing.T) {
+		data := []byte{
+			0x08, 0x0C, // Type = SC_MULTITRANSPORT
+			0x08, 0x00, // Length = 8
+			0x01, 0x00, 0x00, 0x00, // Flags
+		}
+
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, ud.ServerMultitransportChannelData)
+	})
+
+	t.Run("UnknownType", func(t *testing.T) {
+		data := []byte{
+			0xFF, 0x0C, // Unknown type
+			0x08, 0x00, // Length = 8
+			0x00, 0x00, 0x00, 0x00,
+		}
+
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader(data))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "unknown header type")
+	})
+
+	t.Run("EmptyData", func(t *testing.T) {
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader([]byte{}))
+		require.NoError(t, err) // Empty data should return nil (EOF)
+	})
+
+	t.Run("MultipleBlocks", func(t *testing.T) {
+		data := []byte{
+			// SC_CORE
+			0x01, 0x0C, // Type = SC_CORE
+			0x08, 0x00, // Length = 8
+			0x04, 0x00, 0x08, 0x00, // Version
+			// SC_NET
+			0x03, 0x0C, // Type = SC_NET
+			0x08, 0x00, // Length = 8
+			0xEB, 0x03, // MCSChannelId
+			0x00, 0x00, // ChannelCount = 0
+		}
+
+		var ud ServerUserData
+		err := ud.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		require.NotNil(t, ud.ServerCoreData)
+		require.NotNil(t, ud.ServerNetworkData)
+	})
+}
+
+func TestServerSecurityData_DeserializeWithCert(t *testing.T) {
+	data := []byte{
+		0x01, 0x00, 0x00, 0x00, // EncryptionMethod = 1
+		0x01, 0x00, 0x00, 0x00, // EncryptionLevel = 1
+		0x04, 0x00, 0x00, 0x00, // ServerRandomLen = 4
+		0x30, 0x00, 0x00, 0x00, // ServerCertLen = 48
+		0x01, 0x02, 0x03, 0x04, // ServerRandom (4 bytes)
+		// ServerCertificate (proprietary, 48 bytes total)
+		0x01, 0x00, 0x00, 0x00, // DwVersion = 1 (proprietary)
+		0x01, 0x00, 0x00, 0x00, // DwSigAlgId
+		0x01, 0x00, 0x00, 0x00, // DwKeyAlgId
+		0x06, 0x00,             // PublicKeyBlobType
+		0x1C, 0x00,             // PublicKeyBlobLen = 28
+		// RSAPublicKey (28 bytes)
+		0x52, 0x53, 0x41, 0x31, // Magic
+		0x08, 0x00, 0x00, 0x00, // KeyLen = 8
+		0x40, 0x00, 0x00, 0x00, // BitLen
+		0x07, 0x00, 0x00, 0x00, // DataLen
+		0x01, 0x00, 0x01, 0x00, // PubExp
+		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // Modulus (8 bytes)
+		0x08, 0x00,             // SignatureBlobType
+		0x04, 0x00,             // SignatureBlobLen
+		0xAA, 0xBB, 0xCC, 0xDD, // SignatureBlob
+	}
+
+	var d ServerSecurityData
+	err := d.Deserialize(bytes.NewReader(data))
+	require.NoError(t, err)
+	require.NotNil(t, d.ServerCertificate)
+	require.NotNil(t, d.ServerCertificate.ProprietaryCert)
+}

@@ -17,7 +17,7 @@ Long-form documentation lives in `docs/`:
 
 ## Why
 
-I was getting _really_ tired of not having a modern RDP client that works in a browser without extraneous dependencies and overhead (yes, I am looking at you, Guacamole), so I found this project and decided to modernize it
+I was getting _really_ tired of not having a modern RDP client that works in a browser without extraneous dependencies and overhead (yes, I am looking at you, Guacamole), so I found [this project](https://github.com/kulaginds/rdp-html5) and decided to modernize it, fix it up, and, since I wanted to have full control over all the features, dependencies and implementation details, gradually remove all the GPL-licensed code so I can re-release it under MIT.
 
 This project aims to provide a simple, open-source RDP client that has a minimal footprint, can replace Guacamole for most basic use cases, and should run in any modern web browser without plugins.
 

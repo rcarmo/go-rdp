@@ -11,6 +11,7 @@ function Client(websocketURL, canvasID, hostID, userID, passwordID) {
     this.canvasShown = false; // Track if we've shown the canvas yet
     this.pointerCache = {};
     this.isDragging = false; // Track if mouse button is down
+    this.dragButton = null; // Track which button is being dragged
     
     // Session persistence and reconnection
     this.reconnectAttempts = 0;
@@ -662,6 +663,29 @@ Client.prototype.handleMessage = function (arrayBuffer) {
         return;
     }
     
+    // Check for special capability info message (starts with 0xFF marker)
+    const bytes = new Uint8Array(arrayBuffer);
+    if (bytes.length > 1 && bytes[0] === 0xFF) {
+        try {
+            const jsonText = new TextDecoder().decode(bytes.slice(1));
+            const caps = JSON.parse(jsonText);
+            if (caps.type === 'capabilities') {
+                console.log('[RDP Server Capabilities]', caps);
+                console.log('  Codecs:', caps.codecs.length > 0 ? caps.codecs.join(', ') : 'None');
+                console.log('  Surface Commands:', caps.surfaceCommands);
+                console.log('  Color Depth:', caps.colorDepth);
+                console.log('  Desktop Size:', caps.desktopSize);
+                console.log('  Multifragment Size:', caps.multifragmentSize);
+                console.log('  Large Pointer:', caps.largePointer);
+                console.log('  Frame Acknowledge:', caps.frameAcknowledge);
+                this.serverCapabilities = caps;
+                return;
+            }
+        } catch (e) {
+            // Not valid JSON after marker, treat as binary
+        }
+    }
+    
     // Try to parse as JSON first (for clipboard and file transfer)
     try {
         const text = new TextDecoder().decode(arrayBuffer);
@@ -715,7 +739,37 @@ Client.prototype.handleMessage = function (arrayBuffer) {
         return;
     }
 
-    console.warn("unknown update:", header.updateCode);
+    if (header.isSurfCMDs()) {
+        this.handleSurfaceCommands(r);
+        return;
+    }
+
+    if (header.isOrders()) {
+        // Primary drawing orders - complex to implement fully
+        // For now, skip and rely on bitmap updates for screen content
+        // Most modern RDP servers send bitmaps rather than orders
+        Logger.debug('[RDP] Received orders update, skipping (size:', header.size, 'bytes)');
+        return;
+    }
+
+    if (header.isPalette()) {
+        // Palette updates - rarely used with modern color depths
+        Logger.debug('[RDP] Received palette update, skipping');
+        return;
+    }
+
+    console.warn("unknown update:", header.updateCode, "raw header byte would be:", header.updateCode | (header.fragmentation << 4) | (header.compression << 6));
+    
+    // Log first few bytes of remaining data for debugging
+    const remaining = r.length - r.offset;
+    if (remaining > 0) {
+        const preview = Math.min(remaining, 32);
+        const bytes = [];
+        for (let i = 0; i < preview; i++) {
+            bytes.push(r.data.getUint8(r.offset + i).toString(16).padStart(2, '0'));
+        }
+        console.warn("  remaining bytes:", remaining, "preview:", bytes.join(' '));
+    }
 };
 
 function buf2hex(buffer) { // buffer is an ArrayBuffer
@@ -726,6 +780,16 @@ function buf2hex(buffer) { // buffer is an ArrayBuffer
 
 Client.prototype.handleBitmap = function (r) {
     const bitmap = parseBitmapUpdate(r);
+    
+    // Log bitmap update type on first occurrence
+    if (!this.bitmapUpdateLogged) {
+        const firstRect = bitmap.rectangles[0];
+        if (firstRect) {
+            console.log('[RDP Codec] Standard bitmap update - bpp:', firstRect.bitsPerPixel, 
+                        'compressed:', !!(firstRect.flags & 0x0001));
+        }
+        this.bitmapUpdateLogged = true;
+    }
     
     // On first bitmap, show the canvas (proves RDP connection succeeded)
     if (!this.canvasShown) {
@@ -755,87 +819,70 @@ Client.prototype.processBitmapData = function(bitmapData) {
     const rawSize = size * bytesPerPixel;
     
     let rgba = new Uint8ClampedArray(size * 4);
-    let rawData;
     
-    if (!bitmapData.isCompressed()) {
-        rawData = new Uint8ClampedArray(bitmapData.bitmapDataStream);
-    } else {
-        // Decompress the bitmap
-        rawData = this.decompressBitmap(bitmapData, rawSize, rowDelta);
-        if (!rawData) {
-            return; // Decompression failed
+    // Try Go WASM processBitmap (handles all: decompress, flip, convert)
+    if (typeof goRLE !== 'undefined' && goRLE.processBitmap) {
+        const srcData = new Uint8Array(bitmapData.bitmapDataStream);
+        const result = goRLE.processBitmap(srcData, width, height, bpp, bitmapData.isCompressed(), rgba, rowDelta);
+        if (result) {
+            this.ctx.putImageData(
+                new ImageData(rgba, width, height),
+                bitmapData.destLeft,
+                bitmapData.destTop
+            );
+            return;
         }
     }
     
+    // JavaScript fallback
+    let rawData;
+    
+    if (!bitmapData.isCompressed()) {
+        // Uncompressed data - process directly
+        rawData = new Uint8ClampedArray(bitmapData.bitmapDataStream);
+    } else if (bpp === 16 || bpp === 15) {
+        // 16-bit compressed - use JS RLE decompressor
+        rawData = new Uint8ClampedArray(rawSize);
+        const srcData = new Uint8Array(bitmapData.bitmapDataStream);
+        if (!window.rleDecompress16(srcData, rawData, rowDelta)) {
+            return; // Decompression failed
+        }
+    } else {
+        // Compressed 24/32-bit without WASM - cannot process
+        if (!this.wasmFallbackWarningShown) {
+            console.warn('[Bitmap] WASM not available. 24/32-bit compressed bitmaps require WASM.');
+            this.wasmFallbackWarningShown = true;
+        }
+        return;
+    }
+    
     // Flip vertically (RDP sends bottom-up)
-    flipV(rawData, width, height, bytesPerPixel);
+    window.flipV(rawData, width, height, bytesPerPixel);
     
     // Convert to RGBA based on color depth
     switch (bpp) {
         case 32:
-            // 32-bit BGRA -> RGBA
-            bgra32toRGBA(rawData, rgba);
+            window.bgra32toRGBA(rawData, rgba);
             break;
         case 24:
-            // 24-bit BGR -> RGBA
-            bgr24toRGBA(rawData, rawSize, rgba);
+            window.bgr24toRGBA(rawData, rawSize, rgba);
             break;
         case 16:
         case 15:
         default:
-            // 16-bit RGB565 -> RGBA
-            rgb565toRGBA(rawData, rawSize, rgba);
+            window.rgb565toRGBA(rawData, rawSize, rgba);
             break;
     }
     
-    // Draw to canvas
     this.ctx.putImageData(
         new ImageData(rgba, width, height),
         bitmapData.destLeft,
         bitmapData.destTop
     );
     
-    // Store in bitmap cache if caching is enabled
     if (this.bitmapCacheEnabled) {
         this.cacheBitmap(bitmapData, rgba);
     }
-};
-
-// Decompress RLE-compressed bitmap data
-Client.prototype.decompressBitmap = function(bitmapData, rawSize, rowDelta) {
-    // Try WASM decompression first
-    if (typeof Module !== 'undefined' && Module._malloc && Module.ccall) {
-        try {
-            const inputPtr = Module._malloc(bitmapData.bitmapLength);
-            const outputPtr = Module._malloc(rawSize);
-            const inputHeap = new Uint8Array(Module.HEAPU8.buffer, inputPtr, bitmapData.bitmapDataStream.length);
-            inputHeap.set(new Uint8Array(bitmapData.bitmapDataStream));
-
-            const result = Module.ccall('RleDecompress',
-                'number',
-                ['number', 'number', 'number', 'number'],
-                [inputPtr, bitmapData.bitmapLength, outputPtr, rowDelta]
-            );
-
-            if (!result) {
-                Logger.debug("[RDP] WASM decompression failed");
-                Module._free(inputPtr);
-                Module._free(outputPtr);
-                return null;
-            }
-
-            const decompressed = new Uint8ClampedArray(Module.HEAP8.buffer.slice(outputPtr, outputPtr + rawSize));
-            Module._free(inputPtr);
-            Module._free(outputPtr);
-            return decompressed;
-        } catch (error) {
-            console.error("WASM decompression error:", error);
-        }
-    }
-
-    // Fallback: return raw data (may not be properly decompressed)
-    console.warn("WASM not available, bitmap may not render correctly");
-    return new Uint8ClampedArray(bitmapData.bitmapDataStream);
 };
 
 // Bitmap cache management
@@ -910,6 +957,154 @@ Client.prototype.getBitmapCacheStats = function() {
             ? (this.bitmapCacheHits / (this.bitmapCacheHits + this.bitmapCacheMisses) * 100).toFixed(1) + '%'
             : 'N/A'
     };
+};
+
+// Surface command types
+const CMDTYPE_SET_SURFACE_BITS = 0x0001;
+const CMDTYPE_FRAME_MARKER = 0x0004;
+const CMDTYPE_STREAM_SURFACE_BITS = 0x0006;
+
+// NSCodec codec ID (assigned by server, typically 1)
+const CODEC_ID_NSCODEC = 1;
+
+Client.prototype.handleSurfaceCommands = function(r) {
+    // On first surface command, show the canvas
+    if (!this.canvasShown) {
+        this.showCanvas();
+        this.canvasShown = true;
+    }
+
+    // Log that we're receiving surface commands (NSCodec uses this)
+    if (!this.surfaceCommandsLogged) {
+        console.log('[RDP Codec] Receiving Surface Commands - NSCodec may be in use');
+        this.surfaceCommandsLogged = true;
+    }
+
+    // Read remaining data as surface commands
+    const data = r.remaining();
+    if (!data || data.length === 0) {
+        return;
+    }
+
+    let offset = 0;
+    while (offset < data.length) {
+        if (offset + 2 > data.length) break;
+
+        const cmdType = data[offset] | (data[offset + 1] << 8);
+        offset += 2;
+
+        switch (cmdType) {
+            case CMDTYPE_SET_SURFACE_BITS:
+            case CMDTYPE_STREAM_SURFACE_BITS:
+                offset = this.handleSetSurfaceBits(data, offset);
+                break;
+
+            case CMDTYPE_FRAME_MARKER:
+                // Frame marker: frameAction (2) + frameId (4)
+                offset += 6;
+                break;
+
+            default:
+                Logger.debug('[Surface] Unknown surface command:', cmdType);
+                // Skip to end - we don't know the size
+                offset = data.length;
+                break;
+        }
+    }
+};
+
+Client.prototype.handleSetSurfaceBits = function(data, offset) {
+    // SetSurfaceBits structure:
+    // destLeft (2) + destTop (2) + destRight (2) + destBottom (2)
+    // + bpp (1) + flags (1) + reserved (1) + codecID (1)
+    // + width (2) + height (2) + bitmapDataLength (4) + bitmapData (variable)
+    
+    if (offset + 20 > data.length) {
+        return data.length;
+    }
+
+    const destLeft = data[offset] | (data[offset + 1] << 8);
+    const destTop = data[offset + 2] | (data[offset + 3] << 8);
+    const destRight = data[offset + 4] | (data[offset + 5] << 8);
+    const destBottom = data[offset + 6] | (data[offset + 7] << 8);
+    const bpp = data[offset + 8];
+    const flags = data[offset + 9];
+    // reserved = data[offset + 10]
+    const codecID = data[offset + 11];
+    const width = data[offset + 12] | (data[offset + 13] << 8);
+    const height = data[offset + 14] | (data[offset + 15] << 8);
+    const bitmapDataLength = data[offset + 16] | (data[offset + 17] << 8) | 
+                             (data[offset + 18] << 16) | (data[offset + 19] << 24);
+
+    offset += 20;
+
+    if (offset + bitmapDataLength > data.length) {
+        return data.length;
+    }
+
+    const bitmapData = data.subarray(offset, offset + bitmapDataLength);
+    offset += bitmapDataLength;
+
+    // Decode based on codec
+    let rgba = null;
+    
+    if (codecID === CODEC_ID_NSCODEC) {
+        // NSCodec compressed bitmap - try Go WASM first, then JS fallback
+        if (!this.nscodecLogged) {
+            console.log('[RDP Codec] NSCodec in use - codecID:', codecID, 'bpp:', bpp, 'size:', width, 'x', height);
+            this.nscodecLogged = true;
+        }
+        
+        // Try Go WASM decoder first
+        if (typeof goRLE !== 'undefined' && goRLE.decodeNSCodec) {
+            rgba = new Uint8ClampedArray(width * height * 4);
+            const srcData = new Uint8Array(bitmapData);
+            if (!goRLE.decodeNSCodec(srcData, width, height, rgba)) {
+                Logger.debug('[Surface] Go WASM NSCodec decode failed');
+                rgba = null;
+            }
+        }
+        
+        // Fall back to JS decoder
+        if (!rgba && typeof window.NSCodec !== 'undefined') {
+            try {
+                rgba = window.NSCodec.decode(new Uint8Array(bitmapData), width, height);
+            } catch (e) {
+                Logger.debug('[Surface] NSCodec decode error:', e);
+                return offset;
+            }
+        }
+        
+        if (!rgba) {
+            Logger.debug('[Surface] No NSCodec decoder available');
+            return offset;
+        }
+    } else if (codecID === 0) {
+        // Uncompressed bitmap (raw BGRA or BGR)
+        if (!this.rawBitmapLogged) {
+            console.log('[RDP Codec] Raw/uncompressed bitmap - codecID:', codecID, 'bpp:', bpp);
+            this.rawBitmapLogged = true;
+        }
+        if (bpp === 32) {
+            rgba = window.bgra32toRGBA(bitmapData, width, height);
+        } else if (bpp === 24) {
+            rgba = window.bgr24toRGBA(bitmapData, width, height);
+        } else {
+            Logger.debug('[Surface] Unsupported uncompressed bpp:', bpp);
+            return offset;
+        }
+    } else {
+        Logger.debug('[Surface] Unsupported codec:', codecID);
+        return offset;
+    }
+
+    if (rgba) {
+        // Create ImageData and draw to canvas
+        const imageData = new ImageData(new Uint8ClampedArray(rgba), width, height);
+        this.ctx.putImageData(imageData, destLeft, destTop);
+    }
+
+    return offset;
 };
 
 Client.prototype.handlePointer = function (header, r) {
@@ -1193,11 +1388,13 @@ Client.prototype.handleMouseMove = function (e) {
 
     try {
         const pos = this.screenToDesktop(e.clientX, e.clientY);
-        const event = new MouseMoveEvent(pos.x, pos.y);
+        
+        // Pass button state during drag so server knows button is held
+        const event = new MouseMoveEvent(pos.x, pos.y, this.isDragging ? this.dragButton : null);
         const data = event.serialize();
         
-        // Queue mouse move (will be throttled)
-        this.queueInput(data, true);
+        // Queue mouse move - don't throttle during drag
+        this.queueInput(data, !this.isDragging);
     } catch (error) {
         this.logError('Mouse move error', {x: e.clientX, y: e.clientY, error: error.message});
     }
@@ -1211,9 +1408,11 @@ Client.prototype.handleMouseDown = function (e) {
     this.updateActivity();
     
     this.isDragging = true;
+    this.dragButton = mouseButtonMap(e.button); // Track which button is held
 
     const pos = this.screenToDesktop(e.clientX, e.clientY);
-    const event = new MouseDownEvent(pos.x, pos.y, mouseButtonMap(e.button));
+    Logger.debug('[Mouse] Down at', pos.x, pos.y, 'button:', this.dragButton);
+    const event = new MouseDownEvent(pos.x, pos.y, this.dragButton);
     const data = event.serialize();
     
     // Queue click events with priority
@@ -1228,10 +1427,13 @@ Client.prototype.handleMouseDown = function (e) {
 };
 
 Client.prototype.handleMouseUp = function (e) {
+    const button = this.dragButton || mouseButtonMap(e.button);
     this.isDragging = false;
+    this.dragButton = null;
     
     const pos = this.screenToDesktop(e.clientX, e.clientY);
-    const event = new MouseUpEvent(pos.x, pos.y, mouseButtonMap(e.button));
+    Logger.debug('[Mouse] Up at', pos.x, pos.y, 'button:', button);
+    const event = new MouseUpEvent(pos.x, pos.y, button);
     const data = event.serialize();
     
     // Queue click events with priority
