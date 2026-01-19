@@ -8,23 +8,8 @@ const PTRFLAGS_BUTTON2 = 0x2000;
 const PTRFLAGS_BUTTON3 = 0x4000;
 const WheelRotationMask = 0x01FF;
 
-function MouseMoveEvent(xPos, yPos, buttonDown) {
+function MouseMoveEvent(xPos, yPos) {
     this.pointerFlags = PTRFLAGS_MOVE;
-    // If button is held during drag, include button flag and DOWN
-    if (buttonDown) {
-        this.pointerFlags |= PTRFLAGS_DOWN;
-        switch (buttonDown) {
-            case 1:
-                this.pointerFlags |= PTRFLAGS_BUTTON1;
-                break;
-            case 2:
-                this.pointerFlags |= PTRFLAGS_BUTTON2;
-                break;
-            case 3:
-                this.pointerFlags |= PTRFLAGS_BUTTON3;
-                break;
-        }
-    }
     this.xPos = xPos;
     this.yPos = yPos;
 }

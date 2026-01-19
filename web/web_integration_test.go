@@ -26,7 +26,7 @@ func TestWebInterfaceFiles(t *testing.T) {
 		"js/update/header.js",
 		"js/update/bitmap.js",
 		"js/update/pointer.js",
-		"js/rle/wasm_exec.js",
+		"js/rle/ms-rle-wasm.js",
 	}
 
 	for _, jsFile := range jsFiles {
@@ -37,7 +37,7 @@ func TestWebInterfaceFiles(t *testing.T) {
 
 	// Test that WASM files exist
 	wasmFiles := []string{
-		"js/rle/rle.wasm",
+		"js/rle/ms-rle-wasm.wasm",
 	}
 
 	for _, wasmFile := range wasmFiles {
@@ -82,7 +82,7 @@ func TestWebInterfaceContentStructure(t *testing.T) {
 		"js/client.js",
 		"js/input/keyboard.js",
 		"js/input/keymap.js",
-		"js/rle/wasm_exec.js",
+		"js/rle/ms-rle-wasm.js",
 		"js/color.js",
 	}
 

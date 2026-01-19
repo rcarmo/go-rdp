@@ -74,9 +74,9 @@ function BitmapUpdate() {
 function parseBitmapUpdate(r) {
     const update = new BitmapUpdate();
 
-    // Note: For fastpath bitmap updates, data starts with numberRectangles directly
-    // (no updateType prefix - that's only in slow-path format, but we strip it
-    // during conversion in the Go backend)
+    // updateType
+    const updateType = r.uint16(true);
+
     update.numberRectangles = r.uint16(true);
 
     for (let i = 0; i < update.numberRectangles; i++) {
