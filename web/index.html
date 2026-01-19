@@ -205,7 +205,7 @@
             width: 100vw;
             height: 100vh;
             background: #000;
-            z-index: 1000;
+            z-index: 9999; /* Match JavaScript inline style */
             padding: 0;
             margin: 0;
             border-radius: 0;
@@ -308,7 +308,7 @@
             position: fixed;
             top: 20px;
             right: 20px;
-            z-index: 2000;
+            z-index: 10003; /* Above modals */
             max-width: 400px;
         }
         
@@ -592,7 +592,7 @@
             bottom: 0;
             background: rgba(0, 0, 0, 0.3);
             display: none;
-            z-index: 1002;
+            z-index: 10002; /* Above canvas and hot corner */
             align-items: center;
             justify-content: center;
         }
@@ -1199,9 +1199,14 @@
             // Function to send special keys
             function sendSpecialKey(keyCombo) {
                 if (!client || !client.connected) {
-                    console.warn('Cannot send special keys: not connected');
+                    Logger.warn('Cannot send special keys: not connected');
+                    if (window.showToast) {
+                        window.showToast('Not connected', 'error', 'Special Keys', 2000);
+                    }
                     return;
                 }
+                
+                Logger.info('[SpecialKeys] Sending:', keyCombo);
                 
                 // Parse the key combination and send individual events
                 const keys = keyCombo.split('+');
@@ -1257,11 +1262,16 @@
                     }
                 });
                 
+                Logger.debug('[SpecialKeys] Parsed - Modifiers:', modifiers, 'FinalKey:', finalKey);
+                
                 // Send key down events for modifiers
                 modifiers.forEach(modifier => {
                     const event = new KeyboardEventKeyDown(modifier);
                     if (event.keyCode !== undefined) {
+                        Logger.debug('[SpecialKeys] Sending modifier down:', modifier, 'keyCode:', event.keyCode);
                         client.socket.send(event.serialize());
+                    } else {
+                        Logger.warn('[SpecialKeys] Invalid modifier keyCode for:', modifier);
                     }
                 });
                 
@@ -1269,13 +1279,17 @@
                 if (finalKey) {
                     const keyEvent = new KeyboardEventKeyDown(finalKey);
                     if (keyEvent.keyCode !== undefined) {
+                        Logger.debug('[SpecialKeys] Sending key down:', finalKey, 'keyCode:', keyEvent.keyCode);
                         client.socket.send(keyEvent.serialize());
+                    } else {
+                        Logger.warn('[SpecialKeys] Invalid keyCode for:', finalKey);
                     }
                     
                     // Send key up event for the final key (short delay)
                     setTimeout(() => {
                         const upEvent = new KeyboardEventKeyUp(finalKey);
                         if (upEvent.keyCode !== undefined) {
+                            Logger.debug('[SpecialKeys] Sending key up:', finalKey);
                             client.socket.send(upEvent.serialize());
                         }
                     }, 50);
@@ -1286,10 +1300,18 @@
                     modifiers.forEach(modifier => {
                         const upEvent = new KeyboardEventKeyUp(modifier);
                         if (upEvent.keyCode !== undefined) {
+                            Logger.debug('[SpecialKeys] Sending modifier up:', modifier);
                             client.socket.send(upEvent.serialize());
                         }
                     });
                 }, 100);
+                
+                // Close modal after sending
+                specialKeysModal.classList.remove('show');
+                
+                if (window.showToast) {
+                    window.showToast(`Sent ${keyCombo}`, 'success', 'Special Keys', 2000);
+                }
             }
             
             // Keyboard shortcuts

@@ -10,6 +10,7 @@ function Client(websocketURL, canvasID, hostID, userID, passwordID) {
     this.connected = false;
     this.canvasShown = false; // Track if we've shown the canvas yet
     this.pointerCache = {};
+    this.isDragging = false; // Track if mouse button is down
     
     // Session persistence and reconnection
     this.reconnectAttempts = 0;
@@ -1042,7 +1043,9 @@ Client.prototype.flushInputQueue = function() {
         const data = this.inputQueue.shift();
         try {
             this.socket.send(data);
+            Logger.debug('[Input] Sent event, size:', data.byteLength, 'bytes');
         } catch (e) {
+            Logger.error('[Input] Failed to send event:', e.message);
             // Connection error, clear queue
             this.inputQueue = [];
             break;
@@ -1055,8 +1058,9 @@ Client.prototype.flushInputQueue = function() {
         try {
             this.socket.send(this.lastMouseMove);
             this.lastMouseSendTime = now;
+            Logger.debug('[Input] Sent mouse move');
         } catch (e) {
-            // Ignore mouse send errors
+            Logger.error('[Input] Failed to send mouse move:', e.message);
         }
         this.lastMouseMove = null;
     } else if (this.lastMouseMove) {
@@ -1093,25 +1097,43 @@ Client.prototype.handleMouseMove = function (e) {
 Client.prototype.handleMouseDown = function (e) {
     // Update activity for timeout tracking
     this.updateActivity();
+    
+    this.isDragging = true;
 
     const pos = this.screenToDesktop(e.clientX, e.clientY);
-    const event = new MouseDownEvent(pos.x, pos.y, mouseButtonMap(e.button));
+    const button = mouseButtonMap(e.button);
+    const event = new MouseDownEvent(pos.x, pos.y, button);
     const data = event.serialize();
+    
+    Logger.debug('[Mouse] Down at', pos.x, pos.y, 'button:', button, 'flags:', '0x' + event.pointerFlags.toString(16));
     
     // Queue click events with priority
     this.queueInput(data, false);
+    
+    // Add document-level listeners for drag outside canvas
+    document.addEventListener('mousemove', this.handleMouseMove);
+    document.addEventListener('mouseup', this.handleMouseUp);
 
     e.preventDefault();
     return false;
 };
 
 Client.prototype.handleMouseUp = function (e) {
+    this.isDragging = false;
+    
     const pos = this.screenToDesktop(e.clientX, e.clientY);
-    const event = new MouseUpEvent(pos.x, pos.y, mouseButtonMap(e.button));
+    const button = mouseButtonMap(e.button);
+    const event = new MouseUpEvent(pos.x, pos.y, button);
     const data = event.serialize();
+    
+    Logger.debug('[Mouse] Up at', pos.x, pos.y, 'button:', button, 'flags:', '0x' + event.pointerFlags.toString(16));
     
     // Queue click events with priority
     this.queueInput(data, false);
+    
+    // Remove document-level listeners after drag
+    document.removeEventListener('mousemove', this.handleMouseMove);
+    document.removeEventListener('mouseup', this.handleMouseUp);
 
     e.preventDefault();
     return false;
