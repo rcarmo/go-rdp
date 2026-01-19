@@ -55,6 +55,27 @@ func (c *Client) GetUpdate() (*fastpath.UpdatePDU, error) {
 		return nil, err
 	}
 
+	// For native FastPath bitmap updates, inject updateType for JS compatibility
+	// FastPath data format: [updateHeader (1 byte)] [size (2 bytes)] [data...]
+	// JS expects bitmap data to have: [updateType (2 bytes)] [numberRectangles (2 bytes)] [bitmap data...]
+	if len(update.Data) >= 3 {
+		updateCode := update.Data[0] & 0x0f
+		if updateCode == FastPathUpdateCodeBitmap {
+			// Inject updateType (0x0001 for bitmap) after header+size
+			oldData := update.Data
+			newData := make([]byte, len(oldData)+2)
+			copy(newData[0:3], oldData[0:3]) // copy header + size
+			// Update size field to include the extra 2 bytes
+			origSize := binary.LittleEndian.Uint16(oldData[1:3])
+			binary.LittleEndian.PutUint16(newData[1:3], origSize+2)
+			// Insert updateType
+			binary.LittleEndian.PutUint16(newData[3:5], SlowPathUpdateTypeBitmap)
+			// Copy rest of data
+			copy(newData[5:], oldData[3:])
+			update.Data = newData
+		}
+	}
+
 	return update, nil
 }
 
@@ -146,9 +167,8 @@ func (c *Client) handleSlowPathGraphicsUpdate(wire io.Reader) (*fastpath.UpdateP
 	updateData := buf.Bytes()
 
 	// Convert to fastpath format for the browser
-	// The fastpath format is: [updateHeader (1 byte)] [size (2 bytes)] [data...]
-	// For bitmap updates, data is: [numberRectangles (2 bytes)] [bitmap rectangles...]
-	// Note: Native fastpath doesn't include updateType in the data portion
+	// The JavaScript parseBitmapUpdate expects: [updateType (2 bytes)] [numberRectangles (2 bytes)] [bitmap data...]
+	// So we need to include the updateType in the data we send
 
 	var fastpathCode uint8
 	switch updateType {
@@ -164,15 +184,16 @@ func (c *Client) handleSlowPathGraphicsUpdate(wire io.Reader) (*fastpath.UpdateP
 	}
 
 	// Build fastpath-style data for the browser
-	// Format: [updateHeader (1 byte)] [size (2 bytes LE)] [bitmap data...]
-	// The size field is the size of everything after updateHeader+size
-	updateHeader := fastpathCode                // fragmentation=0 (single), compression=0 (none)
-	totalDataSize := uint16(len(updateData))    // bitmap data only (no updateType prefix)
+	// Format: [updateHeader (1 byte)] [size (2 bytes LE)] [updateType (2 bytes LE)] [bitmap data...]
+	// The size field should be the size of everything after the updateHeader+size, i.e. updateType + bitmapData
+	updateHeader := fastpathCode                 // fragmentation=0 (single), compression=0 (none)
+	totalDataSize := uint16(2 + len(updateData)) // updateType (2 bytes) + rest of data
 
-	fpData := make([]byte, 3+len(updateData))
+	fpData := make([]byte, 3+2+len(updateData))
 	fpData[0] = updateHeader
 	binary.LittleEndian.PutUint16(fpData[1:3], totalDataSize)
-	copy(fpData[3:], updateData)
+	binary.LittleEndian.PutUint16(fpData[3:5], updateType)
+	copy(fpData[5:], updateData)
 
 	return &fastpath.UpdatePDU{
 		Action: 0,

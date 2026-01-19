@@ -1,3 +1,20 @@
+// Simple Logger utility
+const Logger = {
+    enabled: false,
+    debug: function(...args) {
+        if (this.enabled) console.log(...args);
+    },
+    info: function(...args) {
+        if (this.enabled) console.info(...args);
+    },
+    warn: function(...args) {
+        console.warn(...args);
+    },
+    error: function(...args) {
+        console.error(...args);
+    }
+};
+
 function Client(websocketURL, canvasID, hostID, userID, passwordID) {
     this.websocketURL = websocketURL;
     this.canvas = document.getElementById(canvasID);
@@ -715,6 +732,11 @@ Client.prototype.handleMessage = function (arrayBuffer) {
         return;
     }
 
+    // Code 15 (0xF) - Unknown extended update, ignore
+    if (header.updateCode === 0xF) {
+        return;
+    }
+
     console.warn("unknown update:", header.updateCode);
 };
 
@@ -752,90 +774,33 @@ Client.prototype.processBitmapData = function(bitmapData) {
     const size = width * height;
     const bytesPerPixel = bpp / 8;
     const rowDelta = width * bytesPerPixel;
-    const rawSize = size * bytesPerPixel;
+    const isCompressed = bitmapData.isCompressed();
     
     let rgba = new Uint8ClampedArray(size * 4);
-    let rawData;
     
-    if (!bitmapData.isCompressed()) {
-        rawData = new Uint8ClampedArray(bitmapData.bitmapDataStream);
-    } else {
-        // Decompress the bitmap
-        rawData = this.decompressBitmap(bitmapData, rawSize, rowDelta);
-        if (!rawData) {
-            return; // Decompression failed
-        }
-    }
-    
-    // Flip vertically (RDP sends bottom-up)
-    flipV(rawData, width, height, bytesPerPixel);
-    
-    // Convert to RGBA based on color depth
-    switch (bpp) {
-        case 32:
-            // 32-bit BGRA -> RGBA
-            bgra32toRGBA(rawData, rgba);
-            break;
-        case 24:
-            // 24-bit BGR -> RGBA
-            bgr24toRGBA(rawData, rawSize, rgba);
-            break;
-        case 16:
-        case 15:
-        default:
-            // 16-bit RGB565 -> RGBA
-            rgb565toRGBA(rawData, rawSize, rgba);
-            break;
-    }
-    
-    // Draw to canvas
-    this.ctx.putImageData(
-        new ImageData(rgba, width, height),
-        bitmapData.destLeft,
-        bitmapData.destTop
-    );
-    
-    // Store in bitmap cache if caching is enabled
-    if (this.bitmapCacheEnabled) {
-        this.cacheBitmap(bitmapData, rgba);
-    }
-};
-
-// Decompress RLE-compressed bitmap data
-Client.prototype.decompressBitmap = function(bitmapData, rawSize, rowDelta) {
-    // Try WASM decompression first
-    if (typeof Module !== 'undefined' && Module._malloc && Module.ccall) {
-        try {
-            const inputPtr = Module._malloc(bitmapData.bitmapLength);
-            const outputPtr = Module._malloc(rawSize);
-            const inputHeap = new Uint8Array(Module.HEAPU8.buffer, inputPtr, bitmapData.bitmapDataStream.length);
-            inputHeap.set(new Uint8Array(bitmapData.bitmapDataStream));
-
-            const result = Module.ccall('RleDecompress',
-                'number',
-                ['number', 'number', 'number', 'number'],
-                [inputPtr, bitmapData.bitmapLength, outputPtr, rowDelta]
+    // Use Go WASM processBitmap (handles all color depths with decompression, flip, and color conversion)
+    if (typeof goRLE !== 'undefined' && goRLE.processBitmap) {
+        const srcData = new Uint8Array(bitmapData.bitmapDataStream);
+        const result = goRLE.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
+        
+        if (result) {
+            // Draw to canvas
+            this.ctx.putImageData(
+                new ImageData(rgba, width, height),
+                bitmapData.destLeft,
+                bitmapData.destTop
             );
-
-            if (!result) {
-                Logger.debug("[RDP] WASM decompression failed");
-                Module._free(inputPtr);
-                Module._free(outputPtr);
-                return null;
+            
+            // Store in bitmap cache if caching is enabled
+            if (this.bitmapCacheEnabled) {
+                this.cacheBitmap(bitmapData, rgba);
             }
-
-            const decompressed = new Uint8ClampedArray(Module.HEAP8.buffer.slice(outputPtr, outputPtr + rawSize));
-            Module._free(inputPtr);
-            Module._free(outputPtr);
-            return decompressed;
-        } catch (error) {
-            console.error("WASM decompression error:", error);
+            return;
         }
+        Logger.warn("[Bitmap] Go WASM processBitmap failed, bpp:", bpp, "compressed:", isCompressed);
+    } else {
+        Logger.error("[Bitmap] Go WASM not loaded - cannot process bitmap");
     }
-
-    // Fallback: return raw data (may not be properly decompressed)
-    console.warn("WASM not available, bitmap may not render correctly");
-    return new Uint8ClampedArray(bitmapData.bitmapDataStream);
 };
 
 // Bitmap cache management

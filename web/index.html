@@ -7,8 +7,18 @@
     <title>RDP Client</title>
     <script src="js/logger.js"></script>
     <script src="js/connection-history.js"></script>
-    <script src="js/binary.js"></script>
-    <script src="js/rle/ms-rle-wasm.js"></script>
+    <script src="js/binary.js?v=2"></script>
+    <script src="js/rle/wasm_exec.js"></script>
+    <script>
+        // Initialize Go WASM
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("js/rle/rle.wasm"), go.importObject).then((result) => {
+            go.run(result.instance);
+            console.log("Go WASM RLE module initialized");
+        }).catch(err => {
+            console.warn("Go WASM failed to load:", err);
+        });
+    </script>
     <script src="js/update/header.js"></script>
     <script src="js/update/bitmap.js"></script>
     <script src="js/update/pointer.js"></script>
@@ -16,7 +26,7 @@
     <script src="js/input/keymap.js"></script>
     <script src="js/input/keyboard.js"></script>
     <script src="js/input/mouse.js"></script>
-    <script src="js/client.js"></script>
+    <script src="js/client.js?v=12"></script>
     <script src="js/color.js"></script>
     <style>
         :root {

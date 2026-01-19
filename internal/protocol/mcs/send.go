@@ -21,7 +21,7 @@ func (d *ClientSendDataRequest) Serialize() []byte {
 	encoding.PerWriteInteger16(d.Initiator, 1001, buf)
 	encoding.PerWriteInteger16(d.ChannelId, 0, buf)
 	buf.WriteByte(0x70) // magic word
-	encoding.BerWriteLength(int(len(d.Data)), buf)
+	encoding.PerWriteLength(uint16(len(d.Data)), buf)
 
 	buf.Write(d.Data)
 
@@ -47,7 +47,7 @@ func (d *ClientSendDataRequest) Deserialize(wire io.Reader) error {
 		return err
 	}
 
-	_, err = encoding.BerReadLength(wire)
+	_, err = encoding.PerReadLength(wire)
 	if err != nil {
 		return err
 	}

@@ -449,8 +449,9 @@ func NewClientConfirmActive(shareID uint32, userId, desktopWidth, desktopHeight 
 			NewSoundCapabilitySet(),
 			NewMultifragmentUpdateCapabilitySet(),
 			NewFrameAcknowledgeCapabilitySet(),
-			NewSurfaceCommandsCapabilitySet(),
-			NewBitmapCodecsCapabilitySet(),
+			// Note: Do NOT add SurfaceCommands or BitmapCodecs here!
+			// Adding them causes xrdp to use GDI orders instead of bitmap updates,
+			// which we don't support. Keep capabilities identical to master branch.
 		},
 	}
 

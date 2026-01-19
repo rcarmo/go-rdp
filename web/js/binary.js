@@ -26,7 +26,7 @@ BinaryReader.prototype.uint32 = function (littleEndian) {
 };
 
 BinaryReader.prototype.blob = function (length) {
-    const data = this.arrayBuffer.slice(this.offset, this.offset + length);
+    const data = new Uint8Array(this.arrayBuffer, this.offset, length);
     this.offset += length;
 
     return data;

@@ -29,7 +29,7 @@ func (d *ServerSendDataIndication) Deserialize(wire io.Reader) error {
 		return err
 	}
 
-	_, err = encoding.BerReadLength(wire)
+	_, err = encoding.PerReadLength(wire)
 	if err != nil {
 		return err
 	}

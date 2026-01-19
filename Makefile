@@ -76,7 +76,7 @@ test-int:
 
 # Building
 .PHONY: build
-build:
+build: build-wasm
 	@echo "Building binary..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME) cmd/server/main.go
@@ -107,17 +107,21 @@ build-all:
 
 .PHONY: build-wasm
 build-wasm:
-	@echo "Building Go WebAssembly RLE module..."
-	GOOS=js GOARCH=wasm go build -o web/js/rle/rle.wasm ./web/wasm/
-	@# Copy wasm_exec.js from Go installation (path varies by version)
-	@GOROOT=$$(go env GOROOT); \
-	if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
-		cp "$$GOROOT/misc/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
-	elif [ -f "$$GOROOT/lib/wasm/wasm_exec.js" ]; then \
-		cp "$$GOROOT/lib/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
+	@echo "Building Go WebAssembly RLE module with TinyGo (optimized for size)..."
+	@if command -v tinygo >/dev/null 2>&1; then \
+		tinygo build -o web/js/rle/rle.wasm -target wasm -opt=z ./web/wasm/; \
+		cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/js/rle/wasm_exec.js; \
 	else \
-		echo "Warning: wasm_exec.js not found in GOROOT"; \
+		echo "TinyGo not found, using standard Go (larger output)..."; \
+		GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o web/js/rle/rle.wasm ./web/wasm/; \
+		GOROOT=$$(go env GOROOT); \
+		if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
+			cp "$$GOROOT/misc/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
+		elif [ -f "$$GOROOT/lib/wasm/wasm_exec.js" ]; then \
+			cp "$$GOROOT/lib/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
+		fi; \
 	fi
+	@ls -lh web/js/rle/rle.wasm
 	@echo "WebAssembly module built: web/js/rle/rle.wasm"
 
 # Docker
