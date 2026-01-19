@@ -24,7 +24,6 @@ func main() {
 	portFlag := flag.String("port", "", "RDP HTML5 server port")
 	logLevelFlag := flag.String("log-level", "", "log level (debug, info, warn, error)")
 	skipTLS := flag.Bool("skip-tls-verify", false, "skip TLS certificate validation")
-	skipSSL := flag.Bool("skip-ssl-verify", false, "skip TLS certificate validation (deprecated alias)")
 	tlsServerName := flag.String("tls-server-name", "", "override TLS server name")
 	useNLA := flag.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
 	helpFlag := flag.Bool("help", false, "show help")
@@ -46,7 +45,7 @@ func main() {
 		Host:              strings.TrimSpace(*hostFlag),
 		Port:              strings.TrimSpace(*portFlag),
 		LogLevel:          strings.TrimSpace(*logLevelFlag),
-		SkipTLSValidation: *skipTLS || *skipSSL,
+		SkipTLSValidation: *skipTLS,
 		TLSServerName:     strings.TrimSpace(*tlsServerName),
 		UseNLA:            *useNLA,
 	}
@@ -108,7 +107,8 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		// Allow inline scripts/styles and WASM for the single-page UI
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:")
+		// Allow data: URIs for img-src to support custom cursor images
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:")
 
 		next.ServeHTTP(w, r)
 	})
@@ -144,8 +144,10 @@ func isOriginAllowed(origin string, allowedOrigins []string, host string) bool {
 		}
 	}
 
+	// When no ALLOWED_ORIGINS configured, allow all origins (development mode)
+	// For production, explicitly set ALLOWED_ORIGINS
 	if len(allowedOrigins) == 0 {
-		return strings.Contains(origin, host)
+		return true
 	}
 
 	return false
@@ -192,7 +194,6 @@ func showHelp() {
 	fmt.Println("  -port               Set server listen port (default 8080)")
 	fmt.Println("  -log-level          Set log level (debug, info, warn, error)")
 	fmt.Println("  -skip-tls-verify    Skip TLS certificate validation")
-	fmt.Println("  -skip-ssl-verify    Skip TLS certificate validation (alias)")
 	fmt.Println("  -tls-server-name    Override TLS server name")
 	fmt.Println("  -version            Show version information")
 	fmt.Println("  -help               Show this help message")

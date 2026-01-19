@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="description" content="Secure HTML5 RDP Client">
-    <title>Secure RDP HTML5 Client</title>
+    <title>RDP Client</title>
+    <script src="js/logger.js"></script>
+    <script src="js/connection-history.js"></script>
     <script src="js/binary.js"></script>
     <script src="js/rle/ms-rle-wasm.js"></script>
     <script src="js/update/header.js"></script>
@@ -18,14 +20,14 @@
     <script src="js/color.js"></script>
     <style>
         :root {
-            --primary-color: #2563eb;
-            --primary-hover: #1d4ed8;
-            --danger-color: #dc2626;
-            --danger-hover: #b91c1c;
-            --background: #f3f4f6;
+            --background: #f5f5f5;
             --surface: #ffffff;
-            --text: #111827;
-            --border: #d1d5db;
+            --text: #333333;
+            --border: #cccccc;
+            --border-dark: #999999;
+            --error: #d32f2f;
+            --success: #388e3c;
+            --warning: #f57c00;
         }
         
         * {
@@ -42,7 +44,7 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -53,22 +55,24 @@
         }
         
         .header h1 {
-            font-size: 2rem;
-            font-weight: 700;
+            font-size: 1.8rem;
+            font-weight: 600;
             margin-bottom: 10px;
+            color: var(--text);
         }
         
         .header p {
-            color: #6b7280;
+            color: #666666;
             font-size: 1rem;
         }
         
         .connection-panel {
             background: var(--surface);
-            border-radius: 12px;
+            border: 1px solid var(--border);
             padding: 24px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            box-shadow: none;
             margin-bottom: 30px;
+            border-radius: 4px;
         }
         
         .form-group {
@@ -79,26 +83,26 @@
             display: block;
             margin-bottom: 6px;
             font-weight: 500;
+            color: var(--text);
         }
         
         .form-group input {
             width: 100%;
-            padding: 10px 12px;
+            padding: 8px 10px;
             border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 16px;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            border-radius: 2px;
+            font-size: 14px;
+            transition: border-color 0.2s;
         }
         
         .form-group input:focus {
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            border-color: var(--border-dark);
+            box-shadow: 0 0 0 1px var(--border-dark);
         }
         
         .form-group input.error {
-            border-color: var(--danger-color);
-            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+            border-color: var(--error);
         }
         
         .form-row {
@@ -114,31 +118,46 @@
         }
         
         .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, border-color 0.2s;
+            background: var(--surface);
+            color: var(--text);
+        }
+        
+        .btn:hover {
+            background: #f0f0f0;
+            border-color: var(--border-dark);
+        }
+        
+        .btn:active {
+            background: #e0e0e0;
         }
         
         .btn-primary {
-            background: var(--primary-color);
-            color: white;
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
         }
         
         .btn-primary:hover {
-            background: var(--primary-hover);
+            background: #f0f0f0;
+            border-color: var(--border-dark);
         }
         
         .btn-danger {
-            background: var(--danger-color);
-            color: white;
+            background: var(--surface);
+            color: var(--error);
+            border: 1px solid var(--border);
         }
         
         .btn-danger:hover {
-            background: var(--danger-hover);
+            background: #f0f0f0;
+            border-color: var(--border-dark);
         }
         
         .btn:disabled {
@@ -148,29 +167,30 @@
         
         .status-indicator {
             padding: 8px 16px;
-            border-radius: 6px;
+            border: 1px solid var(--border);
             font-size: 14px;
             font-weight: 500;
             margin-bottom: 20px;
             display: none;
+            border-radius: 2px;
         }
         
         .status-connected {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #6ee7b7;
+            background: #e8f5e9;
+            color: var(--success);
+            border-color: #c8e6c9;
         }
         
         .status-disconnected {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
+            background: #ffebee;
+            color: var(--error);
+            border-color: #ffcdd2;
         }
         
         .status-connecting {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fcd34d;
+            background: #fff3e0;
+            color: var(--warning);
+            border-color: #ffe0b2;
         }
         
         .canvas-container {
@@ -193,9 +213,9 @@
         
         #canvas {
             display: block !important;
-            /* Do not use percentage - use explicit dimensions set by JavaScript */
             border-radius: 0;
             background: #000;
+            /* Don't set cursor here - let dynamic classes control it */
         }
         
         #pointer-cache {
@@ -205,17 +225,80 @@
         .pointer-cache-null {cursor: none}
         .pointer-cache-default {cursor: default}
         
+        .recent-connections {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #f8f8f8;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+        }
+        
+        .recent-connection-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        
+        .recent-connection-item:hover {
+            background: #f0f0f0;
+            border-color: var(--primary);
+        }
+        
+        .recent-connection-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .recent-connection-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .recent-connection-host {
+            font-weight: 500;
+            font-size: 14px;
+            color: var(--text);
+        }
+        
+        .recent-connection-user {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .recent-connection-remove {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 16px;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+        
+        .recent-connection-remove:hover {
+            color: var(--error);
+        }
+        
         .connection-info {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
+            background: #fafafa;
+            border: 1px solid var(--border);
+            border-radius: 2px;
             padding: 12px;
             margin-top: 16px;
             font-size: 14px;
         }
         
         .error-message {
-            color: var(--danger-color);
+            color: var(--error);
             font-size: 14px;
             margin-top: 4px;
             display: none;
@@ -232,23 +315,23 @@
         .toast {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 2px;
             padding: 16px;
             margin-bottom: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             animation: slideIn 0.3s ease-out;
         }
         
         .toast.success {
-            border-left: 4px solid #059669;
+            border-left: 3px solid var(--success);
         }
         
         .toast.error {
-            border-left: 4px solid var(--danger-color);
+            border-left: 3px solid var(--error);
         }
         
         .toast.info {
-            border-left: 4px solid var(--primary-color);
+            border-left: 3px solid var(--border-dark);
         }
         
         .toast-title {
@@ -267,7 +350,7 @@
             border: none;
             font-size: 18px;
             cursor: pointer;
-            color: #6b7280;
+            color: #666666;
             padding: 0;
             width: 20px;
             height: 20px;
@@ -307,8 +390,8 @@
             gap: 8px;
             background: rgba(255, 255, 255, 0.9);
             padding: 8px 12px;
-            border-radius: 6px;
             border: 1px solid var(--border);
+            border-radius: 2px;
         }
         
         .file-status {
@@ -322,22 +405,22 @@
         }
         
         .canvas-container.drag-over {
-            border-color: var(--primary-color) !important;
-            box-shadow: 0 0 20px rgba(37, 99, 235, 0.4) !important;
+            border-color: var(--border-dark) !important;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2) !important;
         }
         
         .monitor-controls {
-            background: #f9fafb;
+            background: #fafafa;
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 2px;
             padding: 16px;
             margin-bottom: 16px;
         }
         
         .monitor-select {
-            padding: 8px 12px;
+            padding: 6px 10px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 2px;
             font-size: 14px;
             background: white;
             min-width: 200px;
@@ -346,21 +429,21 @@
         .monitor-info {
             margin-top: 12px;
             padding: 8px;
-            background: #e5f3ff;
-            border-radius: 4px;
+            background: #f5f5f5;
+            border-radius: 2px;
             font-size: 13px;
-            color: #374151;
+            color: var(--text);
         }
         
         .cycle-monitor-btn {
-            padding: 8px 16px;
+            padding: 6px 12px;
             font-size: 12px;
         }
         
         .audio-controls {
-            background: #f9fafb;
+            background: #fafafa;
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 2px;
             padding: 16px;
             margin-bottom: 16px;
         }
@@ -374,7 +457,7 @@
         
         .mic-status {
             font-size: 14px;
-            color: #6b7280;
+            color: #666666;
             font-weight: 500;
         }
         
@@ -399,15 +482,15 @@
         
         .level-bar {
             width: 6px;
-            background: #e5e7eb;
-            border-radius: 2px;
+            background: #e0e0e0;
+            border-radius: 1px;
             transition: all 0.1s ease;
             transform-origin: bottom;
             transform: scale(1);
         }
         
         .level-bar.active {
-            background: #10b981;
+            background: var(--success);
             box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
         }
         
@@ -455,8 +538,8 @@
             right: 10px;
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 2px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             padding: 8px 0;
             min-width: 200px;
             z-index: 1001;
@@ -482,11 +565,11 @@
         }
         
         .menu-item:hover {
-            background: var(--background);
+            background: #f0f0f0;
         }
         
         .menu-item.danger {
-            color: var(--danger-color);
+            color: var(--error);
         }
         
         .menu-separator {
@@ -498,7 +581,7 @@
         .menu-shortcut {
             margin-left: auto;
             font-size: 12px;
-            color: #6b7280;
+            color: #666666;
         }
         
         .special-keys-modal {
@@ -507,7 +590,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.3);
             display: none;
             z-index: 1002;
             align-items: center;
@@ -520,11 +603,11 @@
         
         .modal-content {
             background: var(--surface);
-            border-radius: 12px;
+            border-radius: 4px;
             padding: 24px;
             max-width: 400px;
             width: 90%;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         
         .modal-header {
@@ -544,7 +627,7 @@
             border: none;
             font-size: 24px;
             cursor: pointer;
-            color: #6b7280;
+            color: #666666;
             padding: 0;
             width: 24px;
             height: 24px;
@@ -567,7 +650,7 @@
         .special-key-btn {
             padding: 12px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 2px;
             background: var(--surface);
             cursor: pointer;
             font-size: 12px;
@@ -576,13 +659,12 @@
         }
         
         .special-key-btn:hover {
-            background: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
+            background: #f0f0f0;
+            border-color: var(--border-dark);
         }
         
         .special-key-btn:active {
-            transform: scale(0.95);
+            background: #e0e0e0;
         }
         
         @media (max-width: 768px) {
@@ -604,23 +686,52 @@
                 min-width: 150px;
             }
         }
+        
+        /* Center the login dialog on desktop screens */
+        @media (min-width: 769px) {
+            body {
+                display: flex;
+                min-height: 100vh;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+            
+            .container {
+                width: 100%;
+                max-width: 500px;
+            }
+            
+            .connection-panel {
+                margin-top: 0;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>Secure RDP Client</h1>
-            <p>Modern HTML5 Remote Desktop Protocol Client</p>
+            <h1>RDP Client</h1>
+            <p>Remote Desktop Connection</p>
         </header>
 
         <div class="connection-panel">
             <div id="status" class="status-indicator"></div>
             
+            <!-- Recent Connections -->
+            <div id="recent-connections" class="recent-connections" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="font-weight: 500; font-size: 14px; margin: 0;">Recent Connections</label>
+                    <button type="button" id="clear-history" style="background: none; border: none; color: #666; cursor: pointer; font-size: 12px; padding: 2px 8px;">Clear</button>
+                </div>
+                <div id="recent-connections-list"></div>
+            </div>
+            
             <form id="connection-form">
                 <div class="form-group">
-                    <label for="host">RDP Server Address</label>
-                    <input type="text" id="host" name="host" placeholder="example.com or example.com:3389" required 
-                           aria-label="RDP Server Address" 
+                    <label for="host">Computer</label>
+                    <input type="text" id="host" name="host" placeholder="hostname or IP address" required 
+                           aria-label="Computer address" 
                            aria-describedby="host-error"
                            aria-required="true"
                            autocomplete="off">
@@ -629,9 +740,9 @@
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="user">Username</label>
+                        <label for="user">User name</label>
                         <input type="text" id="user" name="user" placeholder="username" required
-                               aria-label="Username" 
+                               aria-label="User name" 
                                aria-describedby="user-error"
                                aria-required="true"
                                autocomplete="username">
@@ -651,12 +762,12 @@
                 
                 <div class="button-group">
                     <button type="submit" id="connect-btn" class="btn btn-primary">Connect</button>
-                    <button type="button" id="disconnect-btn" class="btn btn-danger" disabled>Disconnect</button>
+                    <button type="button" id="disconnect-btn" class="btn btn-danger" disabled>Cancel</button>
                 </div>
                 
                 <div id="connection-info" class="connection-info" style="display: none;">
-                    <strong>Connection Security:</strong> TLS 1.2+ encrypted connection<br>
-                    <strong>Protocol Support:</strong> RDP 10.x with enhanced features
+                    <strong>Security:</strong> Encrypted connection<br>
+                    <strong>Protocol:</strong> RDP
                 </div>
             </form>
         </div>
@@ -677,22 +788,22 @@
     
     <div class="hot-corner-menu" id="hot-corner-menu">
         <button class="menu-item" id="menu-settings">
-            ⚙️ Settings
+            Settings
         </button>
         <button class="menu-item" id="menu-special-keys">
-            ⌨️ Special Keys
+            Special Keys
             <span class="menu-shortcut">Ctrl+Alt+S</span>
         </button>
         <button class="menu-item" id="menu-file-transfer">
-            📁 File Transfer
+            File Transfer
         </button>
         <div class="menu-separator"></div>
         <button class="menu-item" id="menu-fullscreen">
-            🔳 Fullscreen
+            Fullscreen
             <span class="menu-shortcut">F11</span>
         </button>
         <button class="menu-item danger" id="menu-disconnect">
-            🔌 Disconnect
+            Disconnect
             <span class="menu-shortcut">Ctrl+Alt+D</span>
         </button>
     </div>
@@ -753,9 +864,82 @@
             const connectionInfo = document.getElementById('connection-info');
             const form = document.getElementById('connection-form');
             
+            // Recent connections UI
+            const recentConnectionsEl = document.getElementById('recent-connections');
+            const recentConnectionsList = document.getElementById('recent-connections-list');
+            const clearHistoryBtn = document.getElementById('clear-history');
+            
+            // HTML escape helper
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            // Render recent connections
+            function renderRecentConnections() {
+                const history = ConnectionHistory.get();
+                
+                if (history.length === 0) {
+                    recentConnectionsEl.style.display = 'none';
+                    return;
+                }
+                
+                recentConnectionsEl.style.display = 'block';
+                recentConnectionsList.innerHTML = '';
+                
+                history.forEach(function(conn) {
+                    const item = document.createElement('div');
+                    item.className = 'recent-connection-item';
+                    item.innerHTML = `
+                        <div class="recent-connection-info">
+                            <div class="recent-connection-host">${escapeHtml(conn.host)}</div>
+                            <div class="recent-connection-user">${escapeHtml(conn.username)}</div>
+                        </div>
+                        <button type="button" class="recent-connection-remove" data-host="${escapeHtml(conn.host)}" data-user="${escapeHtml(conn.username)}" title="Remove">×</button>
+                    `;
+                    
+                    // Click to fill form
+                    item.querySelector('.recent-connection-info').addEventListener('click', function() {
+                        document.getElementById('host').value = conn.host;
+                        document.getElementById('user').value = conn.username;
+                        document.getElementById('password').focus();
+                    });
+                    
+                    // Click X to remove
+                    item.querySelector('.recent-connection-remove').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        ConnectionHistory.remove(conn.host, conn.username);
+                        renderRecentConnections();
+                    });
+                    
+                    recentConnectionsList.appendChild(item);
+                });
+            }
+            
+            // Clear history button
+            clearHistoryBtn.addEventListener('click', function() {
+                if (confirm('Clear all recent connections?')) {
+                    ConnectionHistory.clear();
+                    renderRecentConnections();
+                }
+            });
+            
+            // Load recent connections on page load
+            renderRecentConnections();
+            
             // Prevent form submission - use WebSocket instead
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
+                
+                // Save to connection history
+                const host = document.getElementById('host').value.trim();
+                const user = document.getElementById('user').value.trim();
+                if (host && user) {
+                    ConnectionHistory.save(host, user);
+                    renderRecentConnections();
+                }
+                
                 client.connect();
             });
             

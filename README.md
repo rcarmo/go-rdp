@@ -60,6 +60,9 @@ export SERVER_IDLE_TIMEOUT=120s
 ### Security Configuration
 
 ```bash
+# CORS Configuration
+# If ALLOWED_ORIGINS is not set, all origins are allowed (development mode)
+# For production, explicitly set allowed origins (localhost/127.0.0.1 always allowed)
 export ALLOWED_ORIGINS="https://example.com,https://app.example.com"
 export MAX_CONNECTIONS=100
 export ENABLE_RATE_LIMIT=true
@@ -78,3 +81,31 @@ export RDP_MAX_HEIGHT=2160
 export RDP_BUFFER_SIZE=65536
 export RDP_TIMEOUT=10s
 ```
+
+## Debugging
+
+### Client-Side Debug Logging
+
+The browser client has a centralized logger that can be enabled/disabled for debugging:
+
+**Enable debug logging in browser console:**
+```javascript
+Logger.enable()  // Enables debug logging and saves preference
+```
+
+**Disable debug logging:**
+```javascript
+Logger.disable()  // Disables debug logging and saves preference
+```
+
+**Check status:**
+```javascript
+Logger.isEnabled()  // Returns true/false
+```
+
+Debug logs include:
+- RDP protocol updates (bitmaps, cursors, etc.)
+- Cursor changes and cache operations
+- WebSocket connection events
+
+The setting persists in localStorage across sessions.

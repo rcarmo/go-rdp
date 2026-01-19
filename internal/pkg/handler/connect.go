@@ -189,7 +189,9 @@ func isAllowedOrigin(origin string) bool {
 
 	allowed := os.Getenv("ALLOWED_ORIGINS")
 	if allowed == "" {
-		return strings.HasPrefix(normalized, "localhost") || strings.HasPrefix(normalized, "127.0.0.1")
+		// When ALLOWED_ORIGINS is not set, allow all origins (development mode)
+		// For production, explicitly set ALLOWED_ORIGINS
+		return true
 	}
 
 	// Always allow localhost-style origins for development, even when a list is provided
