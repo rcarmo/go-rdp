@@ -4,9 +4,19 @@ const ConnectionHistory = {
     _storageKey: 'rdp_connection_history',
     _maxHistory: 5,
 
+    // Normalize host by removing default RDP port
+    _normalizeHost: function(host) {
+        if (!host) return host;
+        // Remove :3389 suffix if present (default RDP port)
+        return host.replace(/:3389$/, '');
+    },
+
     // Save a connection to history
     save: function(host, username) {
         if (!host || !username) return;
+
+        // Normalize host (remove default port)
+        host = this._normalizeHost(host);
 
         const history = this.get();
         
@@ -19,7 +29,7 @@ const ConnectionHistory = {
 
         // Remove duplicate if exists (same host + username)
         const filtered = history.filter(item => 
-            !(item.host === host && item.username === username)
+            !(this._normalizeHost(item.host) === host && item.username === username)
         );
 
         // Add to beginning
@@ -65,7 +75,7 @@ const ConnectionHistory = {
     remove: function(host, username) {
         const history = this.get();
         const filtered = history.filter(item => 
-            !(item.host === host && item.username === username)
+            !(this._normalizeHost(item.host) === this._normalizeHost(host) && item.username === username)
         );
         
         try {

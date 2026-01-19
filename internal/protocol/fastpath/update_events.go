@@ -24,7 +24,7 @@ func (e *PaletteEntry) Deserialize(wire io.Reader) error {
 		return err
 	}
 
-	err = binary.Read(wire, binary.LittleEndian, &e.Green)
+	err = binary.Read(wire, binary.LittleEndian, &e.Blue)
 	if err != nil {
 		return err
 	}

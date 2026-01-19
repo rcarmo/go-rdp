@@ -2,8 +2,10 @@ package rdp
 
 import (
 	"bufio"
+	"crypto/rand"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -21,17 +23,25 @@ func (c *Client) StartNLA() error {
 
 	// Parse domain from username if present (DOMAIN\user or user@domain)
 	domain, user := c.parseDomainUser()
+	log.Printf("NLA: Authenticating as domain=%q user=%q", domain, user)
 
 	// Create NTLMv2 context
 	ntlmCtx := auth.NewNTLMv2(domain, user, c.password)
 
-	// Step 1: Send NTLM Negotiate message
+	// Generate client nonce for version 5+ (32 bytes)
+	clientNonce := make([]byte, 32)
+	if _, err := rand.Read(clientNonce); err != nil {
+		return fmt.Errorf("NLA: failed to generate nonce: %w", err)
+	}
+
+	// Step 1: Send NTLM Negotiate message with client nonce
 	negoMsg := ntlmCtx.GetNegotiateMessage()
-	tsReq := auth.EncodeTSRequest([][]byte{negoMsg}, nil, nil)
+	tsReq := auth.EncodeTSRequestWithNonce([][]byte{negoMsg}, nil, nil, clientNonce)
 
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send negotiate message: %w", err)
 	}
+	log.Printf("NLA: Sent negotiate message with nonce (%d bytes)", len(tsReq))
 
 	// Step 2: Receive server challenge
 	resp := make([]byte, 4096)
@@ -39,11 +49,13 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to read challenge: %w", err)
 	}
+	log.Printf("NLA: Received challenge (%d bytes)", n)
 
 	tsResp, err := auth.DecodeTSRequest(resp[:n])
 	if err != nil {
 		return fmt.Errorf("NLA: failed to decode challenge: %w", err)
 	}
+	log.Printf("NLA: Server version=%d, has nonce=%v", tsResp.Version, len(tsResp.ServerNonce) > 0)
 
 	if len(tsResp.NegoTokens) == 0 {
 		return fmt.Errorf("NLA: no challenge token received from server")
@@ -60,15 +72,28 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to get TLS public key: %w", err)
 	}
+	log.Printf("NLA: Got TLS public key (%d bytes)", len(pubKey))
 
-	// Encrypt the public key
-	encryptedPubKey := ntlmSec.GssEncrypt(pubKey)
+	// Compute pubKeyAuth based on negotiated version
+	// Use the nonce from server response if available, otherwise use client nonce
+	nonce := tsResp.ServerNonce
+	if len(nonce) == 0 {
+		nonce = clientNonce
+	}
+	
+	// For version 5+, compute hash; for version 2-4, use raw public key
+	pubKeyData := auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, nonce)
+	log.Printf("NLA: Using version %d protocol, pubKeyData len=%d", tsResp.Version, len(pubKeyData))
 
-	// Send authenticate message with encrypted public key
-	tsReq = auth.EncodeTSRequest([][]byte{authMsg}, nil, encryptedPubKey)
+	// Encrypt the public key data
+	encryptedPubKey := ntlmSec.GssEncrypt(pubKeyData)
+
+	// Send authenticate message with encrypted public key and client nonce
+	tsReq = auth.EncodeTSRequestWithNonce([][]byte{authMsg}, nil, encryptedPubKey, clientNonce)
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send authenticate message: %w", err)
 	}
+	log.Printf("NLA: Sent authenticate message (%d bytes)", len(tsReq))
 
 	// Step 4: Receive public key verification from server
 	resp = make([]byte, 4096)
@@ -76,6 +101,7 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to read public key response: %w", err)
 	}
+	log.Printf("NLA: Received public key response (%d bytes)", n)
 
 	tsResp, err = auth.DecodeTSRequest(resp[:n])
 	if err != nil {

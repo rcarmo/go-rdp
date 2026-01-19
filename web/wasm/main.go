@@ -175,6 +175,23 @@ func jsDecodeNSCodec(this js.Value, args []js.Value) interface{} {
 	return true
 }
 
+// jsSetPalette updates the 256-color palette from server data
+func jsSetPalette(this js.Value, args []js.Value) interface{} {
+	if len(args) < 2 {
+		return false
+	}
+
+	dataArray := args[0]
+	numColors := args[1].Int()
+
+	dataLen := dataArray.Get("length").Int()
+	data := make([]byte, dataLen)
+	js.CopyBytesToGo(data, dataArray)
+
+	codec.SetPalette(data, numColors)
+	return true
+}
+
 func main() {
 	c := make(chan struct{}, 0)
 
@@ -187,6 +204,7 @@ func main() {
 		"bgra32toRGBA":    js.FuncOf(jsBGRA32toRGBA),
 		"processBitmap":   js.FuncOf(jsProcessBitmap),
 		"decodeNSCodec":   js.FuncOf(jsDecodeNSCodec),
+		"setPalette":      js.FuncOf(jsSetPalette),
 	}))
 
 	println("Go WASM RLE module loaded")

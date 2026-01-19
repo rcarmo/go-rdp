@@ -75,7 +75,7 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 
 	colorDepth := 16 // default to 16-bit
 	if cdStr := r.URL.Query().Get("colorDepth"); cdStr != "" {
-		if cd, err := strconv.Atoi(cdStr); err == nil && (cd == 16 || cd == 24 || cd == 32) {
+		if cd, err := strconv.Atoi(cdStr); err == nil && (cd == 8 || cd == 15 || cd == 16 || cd == 24 || cd == 32) {
 			colorDepth = cd
 		}
 	}

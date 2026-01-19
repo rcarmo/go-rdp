@@ -2,14 +2,64 @@ package auth
 
 import (
 	"bytes"
+	"crypto/sha256"
 )
 
 // TSRequest represents a decoded CredSSP request
 type TSRequest struct {
-	Version    int
-	NegoTokens []NegoToken
-	AuthInfo   []byte
-	PubKeyAuth []byte
+	Version      int
+	NegoTokens   []NegoToken
+	AuthInfo     []byte
+	PubKeyAuth   []byte
+	ClientNonce  []byte // For version 5+
+	ErrorCode    uint32 // For version 3+
+	ServerNonce  []byte // Received from server in version 5+
+}
+
+// Magic strings for CredSSP version 5+ public key hashing (includes null terminator)
+var (
+	ClientServerHashMagic = []byte("CredSSP Client-To-Server Binding Hash\x00")
+	ServerClientHashMagic = []byte("CredSSP Server-To-Client Binding Hash\x00")
+)
+
+// ComputeClientPubKeyAuth computes the pubKeyAuth for the client
+// For version 2-4: just encrypt the public key
+// For version 5+: compute SHA256(pubKey || magic || nonce) and encrypt
+func ComputeClientPubKeyAuth(version int, pubKey, nonce []byte) []byte {
+	if version >= 5 && len(nonce) > 0 {
+		// Version 5+: Hash-based binding
+		// Per MS-CSSP: SHA256(SubjectPublicKey || "CredSSP Client-To-Server Binding Hash\0" || clientNonce)
+		h := sha256.New()
+		h.Write(pubKey)
+		h.Write(ClientServerHashMagic)
+		h.Write(nonce)
+		return h.Sum(nil)
+	}
+	// Version 2-4: Direct public key (will be encrypted by caller)
+	return pubKey
+}
+
+// VerifyServerPubKeyAuth verifies the server's pubKeyAuth response
+// For version 2-4: server sends pubKey with first byte incremented by 1
+// For version 5+: server sends SHA256(pubKey || ServerClientHashMagic || nonce)
+func VerifyServerPubKeyAuth(version int, serverPubKeyAuth, clientPubKey, nonce []byte) bool {
+	if version >= 5 && len(nonce) > 0 {
+		// Version 5+: Hash-based verification
+		h := sha256.New()
+		h.Write(clientPubKey)
+		h.Write(ServerClientHashMagic)
+		h.Write(nonce)
+		expected := h.Sum(nil)
+		return bytes.Equal(serverPubKeyAuth, expected)
+	}
+	// Version 2-4: Server sends pubKey with first byte + 1
+	if len(serverPubKeyAuth) != len(clientPubKey) {
+		return false
+	}
+	expected := make([]byte, len(clientPubKey))
+	copy(expected, clientPubKey)
+	expected[0]++
+	return bytes.Equal(serverPubKeyAuth, expected)
 }
 
 // NegoToken wraps an NTLM message
@@ -25,19 +75,32 @@ type NegoToken struct {
 //	   negoTokens [1] NegoData OPTIONAL,
 //	   authInfo   [2] OCTET STRING OPTIONAL,
 //	   pubKeyAuth [3] OCTET STRING OPTIONAL,
+//	   errorCode  [4] INTEGER OPTIONAL,       -- version 3+
+//	   clientNonce [5] OCTET STRING OPTIONAL, -- version 5+
 //	}
 //	NegoData ::= SEQUENCE OF NegoDataItem
 //	NegoDataItem ::= SEQUENCE {
 //	   negoToken [0] OCTET STRING
 //	}
 func EncodeTSRequest(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte) []byte {
+	return EncodeTSRequestWithNonce(ntlmMessages, authInfo, pubKeyAuth, nil)
+}
+
+// EncodeTSRequestWithNonce encodes a TSRequest with optional client nonce (version 5+)
+func EncodeTSRequestWithNonce(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte, clientNonce []byte) []byte {
 	buf := &bytes.Buffer{}
 
 	// Build the inner content first
 	inner := &bytes.Buffer{}
 
+	// Determine version based on whether nonce is provided
+	version := 6 // Use version 6 for modern Windows compatibility
+	if len(clientNonce) == 0 {
+		version = 2 // Fall back to version 2 if no nonce
+	}
+
 	// [0] version INTEGER
-	versionBytes := encodeContextTag(0, encodeInteger(2))
+	versionBytes := encodeContextTag(0, encodeInteger(version))
 	inner.Write(versionBytes)
 
 	// [1] negoTokens NegoData OPTIONAL
@@ -63,6 +126,12 @@ func EncodeTSRequest(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte) 
 	if len(pubKeyAuth) > 0 {
 		pubKeyAuthBytes := encodeContextTag(3, encodeOctetString(pubKeyAuth))
 		inner.Write(pubKeyAuthBytes)
+	}
+
+	// [5] clientNonce OCTET STRING OPTIONAL (version 5+)
+	if len(clientNonce) > 0 {
+		clientNonceBytes := encodeContextTag(5, encodeOctetString(clientNonce))
+		inner.Write(clientNonceBytes)
 	}
 
 	// Wrap in SEQUENCE
@@ -100,6 +169,11 @@ func DecodeTSRequest(data []byte) (*TSRequest, error) {
 		case 3: // pubKeyAuth
 			_, inner, _ := parseTag(value)
 			req.PubKeyAuth = inner
+		case 4: // errorCode (version 3+)
+			req.ErrorCode = uint32(parseInteger(value))
+		case 5: // clientNonce/serverNonce (version 5+)
+			_, inner, _ := parseTag(value)
+			req.ServerNonce = inner
 		}
 
 		offset += tagLen(content[offset:])
