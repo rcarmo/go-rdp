@@ -28,7 +28,7 @@ func (c *Client) StartNLA() error {
 	// Create NTLMv2 context
 	ntlmCtx := auth.NewNTLMv2(domain, user, c.password)
 
-	// Generate client nonce for version 5+ (32 bytes)
+	// Generate client nonce (32 bytes) - required for version 5+
 	clientNonce := make([]byte, 32)
 	if _, err := rand.Read(clientNonce); err != nil {
 		return fmt.Errorf("NLA: failed to generate nonce: %w", err)
@@ -41,7 +41,7 @@ func (c *Client) StartNLA() error {
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send negotiate message: %w", err)
 	}
-	log.Printf("NLA: Sent negotiate message with nonce (%d bytes)", len(tsReq))
+	log.Printf("NLA: Sent negotiate message (%d bytes)", len(tsReq))
 
 	// Step 2: Receive server challenge
 	resp := make([]byte, 4096)
@@ -55,7 +55,7 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to decode challenge: %w", err)
 	}
-	log.Printf("NLA: Server version=%d, has nonce=%v", tsResp.Version, len(tsResp.ServerNonce) > 0)
+	log.Printf("NLA: Server version=%d, errorCode=%d", tsResp.Version, tsResp.ErrorCode)
 
 	if len(tsResp.NegoTokens) == 0 {
 		return fmt.Errorf("NLA: no challenge token received from server")
@@ -74,18 +74,17 @@ func (c *Client) StartNLA() error {
 	}
 	log.Printf("NLA: Got TLS public key (%d bytes)", len(pubKey))
 
-	// Compute pubKeyAuth based on negotiated version
-	// Use the nonce from server response if available, otherwise use client nonce
-	nonce := tsResp.ServerNonce
-	if len(nonce) == 0 {
-		nonce = clientNonce
+	// For version 5+, compute hash-based pubKeyAuth
+	// SHA256(ClientServerHashMagic || clientNonce || publicKey)
+	var pubKeyData []byte
+	if tsResp.Version >= 5 {
+		pubKeyData = auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, clientNonce)
+		log.Printf("NLA: Using version %d hash-based pubKeyAuth (len=%d)", tsResp.Version, len(pubKeyData))
+	} else {
+		pubKeyData = pubKey
+		log.Printf("NLA: Using version %d raw pubKey", tsResp.Version)
 	}
-	
-	// For version 5+, compute hash; for version 2-4, use raw public key
-	pubKeyData := auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, nonce)
-	log.Printf("NLA: Using version %d protocol, pubKeyData len=%d, first4=%x", tsResp.Version, len(pubKeyData), pubKeyData[:min(4, len(pubKeyData))])
 
-	// Encrypt the public key data
 	encryptedPubKey := ntlmSec.GssEncrypt(pubKeyData)
 	log.Printf("NLA: Encrypted pubKeyAuth len=%d", len(encryptedPubKey))
 

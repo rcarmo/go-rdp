@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
@@ -64,6 +65,11 @@ func NewClient(
 	desktopWidth, desktopHeight int,
 	colorDepth int,
 ) (*Client, error) {
+	// Add default RDP port if not specified
+	if !strings.Contains(hostname, ":") {
+		hostname = hostname + ":3389"
+	}
+
 	c := Client{
 		domain:   "",
 		username: username,
