@@ -90,6 +90,12 @@ func newClientCoreData(selectedProtocol uint32, desktopWidth, desktopHeight uint
 	case 24:
 		highColorDepth = HighColor24BPP
 		supportedColorDepths = RNS_UD_24BPP_SUPPORT | RNS_UD_16BPP_SUPPORT
+	case 15:
+		highColorDepth = HighColor15BPP
+		supportedColorDepths = RNS_UD_15BPP_SUPPORT | RNS_UD_16BPP_SUPPORT
+	case 8:
+		highColorDepth = HighColor8BPP
+		supportedColorDepths = RNS_UD_16BPP_SUPPORT // Server may upgrade
 	default: // 16-bit
 		highColorDepth = HighColor16BPP
 		supportedColorDepths = RNS_UD_16BPP_SUPPORT
