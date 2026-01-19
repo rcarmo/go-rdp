@@ -72,14 +72,14 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to get TLS public key: %w", err)
 	}
-	log.Printf("NLA: Got TLS public key (%d bytes)", len(pubKey))
+	log.Printf("NLA: Got TLS SubjectPublicKey (%d bytes, first 20: %x)", len(pubKey), pubKey[:min(20, len(pubKey))])
 
 	// For version 5+, compute hash-based pubKeyAuth
 	// SHA256(ClientServerHashMagic || clientNonce || publicKey)
 	var pubKeyData []byte
 	if tsResp.Version >= 5 {
 		pubKeyData = auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, clientNonce)
-		log.Printf("NLA: Using version %d hash-based pubKeyAuth (len=%d)", tsResp.Version, len(pubKeyData))
+		log.Printf("NLA: Using version %d hash-based pubKeyAuth (len=%d, first 20: %x)", tsResp.Version, len(pubKeyData), pubKeyData[:min(20, len(pubKeyData))])
 	} else {
 		pubKeyData = pubKey
 		log.Printf("NLA: Using version %d raw pubKey", tsResp.Version)
@@ -108,14 +108,75 @@ func (c *Client) StartNLA() error {
 		return fmt.Errorf("NLA: failed to decode public key response: %w", err)
 	}
 
+	// Verify server's pubKeyAuth (for version 5+, this is a hash; for earlier versions, pubKey+1)
+	if len(tsResp.PubKeyAuth) > 0 {
+		decryptedPubKeyAuth := ntlmSec.GssDecrypt(tsResp.PubKeyAuth)
+		if decryptedPubKeyAuth == nil {
+			return fmt.Errorf("NLA: failed to decrypt server pubKeyAuth")
+		}
+		log.Printf("NLA: Decrypted server pubKeyAuth (%d bytes)", len(decryptedPubKeyAuth))
+
+		// Verify the server's response
+		if !auth.VerifyServerPubKeyAuth(tsResp.Version, decryptedPubKeyAuth, pubKey, clientNonce) {
+			return fmt.Errorf("NLA: server pubKeyAuth verification failed")
+		}
+		log.Printf("NLA: Server pubKeyAuth verified successfully")
+	}
+
 	// Step 5: Send credentials
 	domainBytes, userBytes, passBytes := ntlmCtx.GetEncodedCredentials()
 	credentials := auth.EncodeCredentials(domainBytes, userBytes, passBytes)
 	encryptedCreds := ntlmSec.GssEncrypt(credentials)
+	log.Printf("NLA: Sending encrypted credentials (%d bytes)", len(encryptedCreds))
 
 	tsReq = auth.EncodeTSRequest(nil, encryptedCreds, nil)
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send credentials: %w", err)
+	}
+	log.Printf("NLA: Credentials sent successfully")
+
+	// Step 6: Wait for final server response (optional - some servers send a final TSRequest)
+	// Set a short timeout for this read - if no data comes, credentials were accepted
+	if tcpConn, ok := c.conn.(*tls.Conn); ok {
+		tcpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	}
+
+	finalResp := make([]byte, 4096)
+	n, err = c.conn.Read(finalResp)
+	if err != nil {
+		// Timeout is expected and OK - means server accepted credentials silently
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			log.Printf("NLA: No final response from server (timeout - expected)")
+			// Clear the deadline
+			if tcpConn, ok := c.conn.(*tls.Conn); ok {
+				tcpConn.SetReadDeadline(time.Time{})
+			}
+			return nil
+		}
+		// Other errors might indicate authentication failure
+		log.Printf("NLA: Error reading final response: %v", err)
+		// Try to continue anyway - some servers don't send a final response
+		if tcpConn, ok := c.conn.(*tls.Conn); ok {
+			tcpConn.SetReadDeadline(time.Time{})
+		}
+		return nil
+	}
+
+	// Clear the deadline
+	if tcpConn, ok := c.conn.(*tls.Conn); ok {
+		tcpConn.SetReadDeadline(time.Time{})
+	}
+
+	// If we got data, check if it's an error response
+	if n > 0 {
+		log.Printf("NLA: Received final response (%d bytes)", n)
+		finalTsResp, err := auth.DecodeTSRequest(finalResp[:n])
+		if err == nil {
+			if finalTsResp.ErrorCode != 0 {
+				return fmt.Errorf("NLA: server returned error code: 0x%08X", finalTsResp.ErrorCode)
+			}
+			log.Printf("NLA: Final response indicates success (version=%d)", finalTsResp.Version)
+		}
 	}
 
 	return nil
@@ -196,7 +257,9 @@ func (c *Client) startTLSForNLA() error {
 }
 
 // getTLSPublicKey extracts the server's public key from the TLS connection
-// Per MS-CSSP, this must be the SubjectPublicKeyInfo from the certificate
+// Per MS-CSSP, this must be the SubjectPublicKey (NOT SubjectPublicKeyInfo)
+// SubjectPublicKeyInfo = SEQUENCE { algorithm, subjectPublicKey }
+// We need just the subjectPublicKey BIT STRING content
 func (c *Client) getTLSPublicKey() ([]byte, error) {
 	tlsConn, ok := c.conn.(*tls.Conn)
 	if !ok {
@@ -208,9 +271,82 @@ func (c *Client) getTLSPublicKey() ([]byte, error) {
 		return nil, fmt.Errorf("no peer certificates")
 	}
 
-	// Per MS-CSSP, we need the SubjectPublicKeyInfo (the raw DER-encoded public key)
 	cert := state.PeerCertificates[0]
-	return cert.RawSubjectPublicKeyInfo, nil
+
+	// Parse SubjectPublicKeyInfo to extract just SubjectPublicKey
+	// SubjectPublicKeyInfo ::= SEQUENCE {
+	//   algorithm AlgorithmIdentifier,
+	//   subjectPublicKey BIT STRING
+	// }
+	// We need the raw bytes of the BIT STRING (including its unused bits prefix)
+	spki := cert.RawSubjectPublicKeyInfo
+	if len(spki) < 4 {
+		return nil, fmt.Errorf("SubjectPublicKeyInfo too short")
+	}
+
+	// Parse outer SEQUENCE
+	if spki[0] != 0x30 {
+		return nil, fmt.Errorf("expected SEQUENCE tag for SubjectPublicKeyInfo")
+	}
+
+	// Parse length
+	offset := 1
+	seqLen, lenBytes := parseASN1Length(spki[offset:])
+	offset += lenBytes
+	if seqLen == 0 || offset+seqLen > len(spki) {
+		return nil, fmt.Errorf("invalid SubjectPublicKeyInfo length")
+	}
+
+	// Skip AlgorithmIdentifier SEQUENCE
+	if spki[offset] != 0x30 {
+		return nil, fmt.Errorf("expected SEQUENCE tag for AlgorithmIdentifier")
+	}
+	algIdLen, algIdLenBytes := parseASN1Length(spki[offset+1:])
+	offset += 1 + algIdLenBytes + algIdLen
+
+	// Now at SubjectPublicKey BIT STRING
+	if offset >= len(spki) || spki[offset] != 0x03 {
+		return nil, fmt.Errorf("expected BIT STRING tag for SubjectPublicKey")
+	}
+	offset++ // skip tag
+
+	bitStrLen, bitStrLenBytes := parseASN1Length(spki[offset:])
+	offset += bitStrLenBytes
+
+	if offset+bitStrLen > len(spki) {
+		return nil, fmt.Errorf("SubjectPublicKey extends past end of SubjectPublicKeyInfo")
+	}
+
+	// Skip the "unused bits" byte (first byte of BIT STRING content)
+	// FreeRDP's i2d_PublicKey returns just the raw key structure without this byte
+	if bitStrLen < 1 {
+		return nil, fmt.Errorf("SubjectPublicKey BIT STRING too short")
+	}
+	offset++ // skip unused bits byte
+	bitStrLen--
+
+	// Return just the raw public key DER (SEQUENCE { modulus, exponent } for RSA)
+	return spki[offset : offset+bitStrLen], nil
+}
+
+// parseASN1Length parses ASN.1 DER length encoding
+// Returns the length value and the number of bytes consumed
+func parseASN1Length(data []byte) (int, int) {
+	if len(data) == 0 {
+		return 0, 0
+	}
+	if data[0] < 128 {
+		return int(data[0]), 1
+	}
+	numBytes := int(data[0] & 0x7F)
+	if numBytes == 0 || numBytes > 4 || numBytes >= len(data) {
+		return 0, 1
+	}
+	length := 0
+	for i := 0; i < numBytes; i++ {
+		length = (length << 8) | int(data[1+i])
+	}
+	return length, 1 + numBytes
 }
 
 // parseDomainUser parses DOMAIN\user or user@domain format
