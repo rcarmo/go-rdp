@@ -8,6 +8,7 @@ function Client(websocketURL, canvasID, hostID, userID, passwordID) {
     this.pointerCacheCanvas = document.getElementById("pointer-cache");
     this.pointerCacheCanvasCtx = this.pointerCacheCanvas.getContext("2d");
     this.connected = false;
+    this.canvasShown = false; // Track if we've shown the canvas yet
     this.pointerCache = {};
     
     // Session persistence and reconnection
@@ -556,7 +557,12 @@ Client.prototype.initialize = function () {
 
     this.connected = true;
     
-    // DIRECTLY show the canvas - don't rely on events
+    // NOTE: Don't show canvas or initialize features yet - wait for first bitmap to prove RDP connected
+    // The showCanvas() function will initialize everything on first successful bitmap
+};
+
+Client.prototype.showCanvas = function() {
+    // DIRECTLY show the canvas now that we have proof of successful RDP connection
     const canvasContainer = document.getElementById('canvas-container');
     const formContainer = document.querySelector('.container');
     if (formContainer) {
@@ -581,11 +587,7 @@ Client.prototype.initialize = function () {
     // Force a reflow
     void this.canvas.offsetHeight;
     
-    this.emitEvent('connected', {
-        host: this.sanitizeInput(this.hostEl.value),
-        user: this.sanitizeInput(this.userEl.value)
-    });
-    
+    // NOW initialize all features (only after RDP connection is proven)
     // Initialize audio input redirection
     this.initAudioRedirection();
     
@@ -599,12 +601,17 @@ Client.prototype.initialize = function () {
     // Detect and setup multi-monitor support (don't show success message yet)
     this.detectMonitors(false);
     this.addMonitorControls();
-
-    // Initialize WASM module if available (commented out for now as it's optional)
-    // this.initializeWASM();
+    
+    this.emitEvent('connected', {
+        host: this.sanitizeInput(this.hostEl.value),
+        user: this.sanitizeInput(this.userEl.value)
+    });
 };
 
 Client.prototype.deinitialize = function () {
+    this.connected = false;
+    this.canvasShown = false; // Reset canvas shown flag
+    
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
     this.canvas.removeEventListener('mousemove', this.handleMouseMove);
@@ -708,6 +715,12 @@ function buf2hex(buffer) { // buffer is an ArrayBuffer
 Client.prototype.handleBitmap = function (r) {
     const bitmap = parseBitmapUpdate(r);
     
+    // On first bitmap, show the canvas (proves RDP connection succeeded)
+    if (!this.canvasShown) {
+        this.showCanvas();
+        this.canvasShown = true;
+    }
+    
     // If this is the first successful bitmap update, show multi-monitor message if applicable
     if (this.multiMonitorMode && !this.multiMonitorMessageShown) {
         this.showUserSuccess('Multi-monitor environment detected');
@@ -750,7 +763,7 @@ Client.prototype.handleBitmap = function (r) {
                 );
 
                 if (!result) {
-                    console.log("bad decompress:", bitmapData);
+                    Logger.debug("[RDP] WASM decompression failed for bitmap:", bitmapData);
                     Module._free(inputPtr);
                     Module._free(outputPtr);
                     return;
@@ -951,7 +964,7 @@ Client.prototype.handleKeyUp = function (e) {
     const event = new KeyboardEventKeyUp(e.code);
 
     if (event.keyCode === undefined) {
-        console.warn("undefined key up:", e)
+        Logger.debug("[Input] Undefined key up:", e.code);
         e.preventDefault();
         return false;
     }

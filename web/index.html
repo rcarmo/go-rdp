@@ -528,7 +528,7 @@
             right: 0;
             width: 50px;
             height: 50px;
-            z-index: 1000;
+            z-index: 10000; /* Above canvas container */
             cursor: pointer;
         }
         
@@ -542,7 +542,7 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             padding: 8px 0;
             min-width: 200px;
-            z-index: 1001;
+            z-index: 10001; /* Above hot corner */
             display: none;
         }
         
@@ -729,9 +729,9 @@
             
             <form id="connection-form">
                 <div class="form-group">
-                    <label for="host">Computer</label>
-                    <input type="text" id="host" name="host" placeholder="hostname or IP address" required 
-                           aria-label="Computer address" 
+                    <label for="host">Server</label>
+                    <input type="text" id="host" name="host" placeholder="hostname or IP address, optional port" required 
+                           aria-label="Server address" 
                            aria-describedby="host-error"
                            aria-required="true"
                            autocomplete="off">
@@ -989,7 +989,6 @@
                         canvasContainer.style.height = '100vh';
                         canvasContainer.style.zIndex = '9999';
                         canvasContainer.style.background = '#000';
-                        console.log("INDEX.HTML: canvas container should now be visible");
                         // Canvas is already resized in client.js before connect
                         break;
                         
@@ -1014,14 +1013,9 @@
 
             // Keep UI in sync with client lifecycle events
             document.addEventListener('rdp:connected', function() {
-                console.log("INDEX.HTML: rdp:connected event received!");
-                console.log("INDEX.HTML: canvasContainer before:", canvasContainer.className);
                 updateConnectionState('connected');
-                console.log("INDEX.HTML: canvasContainer after:", canvasContainer.className);
-                console.log("INDEX.HTML: canvasContainer display:", getComputedStyle(canvasContainer).display);
             });
             document.addEventListener('rdp:disconnected', function() {
-                console.log("INDEX.HTML: rdp:disconnected event received!");
                 updateConnectionState('disconnected');
             });
             document.addEventListener('rdp:error', function(e) {
