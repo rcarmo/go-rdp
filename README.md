@@ -6,6 +6,15 @@
 
 A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssembly.
 
+## Documentation
+
+Long-form documentation lives in `docs/`:
+
+- [Docs index](docs/index.md)
+- [Architecture](docs/architecture.md)
+- [Configuration](docs/configuration.md)
+- [Debugging](docs/debugging.md)
+
 ## Why
 
 I was getting _really_ tired of not having a modern RDP client that works in a browser without extraneous dependencies and overhead (yes, I am looking at you, Guacamole), so I found this project and decided to modernize it
@@ -22,90 +31,11 @@ This project aims to provide a simple, open-source RDP client that has a minimal
 
 ## Limitations
 
-- **NLA/CredSSP**: Network Level Authentication support is incomplete
+- **NLA / `CredSSP`**: Network Level Authentication support is incomplete
 - **Windows Compatibility**: Primarily tested with XRDP; Windows RDP servers may not work
 - **Graphics**: Only basic bitmap updates supported; no RemoteFX or H.264
 - **Clipboard/Audio/Printing**: Not implemented
 - **Virtual Channels**: Partial implementation only
 - **Security**: Not audited; do not use with sensitive systems
 
-## Architecture
-
-### Backend (Go)
-
-- **RDP Protocol Implementation**: Partial RDP protocol stack, tested primarily with XRDP
-- **WebSocket Server**: Bridges browser to RDP server
-- **Configuration System**: Environment-based configuration
-
-### Frontend (HTML5/JavaScript)
-
-- **Canvas-based Rendering**: 2D canvas for bitmap display
-- **WebAssembly Integration**: RLE decompression module
-- **Basic Responsive Design**: Adapts to window size
-
-## Configuration
-
-The application uses environment variables for configuration. See `internal/pkg/config/config.go` for all available options.
-
-### Server Configuration
-
-```bash
-export SERVER_HOST=0.0.0.0
-export SERVER_PORT=8080
-export SERVER_READ_TIMEOUT=30s
-export SERVER_WRITE_TIMEOUT=30s
-export SERVER_IDLE_TIMEOUT=120s
-```
-
-### Security Configuration
-
-```bash
-# CORS Configuration
-# If ALLOWED_ORIGINS is not set, all origins are allowed (development mode)
-# For production, explicitly set allowed origins (localhost/127.0.0.1 always allowed)
-export ALLOWED_ORIGINS="https://example.com,https://app.example.com"
-export MAX_CONNECTIONS=100
-export ENABLE_RATE_LIMIT=true
-export RATE_LIMIT_PER_MINUTE=60
-export ENABLE_TLS=false
-export MIN_TLS_VERSION=1.2
-```
-
-### RDP Configuration
-
-```bash
-export RDP_DEFAULT_WIDTH=1024
-export RDP_DEFAULT_HEIGHT=768
-export RDP_MAX_WIDTH=3840
-export RDP_MAX_HEIGHT=2160
-export RDP_BUFFER_SIZE=65536
-export RDP_TIMEOUT=10s
-```
-
-## Debugging
-
-### Client-Side Debug Logging
-
-The browser client has a centralized logger that can be enabled/disabled for debugging:
-
-**Enable debug logging in browser console:**
-```javascript
-Logger.enable()  // Enables debug logging and saves preference
-```
-
-**Disable debug logging:**
-```javascript
-Logger.disable()  // Disables debug logging and saves preference
-```
-
-**Check status:**
-```javascript
-Logger.isEnabled()  // Returns true/false
-```
-
-Debug logs include:
-- RDP protocol updates (bitmaps, cursors, etc.)
-- Cursor changes and cache operations
-- WebSocket connection events
-
-The setting persists in localStorage across sessions.
+For details on architecture, configuration, and debugging, see the docs links above.
