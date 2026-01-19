@@ -781,6 +781,11 @@
                     </select>
                 </div>
                 
+                <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="disableNLA" name="disableNLA" value="true">
+                    <label for="disableNLA" style="margin-bottom: 0;">Disable NLA (for xrdp/older servers)</label>
+                </div>
+                
                 <div class="button-group">
                     <button type="submit" id="connect-btn" class="btn btn-primary">Connect</button>
                     <button type="button" id="disconnect-btn" class="btn btn-danger" disabled>Cancel</button>
@@ -953,11 +958,13 @@
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                // Save to connection history
-                const host = document.getElementById('host').value.trim();
+                // Save to connection history (strip default port)
+                let host = document.getElementById('host').value.trim();
                 const user = document.getElementById('user').value.trim();
                 if (host && user) {
-                    ConnectionHistory.save(host, user);
+                    // Remove :3389 before saving
+                    const hostForHistory = host.replace(/:3389$/, '');
+                    ConnectionHistory.save(hostForHistory, user);
                     renderRecentConnections();
                 }
                 
@@ -1075,11 +1082,7 @@
                     return false;
                 }
                 
-                // Remove redundant hostname:port validation - let server handle it
-                // Auto-add default port if not specified
-                if (!host.includes(':')) {
-                    document.getElementById('host').value = host + ':3389';
-                }
+                // Don't modify input field - server will handle default port
                 
                 updateConnectionState('connecting');
                 return originalConnect();

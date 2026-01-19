@@ -360,6 +360,10 @@ Client.prototype.connect = function () {
     const colorDepthEl = document.getElementById('colorDepth');
     const colorDepth = colorDepthEl ? colorDepthEl.value : '16';
 
+    // Check if NLA should be disabled
+    const disableNLAEl = document.getElementById('disableNLA');
+    const disableNLA = disableNLAEl ? disableNLAEl.checked : false;
+
     const url = new URL(this.websocketURL);
     url.searchParams.set('host', host);
     url.searchParams.set('user', user);
@@ -367,6 +371,9 @@ Client.prototype.connect = function () {
     url.searchParams.set('width', screenWidth);
     url.searchParams.set('height', screenHeight);
     url.searchParams.set('colorDepth', colorDepth);
+    if (disableNLA) {
+        url.searchParams.set('disableNLA', 'true');
+    }
 
     this.socket = new WebSocket(url.toString());
 

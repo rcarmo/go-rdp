@@ -83,17 +83,18 @@ func (c *Client) StartNLA() error {
 	
 	// For version 5+, compute hash; for version 2-4, use raw public key
 	pubKeyData := auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, nonce)
-	log.Printf("NLA: Using version %d protocol, pubKeyData len=%d", tsResp.Version, len(pubKeyData))
+	log.Printf("NLA: Using version %d protocol, pubKeyData len=%d, first4=%x", tsResp.Version, len(pubKeyData), pubKeyData[:min(4, len(pubKeyData))])
 
 	// Encrypt the public key data
 	encryptedPubKey := ntlmSec.GssEncrypt(pubKeyData)
+	log.Printf("NLA: Encrypted pubKeyAuth len=%d", len(encryptedPubKey))
 
 	// Send authenticate message with encrypted public key and client nonce
 	tsReq = auth.EncodeTSRequestWithNonce([][]byte{authMsg}, nil, encryptedPubKey, clientNonce)
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send authenticate message: %w", err)
 	}
-	log.Printf("NLA: Sent authenticate message (%d bytes)", len(tsReq))
+	log.Printf("NLA: Sent authenticate message (%d bytes), authMsg len=%d", len(tsReq), len(authMsg))
 
 	// Step 4: Receive public key verification from server
 	resp = make([]byte, 4096)
