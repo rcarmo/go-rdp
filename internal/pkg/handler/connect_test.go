@@ -166,10 +166,10 @@ func TestIsAllowedOrigin(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			name:           "external origin default",
+			name:           "external origin default (dev mode - allow all)",
 			origin:         "http://example.com:8080",
 			envOrigins:     "",
-			expectedResult: false,
+			expectedResult: true, // In dev mode (no ALLOWED_ORIGINS env), we allow all origins
 		},
 		{
 			name:           "allowed origin from env",

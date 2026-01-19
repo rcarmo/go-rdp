@@ -121,7 +121,7 @@ func (c *client) connectionInitiation() error {
 }
 
 func (c *client) basicSettingsExchange() error {
-	clientUserDataSet := pdu.NewClientUserDataSet(uint32(c.selectedProtocol), c.desktopWidth, c.desktopHeight, c.channels)
+	clientUserDataSet := pdu.NewClientUserDataSet(uint32(c.selectedProtocol), c.desktopWidth, c.desktopHeight, c.colorDepth, c.channels)
 
 	wire, err := c.mcsLayer.Connect(clientUserDataSet.Serialize())
 	if err != nil {

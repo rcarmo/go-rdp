@@ -339,12 +339,17 @@ Client.prototype.connect = function () {
     this.canvas.width = screenWidth;
     this.canvas.height = screenHeight;
 
+    // Get color depth selection (default to 16)
+    const colorDepthEl = document.getElementById('colorDepth');
+    const colorDepth = colorDepthEl ? colorDepthEl.value : '16';
+
     const url = new URL(this.websocketURL);
     url.searchParams.set('host', host);
     url.searchParams.set('user', user);
     url.searchParams.set('password', password);
     url.searchParams.set('width', screenWidth);
     url.searchParams.set('height', screenHeight);
+    url.searchParams.set('colorDepth', colorDepth);
 
     this.socket = new WebSocket(url.toString());
 
@@ -589,6 +594,9 @@ Client.prototype.showCanvas = function() {
     void this.canvas.offsetHeight;
     
     // NOW initialize all features (only after RDP connection is proven)
+    // Initialize bitmap cache for better performance
+    this.initBitmapCache();
+    
     // Initialize audio input redirection
     this.initAudioRedirection();
     
@@ -636,6 +644,9 @@ Client.prototype.deinitialize = function () {
     
     // Clear all timeout tracking
     this.clearAllTimeouts();
+    
+    // Clear bitmap cache
+    this.clearBitmapCache();
 
     Object.entries(this.pointerCache).forEach(([index, style]) => {
         document.getElementsByTagName('head')[0].removeChild(style);
@@ -729,77 +740,176 @@ Client.prototype.handleBitmap = function (r) {
     }
 
     bitmap.rectangles.forEach((bitmapData) => {
-        const size = bitmapData.width * bitmapData.height;
-        const rowDelta = bitmapData.width * 2;
-        const resultSize = size * 2;
+        this.processBitmapData(bitmapData);
+    });
+};
 
-        if (!bitmapData.isCompressed()) {
-            let rgb = new Uint8ClampedArray(bitmapData.bitmapDataStream);
-            let rgba = new Uint8ClampedArray(bitmapData.width * bitmapData.height * 4);
-
-            flipV(rgb, bitmapData.width, bitmapData.height);
-            rgb2rgba(rgb, resultSize, rgba)
-
-            this.ctx.putImageData(new ImageData(rgba, bitmapData.width, bitmapData.height), bitmapData.destLeft, bitmapData.destTop);
-
-            return;
+// Process a single bitmap rectangle with support for multiple color depths
+Client.prototype.processBitmapData = function(bitmapData) {
+    const width = bitmapData.width;
+    const height = bitmapData.height;
+    const bpp = bitmapData.bitsPerPixel;
+    const size = width * height;
+    const bytesPerPixel = bpp / 8;
+    const rowDelta = width * bytesPerPixel;
+    const rawSize = size * bytesPerPixel;
+    
+    let rgba = new Uint8ClampedArray(size * 4);
+    let rawData;
+    
+    if (!bitmapData.isCompressed()) {
+        rawData = new Uint8ClampedArray(bitmapData.bitmapDataStream);
+    } else {
+        // Decompress the bitmap
+        rawData = this.decompressBitmap(bitmapData, rawSize, rowDelta);
+        if (!rawData) {
+            return; // Decompression failed
         }
+    }
+    
+    // Flip vertically (RDP sends bottom-up)
+    flipV(rawData, width, height, bytesPerPixel);
+    
+    // Convert to RGBA based on color depth
+    switch (bpp) {
+        case 32:
+            // 32-bit BGRA -> RGBA
+            bgra32toRGBA(rawData, rgba);
+            break;
+        case 24:
+            // 24-bit BGR -> RGBA
+            bgr24toRGBA(rawData, rawSize, rgba);
+            break;
+        case 16:
+        case 15:
+        default:
+            // 16-bit RGB565 -> RGBA
+            rgb565toRGBA(rawData, rawSize, rgba);
+            break;
+    }
+    
+    // Draw to canvas
+    this.ctx.putImageData(
+        new ImageData(rgba, width, height),
+        bitmapData.destLeft,
+        bitmapData.destTop
+    );
+    
+    // Store in bitmap cache if caching is enabled
+    if (this.bitmapCacheEnabled) {
+        this.cacheBitmap(bitmapData, rgba);
+    }
+};
 
-        // Check if WASM Module is available
-        if (typeof Module !== 'undefined' && Module._malloc && Module.ccall) {
-            try {
-                const inputPtr = Module._malloc(bitmapData.bitmapLength);
-                const outputPtr = Module._malloc(resultSize);
-                const inputHeap = new Uint8Array(Module.HEAPU8.buffer, inputPtr, bitmapData.bitmapDataStream.length);
-                inputHeap.set(new Uint8Array(bitmapData.bitmapDataStream));
+// Decompress RLE-compressed bitmap data
+Client.prototype.decompressBitmap = function(bitmapData, rawSize, rowDelta) {
+    // Try WASM decompression first
+    if (typeof Module !== 'undefined' && Module._malloc && Module.ccall) {
+        try {
+            const inputPtr = Module._malloc(bitmapData.bitmapLength);
+            const outputPtr = Module._malloc(rawSize);
+            const inputHeap = new Uint8Array(Module.HEAPU8.buffer, inputPtr, bitmapData.bitmapDataStream.length);
+            inputHeap.set(new Uint8Array(bitmapData.bitmapDataStream));
 
-                const result = Module.ccall('RleDecompress',
-                    'number',
-                    ['number', 'number', 'number', 'number'],
-                    [
-                        inputPtr, bitmapData.bitmapLength,
-                        outputPtr,
-                        rowDelta,
-                    ]
-                );
+            const result = Module.ccall('RleDecompress',
+                'number',
+                ['number', 'number', 'number', 'number'],
+                [inputPtr, bitmapData.bitmapLength, outputPtr, rowDelta]
+            );
 
-                if (!result) {
-                    Logger.debug("[RDP] WASM decompression failed for bitmap:", bitmapData);
-                    Module._free(inputPtr);
-                    Module._free(outputPtr);
-                    return;
-                }
-
-                let rgb = new Uint8ClampedArray(Module.HEAP8.buffer.slice(outputPtr, outputPtr + resultSize));
-                let rgba = new Uint8ClampedArray(bitmapData.width * bitmapData.height * 4);
-
-                flipV(rgb, bitmapData.width, bitmapData.height);
-                rgb2rgba(rgb, resultSize, rgba)
-
-                this.ctx.putImageData(new ImageData(rgba, bitmapData.width, bitmapData.height), bitmapData.destLeft, bitmapData.destTop);
-
+            if (!result) {
+                Logger.debug("[RDP] WASM decompression failed");
                 Module._free(inputPtr);
                 Module._free(outputPtr);
-                return;
-            } catch (error) {
-                console.error("WASM decompression failed, falling back to JavaScript:", error);
-                // Fall through to JavaScript decompression
+                return null;
             }
-        }
 
-        // Fallback to JavaScript decompression if WASM is not available
-        try {
-            let rgb = new Uint8ClampedArray(bitmapData.bitmapDataStream);
-            let rgba = new Uint8ClampedArray(bitmapData.width * bitmapData.height * 4);
-
-            flipV(rgb, bitmapData.width, bitmapData.height);
-            rgb2rgba(rgb, resultSize, rgba)
-
-            this.ctx.putImageData(new ImageData(rgba, bitmapData.width, bitmapData.height), bitmapData.destLeft, bitmapData.destTop);
+            const decompressed = new Uint8ClampedArray(Module.HEAP8.buffer.slice(outputPtr, outputPtr + rawSize));
+            Module._free(inputPtr);
+            Module._free(outputPtr);
+            return decompressed;
         } catch (error) {
-            console.error("Failed to decompress bitmap:", error);
+            console.error("WASM decompression error:", error);
         }
+    }
+
+    // Fallback: return raw data (may not be properly decompressed)
+    console.warn("WASM not available, bitmap may not render correctly");
+    return new Uint8ClampedArray(bitmapData.bitmapDataStream);
+};
+
+// Bitmap cache management
+Client.prototype.initBitmapCache = function() {
+    this.bitmapCacheEnabled = true;
+    this.bitmapCache = new Map();
+    this.bitmapCacheMaxSize = 1000; // Max cached bitmaps
+    this.bitmapCacheHits = 0;
+    this.bitmapCacheMisses = 0;
+};
+
+Client.prototype.cacheBitmap = function(bitmapData, rgba) {
+    // Generate cache key from bitmap properties
+    const key = this.getBitmapCacheKey(bitmapData);
+    
+    // LRU eviction if cache is full
+    if (this.bitmapCache.size >= this.bitmapCacheMaxSize) {
+        const firstKey = this.bitmapCache.keys().next().value;
+        this.bitmapCache.delete(firstKey);
+    }
+    
+    // Store ImageData for quick retrieval
+    this.bitmapCache.set(key, {
+        imageData: new ImageData(new Uint8ClampedArray(rgba), bitmapData.width, bitmapData.height),
+        width: bitmapData.width,
+        height: bitmapData.height,
+        timestamp: Date.now()
     });
+};
+
+Client.prototype.getCachedBitmap = function(bitmapData) {
+    const key = this.getBitmapCacheKey(bitmapData);
+    const cached = this.bitmapCache.get(key);
+    
+    if (cached) {
+        this.bitmapCacheHits++;
+        // Move to end for LRU
+        this.bitmapCache.delete(key);
+        this.bitmapCache.set(key, cached);
+        return cached.imageData;
+    }
+    
+    this.bitmapCacheMisses++;
+    return null;
+};
+
+Client.prototype.getBitmapCacheKey = function(bitmapData) {
+    // Create a hash from the first 64 bytes of bitmap data for quick lookup
+    const sample = bitmapData.bitmapDataStream.slice(0, Math.min(64, bitmapData.bitmapDataStream.length));
+    let hash = 0;
+    for (let i = 0; i < sample.length; i++) {
+        hash = ((hash << 5) - hash) + sample[i];
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+    return `${bitmapData.width}x${bitmapData.height}x${bitmapData.bitsPerPixel}:${hash}`;
+};
+
+Client.prototype.clearBitmapCache = function() {
+    if (this.bitmapCache) {
+        this.bitmapCache.clear();
+    }
+    this.bitmapCacheHits = 0;
+    this.bitmapCacheMisses = 0;
+};
+
+Client.prototype.getBitmapCacheStats = function() {
+    return {
+        size: this.bitmapCache ? this.bitmapCache.size : 0,
+        hits: this.bitmapCacheHits || 0,
+        misses: this.bitmapCacheMisses || 0,
+        hitRate: this.bitmapCacheHits && this.bitmapCacheMisses 
+            ? (this.bitmapCacheHits / (this.bitmapCacheHits + this.bitmapCacheMisses) * 100).toFixed(1) + '%'
+            : 'N/A'
+    };
 };
 
 Client.prototype.handlePointer = function (header, r) {
@@ -992,13 +1102,18 @@ function elementOffset(el) {
 }
 
 function mouseButtonMap(button) {
+    // Map browser button codes to RDP button codes
+    // Browser: 0=left, 1=middle, 2=right
+    // RDP: 1=BUTTON1 (left), 2=BUTTON2 (right), 3=BUTTON3 (middle)
     switch(button) {
         case 0:
-            return 1;
+            return 1;  // Left click
+        case 1:
+            return 3;  // Middle click
         case 2:
-            return 2;
+            return 2;  // Right click
         default:
-            return 0;
+            return 1;  // Default to left click
     }
 }
 
@@ -1043,9 +1158,7 @@ Client.prototype.flushInputQueue = function() {
         const data = this.inputQueue.shift();
         try {
             this.socket.send(data);
-            Logger.debug('[Input] Sent event, size:', data.byteLength, 'bytes');
         } catch (e) {
-            Logger.error('[Input] Failed to send event:', e.message);
             // Connection error, clear queue
             this.inputQueue = [];
             break;
@@ -1058,9 +1171,8 @@ Client.prototype.flushInputQueue = function() {
         try {
             this.socket.send(this.lastMouseMove);
             this.lastMouseSendTime = now;
-            Logger.debug('[Input] Sent mouse move');
         } catch (e) {
-            Logger.error('[Input] Failed to send mouse move:', e.message);
+            // Ignore mouse send errors
         }
         this.lastMouseMove = null;
     } else if (this.lastMouseMove) {
@@ -1101,11 +1213,8 @@ Client.prototype.handleMouseDown = function (e) {
     this.isDragging = true;
 
     const pos = this.screenToDesktop(e.clientX, e.clientY);
-    const button = mouseButtonMap(e.button);
-    const event = new MouseDownEvent(pos.x, pos.y, button);
+    const event = new MouseDownEvent(pos.x, pos.y, mouseButtonMap(e.button));
     const data = event.serialize();
-    
-    Logger.debug('[Mouse] Down at', pos.x, pos.y, 'button:', button, 'flags:', '0x' + event.pointerFlags.toString(16));
     
     // Queue click events with priority
     this.queueInput(data, false);
@@ -1122,11 +1231,8 @@ Client.prototype.handleMouseUp = function (e) {
     this.isDragging = false;
     
     const pos = this.screenToDesktop(e.clientX, e.clientY);
-    const button = mouseButtonMap(e.button);
-    const event = new MouseUpEvent(pos.x, pos.y, button);
+    const event = new MouseUpEvent(pos.x, pos.y, mouseButtonMap(e.button));
     const data = event.serialize();
-    
-    Logger.debug('[Mouse] Up at', pos.x, pos.y, 'button:', button, 'flags:', '0x' + event.pointerFlags.toString(16));
     
     // Queue click events with priority
     this.queueInput(data, false);

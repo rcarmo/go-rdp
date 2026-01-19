@@ -32,6 +32,7 @@ type client struct {
 	password string
 
 	desktopWidth, desktopHeight uint16
+	colorDepth                  int
 
 	serverCapabilitySets []pdu.CapabilitySet
 	remoteApp            *RemoteApp
@@ -61,6 +62,7 @@ const (
 func NewClient(
 	hostname, username, password string,
 	desktopWidth, desktopHeight int,
+	colorDepth int,
 ) (*client, error) {
 	c := client{
 		domain:   "",
@@ -69,6 +71,7 @@ func NewClient(
 
 		desktopWidth:  uint16(desktopWidth),
 		desktopHeight: uint16(desktopHeight),
+		colorDepth:    colorDepth,
 
 		selectedProtocol: pdu.NegotiationProtocolSSL,
 		// Default TLS configuration - can be overridden with SetTLSConfig

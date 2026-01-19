@@ -149,11 +149,11 @@ func TestCorsMiddleware(t *testing.T) {
 			expectAllowed:  true,
 		},
 		{
-			name:           "different origin when no list configured",
+			name:           "different origin when no list configured (dev mode - allow all)",
 			allowedOrigins: []string{},
 			requestOrigin:  "https://malicious.com",
 			requestHost:    "localhost:8080",
-			expectAllowed:  false,
+			expectAllowed:  true, // In dev mode (no ALLOWED_ORIGINS), we allow all origins
 		},
 		{
 			name:           "OPTIONS request",

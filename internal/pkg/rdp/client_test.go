@@ -43,7 +43,7 @@ func TestClient_NewClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := NewClient(tt.hostname, tt.username, tt.password, tt.width, tt.height)
+			client, err := NewClient(tt.hostname, tt.username, tt.password, tt.width, tt.height, 16)
 
 			if tt.expectError {
 				require.Error(t, err)

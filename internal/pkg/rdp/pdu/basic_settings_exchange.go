@@ -60,12 +60,46 @@ type ClientCoreData struct {
 	DeviceScaleFactor     uint32
 }
 
-func newClientCoreData(selectedProtocol uint32, desktopWidth, desktopHeight uint16) *ClientCoreData {
+// Color depth constants from MS-RDPBCGR
+const (
+	// HighColorDepth values
+	HighColor4BPP  uint16 = 0x0004
+	HighColor8BPP  uint16 = 0x0008
+	HighColor15BPP uint16 = 0x000F
+	HighColor16BPP uint16 = 0x0010
+	HighColor24BPP uint16 = 0x0018
+
+	// SupportedColorDepths flags
+	RNS_UD_24BPP_SUPPORT uint16 = 0x0001
+	RNS_UD_16BPP_SUPPORT uint16 = 0x0002
+	RNS_UD_15BPP_SUPPORT uint16 = 0x0004
+	RNS_UD_32BPP_SUPPORT uint16 = 0x0008
+)
+
+func newClientCoreData(selectedProtocol uint32, desktopWidth, desktopHeight uint16, colorDepth int) *ClientCoreData {
+	// Set color depth values based on requested depth
+	var highColorDepth uint16
+	var supportedColorDepths uint16
+	var earlyCapabilityFlags uint16 = ECFSupportErrInfoPDU
+
+	switch colorDepth {
+	case 32:
+		highColorDepth = HighColor24BPP // 32-bit uses 24-bit high color + ECFWant32BPPSession flag
+		supportedColorDepths = RNS_UD_32BPP_SUPPORT | RNS_UD_24BPP_SUPPORT | RNS_UD_16BPP_SUPPORT
+		earlyCapabilityFlags |= ECFWant32BPPSession
+	case 24:
+		highColorDepth = HighColor24BPP
+		supportedColorDepths = RNS_UD_24BPP_SUPPORT | RNS_UD_16BPP_SUPPORT
+	default: // 16-bit
+		highColorDepth = HighColor16BPP
+		supportedColorDepths = RNS_UD_16BPP_SUPPORT
+	}
+
 	data := ClientCoreData{
 		Version:                rdpVersion5Plus,
 		DesktopWidth:           desktopWidth,
 		DesktopHeight:          desktopHeight,
-		ColorDepth:             0xCA01,     // RNS_UD_COLOR_8BPP
+		ColorDepth:             0xCA01,     // RNS_UD_COLOR_8BPP (ignored when HighColorDepth is set)
 		SASSequence:            0xAA03,     // RNS_UD_SAS_DEL
 		KeyboardLayout:         0x00000409, // US
 		ClientBuild:            0xece,
@@ -74,12 +108,12 @@ func newClientCoreData(selectedProtocol uint32, desktopWidth, desktopHeight uint
 		KeyboardSubType:        0x00000000,
 		KeyboardFunctionKey:    12,
 		ImeFileName:            [64]byte{},
-		PostBeta2ColorDepth:    0xCA03, // RNS_UD_COLOR_16BPP_565
+		PostBeta2ColorDepth:    0xCA03, // RNS_UD_COLOR_16BPP_565 (ignored when HighColorDepth is set)
 		ClientProductId:        0x0001,
 		SerialNumber:           0x00000000,
-		HighColorDepth:         0x0010, // HIGH_COLOR_16BPP
-		SupportedColorDepths:   0x0002, // RNS_UD_16BPP_SUPPORT
-		EarlyCapabilityFlags:   ECFSupportErrInfoPDU,
+		HighColorDepth:         highColorDepth,
+		SupportedColorDepths:   supportedColorDepths,
+		EarlyCapabilityFlags:   earlyCapabilityFlags,
 		ClientDigProductId:     [64]byte{},
 		ConnectionType:         0x00,
 		Pad1octet:              0x00,
@@ -150,9 +184,10 @@ type ClientUserDataSet struct {
 
 func NewClientUserDataSet(selectedProtocol uint32,
 	desktopWidth, desktopHeight uint16,
+	colorDepth int,
 	channelNames []string) *ClientUserDataSet {
 	return &ClientUserDataSet{
-		ClientCoreData:     newClientCoreData(selectedProtocol, desktopWidth, desktopHeight),
+		ClientCoreData:     newClientCoreData(selectedProtocol, desktopWidth, desktopHeight, colorDepth),
 		ClientSecurityData: newClientSecurityData(),
 		ClientNetworkData:  newClientNetworkData(channelNames),
 	}

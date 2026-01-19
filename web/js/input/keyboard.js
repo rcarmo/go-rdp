@@ -6,15 +6,13 @@ window.KeyboardEventKeyDown = function KeyboardEventKeyDown(code) {
 };
 
 window.KeyboardEventKeyDown.prototype.serialize = function () {
-    const data = new ArrayBuffer(3);
+    const data = new ArrayBuffer(2);
     const w = new BinaryWriter(data);
 
     const eventFlags = 0;
-    const eventCode = (FASTPATH_INPUT_EVENT_SCANCODE & 0x3) << 5;
-    const eventHeader = eventFlags | eventCode;
+    const eventHeader = ((FASTPATH_INPUT_EVENT_SCANCODE & 0x7) << 5) | (eventFlags & 0x1f);
 
     w.uint8(eventHeader);
-    // w.uint16(this.keyCode, true);
     w.uint8(this.keyCode);
 
     return data;
@@ -25,15 +23,13 @@ window.KeyboardEventKeyUp = function KeyboardEventKeyUp(code) {
 };
 
 window.KeyboardEventKeyUp.prototype.serialize = function () {
-    const data = new ArrayBuffer(3);
+    const data = new ArrayBuffer(2);
     const w = new BinaryWriter(data);
 
-    const eventFlags = (FASTPATH_INPUT_KBDFLAGS_RELEASE) & 0x1f;
-    const eventCode = (FASTPATH_INPUT_EVENT_SCANCODE & 0x7) << 5;
-    const eventHeader = eventFlags | eventCode;
+    const eventFlags = FASTPATH_INPUT_KBDFLAGS_RELEASE;
+    const eventHeader = ((FASTPATH_INPUT_EVENT_SCANCODE & 0x7) << 5) | (eventFlags & 0x1f);
 
     w.uint8(eventHeader);
-    // w.uint16(this.keyCode, true);
     w.uint8(this.keyCode);
 
     return data;

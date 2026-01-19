@@ -33,7 +33,8 @@ function MouseDownEvent(xPos, yPos, button) {
 }
 
 function MouseUpEvent(xPos, yPos, button) {
-    this.pointerFlags = PTRFLAGS_MOVE;
+    // MouseUp should NOT have PTRFLAGS_DOWN set (absence of DOWN = release)
+    this.pointerFlags = 0;
     this.xPos = xPos;
     this.yPos = yPos;
 
@@ -71,7 +72,7 @@ const serialize = function () {
     const data = new ArrayBuffer(7);
     const w = new BinaryWriter(data);
 
-    const eventHeader = FASTPATH_INPUT_EVENT_MOUSE << 5;
+    const eventHeader = (FASTPATH_INPUT_EVENT_MOUSE & 0x7) << 5;
 
     w.uint8(eventHeader);
     w.uint16(this.pointerFlags, true);

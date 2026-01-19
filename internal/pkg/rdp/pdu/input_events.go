@@ -125,7 +125,7 @@ const (
 	PTRFlagsDown          uint16 = 0x8000
 	PTRFlagsButton1       uint16 = 0x1000
 	PTRFlagsButton2       uint16 = 0x2000
-	PTRFlagsButton3       uint16 = 0x3000
+	PTRFlagsButton3       uint16 = 0x4000
 )
 
 type mouseEvent struct {

@@ -36,7 +36,8 @@ func TestNewClientInfoPDU_Serialize(t *testing.T) {
 	actual := req.Serialize(false)
 	require.Equal(t, expected, actual)
 
-	// true = enhanced security (TLS) - no header, so 4 bytes shorter
+	// true = enhanced security (TLS) - now includes header for XRDP compatibility
+	// Per code comments: XRDP expects SEC_INFO_PKT security header even with TLS
 	actualTLS := req.Serialize(true)
-	require.Equal(t, expected[4:], actualTLS) // Skip the 4-byte security header
+	require.Equal(t, expected, actualTLS) // Same output - header always included for compatibility
 }

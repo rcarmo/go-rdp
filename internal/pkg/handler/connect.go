@@ -70,11 +70,18 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	colorDepth := 16 // default to 16-bit
+	if cdStr := r.URL.Query().Get("colorDepth"); cdStr != "" {
+		if cd, err := strconv.Atoi(cdStr); err == nil && (cd == 16 || cd == 24 || cd == 32) {
+			colorDepth = cd
+		}
+	}
+
 	host := r.URL.Query().Get("host")
 	user := r.URL.Query().Get("user")
 	password := r.URL.Query().Get("password")
 
-	rdpClient, err := rdp.NewClient(host, user, password, width, height)
+	rdpClient, err := rdp.NewClient(host, user, password, width, height, colorDepth)
 	if err != nil {
 		log.Println(fmt.Errorf("rdp init: %w", err))
 
