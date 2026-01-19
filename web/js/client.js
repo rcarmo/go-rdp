@@ -732,12 +732,46 @@ Client.prototype.handleMessage = function (arrayBuffer) {
         return;
     }
 
+    if (header.isPalette()) {
+        this.handlePalette(r);
+        return;
+    }
+
     // Code 15 (0xF) - Unknown extended update, ignore
     if (header.updateCode === 0xF) {
         return;
     }
 
     console.warn("unknown update:", header.updateCode);
+};
+
+// Handle palette update from server (for 8-bit color mode)
+Client.prototype.handlePalette = function(r) {
+    // Palette update format per MS-RDPBCGR:
+    // [updateType (2)] [pad (2)] [numberColors (4)] [palette entries...]
+    // Each palette entry is: red (1), green (1), blue (1) = 3 bytes
+    
+    const updateType = r.uint16(true);  // little endian
+    const pad = r.uint16(true);
+    const numberColors = r.uint32(true);
+    
+    if (numberColors > 256 || numberColors === 0) {
+        console.warn('[Palette] Invalid number of colors:', numberColors);
+        return;
+    }
+    
+    console.log('[Palette] Received palette update with', numberColors, 'colors');
+    
+    // Read palette data (3 bytes per color: R, G, B)
+    const paletteData = r.blob(numberColors * 3);
+    
+    // Send to WASM for storage
+    if (typeof goRLE !== 'undefined' && goRLE.setPalette) {
+        const result = goRLE.setPalette(new Uint8Array(paletteData), numberColors);
+        console.log('[Palette] Updated', numberColors, 'colors via WASM');
+    } else {
+        console.warn('[Palette] Go WASM not available for palette update');
+    }
 };
 
 function buf2hex(buffer) { // buffer is an ArrayBuffer
