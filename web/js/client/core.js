@@ -2,8 +2,10 @@
  * RDP Client Core Module
  * Main Client constructor and core initialization
  */
+console.log('[Module] core.js loaded');
 
 function Client(websocketURL, canvasID, hostID, userID, passwordID) {
+    console.log('[Client] Constructor called');
     this.websocketURL = websocketURL;
     this.canvas = document.getElementById(canvasID);
     this.hostEl = document.getElementById(hostID);

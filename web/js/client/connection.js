@@ -5,6 +5,8 @@
 
 // Establish WebSocket connection to RDP server
 Client.prototype.connect = function () {
+    console.log('[RDP] connect() called');
+    
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         console.warn("Connection already established");
         return;
@@ -43,9 +45,12 @@ Client.prototype.connect = function () {
     url.searchParams.set('height', screenHeight);
     url.searchParams.set('colorDepth', colorDepth);
 
+    console.log('[RDP] Connecting to:', url.toString().replace(/password=[^&]+/, 'password=***'));
+    
     this.socket = new WebSocket(url.toString());
 
     this.socket.onopen = () => {
+        console.log('[RDP] WebSocket connected');
         this.initialize();
     };
 
@@ -55,6 +60,7 @@ Client.prototype.connect = function () {
     };
 
     this.socket.onerror = (e) => {
+        console.error('[RDP] WebSocket error:', e);
         const errorMsg = e.message || '';
         this.logError('WebSocket connection error', {error: errorMsg, code: e.code});
         

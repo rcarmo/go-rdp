@@ -581,6 +581,11 @@
             height: 50px;
             z-index: 10000; /* Above canvas container */
             cursor: pointer;
+            display: none; /* Hidden by default, shown when connected */
+        }
+        
+        .hot-corner.active {
+            display: block;
         }
         
         .hot-corner-menu {
@@ -1074,9 +1079,14 @@
             // Keep UI in sync with client lifecycle events
             document.addEventListener('rdp:connected', function() {
                 updateConnectionState('connected');
+                // Show hot corner menu when connected
+                document.getElementById('hot-corner').classList.add('active');
             });
             document.addEventListener('rdp:disconnected', function() {
                 updateConnectionState('disconnected');
+                // Hide hot corner menu when disconnected
+                document.getElementById('hot-corner').classList.remove('active');
+                document.getElementById('hot-corner-menu').classList.remove('show');
             });
             document.addEventListener('rdp:error', function(e) {
                 const detail = e.detail || {};
