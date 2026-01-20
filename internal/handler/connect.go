@@ -3,19 +3,21 @@ package handler
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/net/websocket"
 
 	"github.com/rcarmo/rdp-html5/internal/config"
+	"github.com/rcarmo/rdp-html5/internal/logging"
 	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 	"github.com/rcarmo/rdp-html5/internal/rdp"
@@ -29,6 +31,14 @@ type rdpConn interface {
 // capabilitiesGetter interface for testing
 type capabilitiesGetter interface {
 	GetServerCapabilities() *rdp.ServerCapabilityInfo
+}
+
+// connectionRequest represents credentials sent via WebSocket
+type connectionRequest struct {
+	Type     string `json:"type"`
+	Host     string `json:"host"`
+	User     string `json:"user"`
+	Password string `json:"password"`
 }
 
 func Connect(w http.ResponseWriter, r *http.Request) {
@@ -57,20 +67,20 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
-	defer wsConn.Close()
+	defer func() { _ = wsConn.Close() }()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
 	width, err := strconv.Atoi(r.URL.Query().Get("width"))
 	if err != nil {
-		log.Println(fmt.Errorf("get width: %w", err))
+		logging.Error("Get width: %v", err)
 		return
 	}
 
 	height, err := strconv.Atoi(r.URL.Query().Get("height"))
 	if err != nil {
-		log.Println(fmt.Errorf("get height: %w", err))
+		logging.Error("Get height: %v", err)
 		return
 	}
 
@@ -83,20 +93,55 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 
 	// Check if NLA should be disabled for this connection
 	disableNLA := r.URL.Query().Get("disableNLA") == "true"
-	
+
 	// Check if audio should be enabled
 	enableAudio := r.URL.Query().Get("audio") == "true"
 
-	host := r.URL.Query().Get("host")
-	user := r.URL.Query().Get("user")
-	password := r.URL.Query().Get("password")
+	// Wait for credentials via WebSocket message (more secure than URL params)
+	var credentials connectionRequest
+	
+	// Set read deadline for credentials
+	if err := wsConn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		logging.Error("Set read deadline: %v", err)
+		return
+	}
+	
+	var credMsg []byte
+	if err := websocket.Message.Receive(wsConn, &credMsg); err != nil {
+		logging.Error("Receive credentials: %v", err)
+		sendError(wsConn, "Failed to receive credentials")
+		return
+	}
+	
+	// Clear read deadline
+	if err := wsConn.SetReadDeadline(time.Time{}); err != nil {
+		logging.Error("Clear read deadline: %v", err)
+		return
+	}
+	
+	if err := json.Unmarshal(credMsg, &credentials); err != nil {
+		logging.Error("Parse credentials: %v", err)
+		sendError(wsConn, "Invalid credentials format")
+		return
+	}
+	
+	if credentials.Type != "credentials" {
+		logging.Error("Invalid message type: %s", credentials.Type)
+		sendError(wsConn, "Expected credentials message")
+		return
+	}
+	
+	host := credentials.Host
+	user := credentials.User
+	password := credentials.Password
 
 	rdpClient, err := rdp.NewClient(host, user, password, width, height, colorDepth)
 	if err != nil {
-		log.Println(fmt.Errorf("rdp init: %w", err))
+		logging.Error("RDP init: %v", err)
+		sendError(wsConn, fmt.Sprintf("RDP initialization failed: %v", err))
 		return
 	}
-	defer rdpClient.Close()
+	defer func() { _ = rdpClient.Close() }()
 
 	// Set TLS configuration from server config
 	cfg := config.GetGlobalConfig()
@@ -104,7 +149,7 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 		var err error
 		cfg, err = config.Load()
 		if err != nil {
-			log.Printf("Failed to load config for TLS settings: %v", err)
+			logging.Debug("Failed to load config for TLS settings: %v", err)
 			cfg = &config.Config{}
 		}
 	}
@@ -115,17 +160,17 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	useNLA := cfg.Security.UseNLA && !disableNLA
 	rdpClient.SetUseNLA(useNLA)
 	if disableNLA {
-		log.Printf("NLA disabled for this connection")
+		logging.Info("NLA disabled for this connection")
 	}
 	
 	// Enable audio if requested
 	if enableAudio {
 		rdpClient.EnableAudio()
-		log.Printf("Audio redirection enabled")
+		logging.Info("Audio redirection enabled")
 	}
 
 	if err = rdpClient.Connect(); err != nil {
-		log.Println(fmt.Errorf("rdp connect: %w", err))
+		logging.Error("RDP connect: %v", err)
 		return
 	}
 	
@@ -158,12 +203,12 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
 			if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
 				return
 			}
-			log.Println(fmt.Errorf("error reading message from ws: %w", err))
+			logging.Error("Error reading message from WS: %v", err)
 			return
 		}
 
 		if err := rdpConn.SendInputEvent(data); err != nil {
-			log.Println(fmt.Errorf("failed writing to rdp: %w", err))
+			logging.Error("Failed writing to RDP: %v", err)
 			return
 		}
 	}
@@ -185,7 +230,7 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
 		case errors.Is(err, pdu.ErrDeactiateAll):
 			return
 		default:
-			log.Println(fmt.Errorf("get update: %w", err))
+			logging.Error("Get update: %v", err)
 			return
 		}
 
@@ -197,7 +242,7 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				return
 			}
-			log.Println(fmt.Errorf("failed sending message to ws: %w", err))
+			logging.Error("Failed sending message to WS: %v", err)
 			return
 		}
 	}
@@ -210,7 +255,7 @@ func sendCapabilitiesInfo(wsConn *websocket.Conn, rdpClient capabilitiesGetter) 
 		return
 	}
 
-	log.Printf("Server Capabilities: codecs=%v surfaceCmds=%v colorDepth=%d desktop=%s multifrag=%d largePtr=%v frameAck=%v",
+	logging.Info("Server Capabilities: codecs=%v surfaceCmds=%v colorDepth=%d desktop=%s multifrag=%d largePtr=%v frameAck=%v",
 		caps.BitmapCodecs, caps.SurfaceCommands, caps.ColorDepth, caps.DesktopSize,
 		caps.MultifragmentSize, caps.LargePointer, caps.FrameAcknowledge)
 
@@ -219,20 +264,23 @@ func sendCapabilitiesInfo(wsConn *websocket.Conn, rdpClient capabilitiesGetter) 
 	wsMutex.Lock()
 	defer wsMutex.Unlock()
 	if err := websocket.Message.Send(wsConn, msg); err != nil {
-		log.Printf("Failed to send capabilities info: %v", err)
+		logging.Error("Failed to send capabilities info: %v", err)
 	}
 }
 
 // buildCapabilitiesMessage creates the capabilities JSON message
 func buildCapabilitiesMessage(caps *rdp.ServerCapabilityInfo) []byte {
-	jsonData := fmt.Sprintf(`{"type":"capabilities","codecs":[%s],"surfaceCommands":%t,"colorDepth":%d,"desktopSize":"%s","multifragmentSize":%d,"largePointer":%t,"frameAcknowledge":%t}`,
+	logLevel := strings.ToLower(logging.GetLevelString())
+	
+	jsonData := fmt.Sprintf(`{"type":"capabilities","codecs":[%s],"surfaceCommands":%t,"colorDepth":%d,"desktopSize":"%s","multifragmentSize":%d,"largePointer":%t,"frameAcknowledge":%t,"logLevel":"%s"}`,
 		codecListToJSON(caps.BitmapCodecs),
 		caps.SurfaceCommands,
 		caps.ColorDepth,
 		caps.DesktopSize,
 		caps.MultifragmentSize,
 		caps.LargePointer,
-		caps.FrameAcknowledge)
+		caps.FrameAcknowledge,
+		logLevel)
 
 	msg := make([]byte, 1+len(jsonData))
 	msg[0] = 0xFF
@@ -249,6 +297,14 @@ func codecListToJSON(codecs []string) string {
 		quoted[i] = `"` + c + `"`
 	}
 	return strings.Join(quoted, ",")
+}
+
+// sendError sends an error message to the client via WebSocket
+func sendError(wsConn *websocket.Conn, message string) {
+	errMsg := fmt.Sprintf(`{"type":"error","message":"%s"}`, message)
+	if err := websocket.Message.Send(wsConn, errMsg); err != nil {
+		logging.Error("Failed to send error message: %v", err)
+	}
 }
 
 func isAllowedOrigin(origin string) bool {
@@ -329,6 +385,6 @@ func sendAudioData(wsConn *websocket.Conn, data []byte, format *audio.AudioForma
 	wsMutex.Unlock()
 
 	if err != nil {
-		log.Printf("Failed to send audio data: %v", err)
+		logging.Debug("Failed to send audio data: %v", err)
 	}
 }

@@ -101,7 +101,7 @@ func TestClient_handleSlowPathGraphicsUpdate_EdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, tt.updateType)
+			_ = binary.Write(buf, binary.LittleEndian, tt.updateType)
 			buf.Write(tt.data)
 
 			client := &Client{}

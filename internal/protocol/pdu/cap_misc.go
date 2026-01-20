@@ -46,10 +46,10 @@ type ControlCapabilitySet struct{}
 func (s *ControlCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // controlFlags
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // remoteDetachFlag
-	binary.Write(buf, binary.LittleEndian, uint16(2)) // controlInterest
-	binary.Write(buf, binary.LittleEndian, uint16(2)) // detachInterest
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // controlFlags
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // remoteDetachFlag
+	_ = binary.Write(buf, binary.LittleEndian, uint16(2)) // controlInterest
+	_ = binary.Write(buf, binary.LittleEndian, uint16(2)) // detachInterest
 
 	return buf.Bytes()
 }
@@ -65,10 +65,10 @@ type WindowActivationCapabilitySet struct{}
 func (s *WindowActivationCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // helpKeyFlag
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // helpKeyIndexFlag
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // helpExtendedKeyFlag
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // windowManagerKeyFlag
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // helpKeyFlag
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // helpKeyIndexFlag
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // helpExtendedKeyFlag
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // windowManagerKeyFlag
 
 	return buf.Bytes()
 }
@@ -84,8 +84,8 @@ type ShareCapabilitySet struct{}
 func (s *ShareCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // nodeID
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // pad2octets
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // nodeID
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // pad2octets
 
 	return buf.Bytes()
 }
@@ -103,8 +103,8 @@ type FontCapabilitySet struct {
 func (s *FontCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, s.fontSupportFlags)
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // padding
+	_ = binary.Write(buf, binary.LittleEndian, s.fontSupportFlags)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // padding
 
 	return buf.Bytes()
 }

@@ -15,7 +15,7 @@ export const ClipboardMixin = {
      */
     initClipboardSupport() {
         this.clipboardApiSupported = !!(navigator.clipboard && navigator.clipboard.writeText);
-        Logger.debug('[Clipboard] Clipboard API supported:', this.clipboardApiSupported);
+        Logger.info("Clipboard", `API supported: ${this.clipboardApiSupported}`);
     },
     
     /**
@@ -33,7 +33,7 @@ export const ClipboardMixin = {
             this.showUserWarning('Text truncated to ' + maxLength + ' characters');
         }
         
-        Logger.debug('[Clipboard] Typing', text.length, 'characters to remote');
+        Logger.info("Clipboard", `Typing ${text.length} chars to remote`);
         
         // Type each character with a small delay to prevent overwhelming the connection
         let index = 0;
@@ -60,7 +60,7 @@ export const ClipboardMixin = {
     sendCharacter(char) {
         const code = this.charToKeyCode(char);
         if (!code) {
-            Logger.debug('[Clipboard] No mapping for character:', char.charCodeAt(0));
+            Logger.debug("Clipboard", `No mapping for char code: ${char.charCodeAt(0)}`);
             return;
         }
         
@@ -178,7 +178,7 @@ export const ClipboardMixin = {
             await navigator.clipboard.writeText(text);
             return true;
         } catch (err) {
-            Logger.error('[Clipboard] Failed to write clipboard:', err);
+            Logger.warn("Clipboard", `Write failed: ${err.message}`);
             return false;
         }
     }

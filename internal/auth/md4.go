@@ -4,12 +4,6 @@ import (
 	"encoding/binary"
 )
 
-// MD4 block size and digest size
-const (
-	md4BlockSize = 64
-	md4Size      = 16
-)
-
 func md4(data []byte) []byte {
 	var a, b, c, d uint32 = 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476
 

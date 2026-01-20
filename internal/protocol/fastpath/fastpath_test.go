@@ -860,9 +860,9 @@ func TestPaletteUpdateData_Deserialize(t *testing.T) {
 			name: "valid palette with 2 entries",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0x0002)) // updateType
-				binary.Write(buf, binary.LittleEndian, uint16(0x0000)) // padding
-				binary.Write(buf, binary.LittleEndian, uint16(2))      // numberColors
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0002)) // updateType
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000)) // padding
+				_ = binary.Write(buf, binary.LittleEndian, uint16(2))      // numberColors
 				// Entry 1
 				buf.Write([]byte{0xFF, 0x00, 0x00}) // R, G, B
 				// Entry 2
@@ -875,9 +875,9 @@ func TestPaletteUpdateData_Deserialize(t *testing.T) {
 			name: "empty palette",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0x0002)) // updateType
-				binary.Write(buf, binary.LittleEndian, uint16(0x0000)) // padding
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // numberColors
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0002)) // updateType
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000)) // padding
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))      // numberColors
 				return buf.Bytes()
 			}(),
 			expectedEntries: 0,
@@ -920,10 +920,10 @@ func TestCompressedDataHeader_Deserialize(t *testing.T) {
 			name: "valid compressed header",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0x0000)) // cbCompFirstRowSize
-				binary.Write(buf, binary.LittleEndian, uint16(0x1000)) // cbCompMainBodySize
-				binary.Write(buf, binary.LittleEndian, uint16(0x0040)) // cbScanWidth
-				binary.Write(buf, binary.LittleEndian, uint16(0x4000)) // cbUncompressedSize
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000)) // cbCompFirstRowSize
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x1000)) // cbCompMainBodySize
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0040)) // cbScanWidth
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x4000)) // cbUncompressedSize
 				return buf.Bytes()
 			}(),
 			expectedMain:   0x1000,
@@ -968,15 +968,15 @@ func TestBitmapData_Deserialize(t *testing.T) {
 			name: "uncompressed bitmap",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // destLeft
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // destTop
-				binary.Write(buf, binary.LittleEndian, uint16(10))     // destRight
-				binary.Write(buf, binary.LittleEndian, uint16(10))     // destBottom
-				binary.Write(buf, binary.LittleEndian, uint16(10))     // width
-				binary.Write(buf, binary.LittleEndian, uint16(10))     // height
-				binary.Write(buf, binary.LittleEndian, uint16(24))     // bitsPerPixel
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // flags (no compression)
-				binary.Write(buf, binary.LittleEndian, uint16(4))      // bitmapLength
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))      // destLeft
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))      // destTop
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10))     // destRight
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10))     // destBottom
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10))     // width
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10))     // height
+				_ = binary.Write(buf, binary.LittleEndian, uint16(24))     // bitsPerPixel
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))      // flags (no compression)
+				_ = binary.Write(buf, binary.LittleEndian, uint16(4))      // bitmapLength
 				buf.Write([]byte{0xAA, 0xBB, 0xCC, 0xDD})              // bitmapDataStream
 				return buf.Bytes()
 			}(),
@@ -996,15 +996,15 @@ func TestBitmapData_Deserialize(t *testing.T) {
 			name: "compressed with NO_HDR flag",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0))                                        // destLeft
-				binary.Write(buf, binary.LittleEndian, uint16(0))                                        // destTop
-				binary.Write(buf, binary.LittleEndian, uint16(20))                                       // destRight
-				binary.Write(buf, binary.LittleEndian, uint16(20))                                       // destBottom
-				binary.Write(buf, binary.LittleEndian, uint16(20))                                       // width
-				binary.Write(buf, binary.LittleEndian, uint16(20))                                       // height
-				binary.Write(buf, binary.LittleEndian, uint16(32))                                       // bitsPerPixel
-				binary.Write(buf, binary.LittleEndian, uint16(BitmapDataFlagCompression|BitmapDataFlagNoHDR)) // flags
-				binary.Write(buf, binary.LittleEndian, uint16(3))                                        // bitmapLength
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))                                        // destLeft
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))                                        // destTop
+				_ = binary.Write(buf, binary.LittleEndian, uint16(20))                                       // destRight
+				_ = binary.Write(buf, binary.LittleEndian, uint16(20))                                       // destBottom
+				_ = binary.Write(buf, binary.LittleEndian, uint16(20))                                       // width
+				_ = binary.Write(buf, binary.LittleEndian, uint16(20))                                       // height
+				_ = binary.Write(buf, binary.LittleEndian, uint16(32))                                       // bitsPerPixel
+				_ = binary.Write(buf, binary.LittleEndian, uint16(BitmapDataFlagCompression|BitmapDataFlagNoHDR)) // flags
+				_ = binary.Write(buf, binary.LittleEndian, uint16(3))                                        // bitmapLength
 				buf.Write([]byte{0x11, 0x22, 0x33})                                                      // bitmapDataStream
 				return buf.Bytes()
 			}(),
@@ -1066,18 +1066,18 @@ func TestBitmapUpdateData_Deserialize(t *testing.T) {
 			name: "single rectangle",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0x0001)) // updateType
-				binary.Write(buf, binary.LittleEndian, uint16(1))      // numberRectangles
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0001)) // updateType
+				_ = binary.Write(buf, binary.LittleEndian, uint16(1))      // numberRectangles
 				// Bitmap data
-				binary.Write(buf, binary.LittleEndian, uint16(0))  // destLeft
-				binary.Write(buf, binary.LittleEndian, uint16(0))  // destTop
-				binary.Write(buf, binary.LittleEndian, uint16(10)) // destRight
-				binary.Write(buf, binary.LittleEndian, uint16(10)) // destBottom
-				binary.Write(buf, binary.LittleEndian, uint16(10)) // width
-				binary.Write(buf, binary.LittleEndian, uint16(10)) // height
-				binary.Write(buf, binary.LittleEndian, uint16(24)) // bitsPerPixel
-				binary.Write(buf, binary.LittleEndian, uint16(0))  // flags
-				binary.Write(buf, binary.LittleEndian, uint16(2))  // bitmapLength
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))  // destLeft
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))  // destTop
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10)) // destRight
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10)) // destBottom
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10)) // width
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10)) // height
+				_ = binary.Write(buf, binary.LittleEndian, uint16(24)) // bitsPerPixel
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))  // flags
+				_ = binary.Write(buf, binary.LittleEndian, uint16(2))  // bitmapLength
 				buf.Write([]byte{0xAA, 0xBB})                      // data
 				return buf.Bytes()
 			}(),
@@ -1087,8 +1087,8 @@ func TestBitmapUpdateData_Deserialize(t *testing.T) {
 			name: "zero rectangles",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0x0001)) // updateType
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // numberRectangles
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0x0001)) // updateType
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))      // numberRectangles
 				return buf.Bytes()
 			}(),
 			expectedRects: 0,
@@ -1130,8 +1130,8 @@ func TestPointerPositionUpdateData_Deserialize(t *testing.T) {
 			name: "valid position",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(100)) // xPos
-				binary.Write(buf, binary.LittleEndian, uint16(200)) // yPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(100)) // xPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(200)) // yPos
 				return buf.Bytes()
 			}(),
 			expectedX: 100,
@@ -1141,8 +1141,8 @@ func TestPointerPositionUpdateData_Deserialize(t *testing.T) {
 			name: "max position",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(0xFFFF)) // xPos
-				binary.Write(buf, binary.LittleEndian, uint16(0xFFFF)) // yPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0xFFFF)) // xPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0xFFFF)) // yPos
 				return buf.Bytes()
 			}(),
 			expectedX: 0xFFFF,
@@ -1185,13 +1185,13 @@ func TestColorPointerUpdateData_Deserialize(t *testing.T) {
 			name: "valid color pointer without masks",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(1))  // cacheIndex
-				binary.Write(buf, binary.LittleEndian, uint16(0))  // xPos
-				binary.Write(buf, binary.LittleEndian, uint16(0))  // yPos
-				binary.Write(buf, binary.LittleEndian, uint16(32)) // width
-				binary.Write(buf, binary.LittleEndian, uint16(32)) // height
-				binary.Write(buf, binary.LittleEndian, uint16(0))  // lengthAndMask
-				binary.Write(buf, binary.LittleEndian, uint16(0))  // lengthXorMask
+				_ = binary.Write(buf, binary.LittleEndian, uint16(1))  // cacheIndex
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))  // xPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))  // yPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(32)) // width
+				_ = binary.Write(buf, binary.LittleEndian, uint16(32)) // height
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))  // lengthAndMask
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))  // lengthXorMask
 				buf.WriteByte(0x00)                                // padding
 				return buf.Bytes()
 			}(),
@@ -1209,13 +1209,13 @@ func TestColorPointerUpdateData_Deserialize(t *testing.T) {
 			name: "valid color pointer with masks",
 			input: func() []byte {
 				buf := new(bytes.Buffer)
-				binary.Write(buf, binary.LittleEndian, uint16(2))   // cacheIndex
-				binary.Write(buf, binary.LittleEndian, uint16(10))  // xPos
-				binary.Write(buf, binary.LittleEndian, uint16(15))  // yPos
-				binary.Write(buf, binary.LittleEndian, uint16(16))  // width
-				binary.Write(buf, binary.LittleEndian, uint16(16))  // height
-				binary.Write(buf, binary.LittleEndian, uint16(4))   // lengthAndMask
-				binary.Write(buf, binary.LittleEndian, uint16(8))   // lengthXorMask
+				_ = binary.Write(buf, binary.LittleEndian, uint16(2))   // cacheIndex
+				_ = binary.Write(buf, binary.LittleEndian, uint16(10))  // xPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(15))  // yPos
+				_ = binary.Write(buf, binary.LittleEndian, uint16(16))  // width
+				_ = binary.Write(buf, binary.LittleEndian, uint16(16))  // height
+				_ = binary.Write(buf, binary.LittleEndian, uint16(4))   // lengthAndMask
+				_ = binary.Write(buf, binary.LittleEndian, uint16(8))   // lengthXorMask
 				buf.Write([]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}) // xorMaskData
 				buf.Write([]byte{0xAA, 0xBB, 0xCC, 0xDD})                          // andMaskData
 				buf.WriteByte(0x00)                                                // padding

@@ -40,23 +40,23 @@ func TestClient_handleSlowPathGraphicsUpdate_Bitmap(t *testing.T) {
 	buf := new(bytes.Buffer)
 	
 	// Write some bitmap data (number of rectangles followed by rectangle data)
-	binary.Write(buf, binary.LittleEndian, uint16(1)) // numberRectangles
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // destLeft
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // destTop
-	binary.Write(buf, binary.LittleEndian, uint16(100)) // destRight
-	binary.Write(buf, binary.LittleEndian, uint16(100)) // destBottom
-	binary.Write(buf, binary.LittleEndian, uint16(100)) // width
-	binary.Write(buf, binary.LittleEndian, uint16(100)) // height
-	binary.Write(buf, binary.LittleEndian, uint16(16)) // bitsPerPixel
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // flags
-	binary.Write(buf, binary.LittleEndian, uint16(4)) // bitmapLength
+	_ = binary.Write(buf, binary.LittleEndian, uint16(1)) // numberRectangles
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // destLeft
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // destTop
+	_ = binary.Write(buf, binary.LittleEndian, uint16(100)) // destRight
+	_ = binary.Write(buf, binary.LittleEndian, uint16(100)) // destBottom
+	_ = binary.Write(buf, binary.LittleEndian, uint16(100)) // width
+	_ = binary.Write(buf, binary.LittleEndian, uint16(100)) // height
+	_ = binary.Write(buf, binary.LittleEndian, uint16(16)) // bitsPerPixel
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // flags
+	_ = binary.Write(buf, binary.LittleEndian, uint16(4)) // bitmapLength
 	buf.Write([]byte{0x01, 0x02, 0x03, 0x04}) // bitmap data
 
 	client := &Client{}
 	
 	// Prepend updateType for the reader
 	inputBuf := new(bytes.Buffer)
-	binary.Write(inputBuf, binary.LittleEndian, SlowPathUpdateTypeBitmap)
+	_ = binary.Write(inputBuf, binary.LittleEndian, SlowPathUpdateTypeBitmap)
 	inputBuf.Write(buf.Bytes())
 	
 	result, err := client.handleSlowPathGraphicsUpdate(inputBuf)
@@ -70,8 +70,8 @@ func TestClient_handleSlowPathGraphicsUpdate_Palette(t *testing.T) {
 	buf := new(bytes.Buffer)
 	
 	// Write palette data
-	binary.Write(buf, binary.LittleEndian, SlowPathUpdateTypePalette)
-	binary.Write(buf, binary.LittleEndian, uint16(256)) // numColors
+	_ = binary.Write(buf, binary.LittleEndian, SlowPathUpdateTypePalette)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(256)) // numColors
 	buf.Write(make([]byte, 256*3)) // RGB values
 	
 	client := &Client{}
@@ -84,7 +84,7 @@ func TestClient_handleSlowPathGraphicsUpdate_Palette(t *testing.T) {
 func TestClient_handleSlowPathGraphicsUpdate_Synchronize(t *testing.T) {
 	buf := new(bytes.Buffer)
 	
-	binary.Write(buf, binary.LittleEndian, SlowPathUpdateTypeSynchronize)
+	_ = binary.Write(buf, binary.LittleEndian, SlowPathUpdateTypeSynchronize)
 	// Synchronize has no additional data
 	
 	client := &Client{}
@@ -98,7 +98,7 @@ func TestClient_handleSlowPathGraphicsUpdate_Orders(t *testing.T) {
 	buf := new(bytes.Buffer)
 	
 	// Orders (0x0000) is not a known graphics update type for conversion
-	binary.Write(buf, binary.LittleEndian, SlowPathUpdateTypeOrders)
+	_ = binary.Write(buf, binary.LittleEndian, SlowPathUpdateTypeOrders)
 	buf.Write([]byte{0x01, 0x02})
 	
 	client := &Client{}
@@ -113,7 +113,7 @@ func TestClient_handleSlowPathGraphicsUpdate_UnknownType(t *testing.T) {
 	buf := new(bytes.Buffer)
 	
 	// Unknown update type
-	binary.Write(buf, binary.LittleEndian, uint16(0xFF))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0xFF))
 	buf.Write([]byte{0x01, 0x02})
 	
 	client := &Client{}

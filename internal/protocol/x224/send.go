@@ -16,9 +16,9 @@ type Data struct {
 func (pdu *Data) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.BigEndian, pdu.LI)
-	binary.Write(buf, binary.BigEndian, pdu.DTROA)
-	binary.Write(buf, binary.BigEndian, pdu.NREOT)
+	_ = binary.Write(buf, binary.BigEndian, pdu.LI)
+	_ = binary.Write(buf, binary.BigEndian, pdu.DTROA)
+	_ = binary.Write(buf, binary.BigEndian, pdu.NREOT)
 
 	buf.Write(pdu.UserData)
 

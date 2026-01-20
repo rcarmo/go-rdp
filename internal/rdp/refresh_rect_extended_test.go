@@ -137,13 +137,13 @@ func TestBuildShareDataHeader_BinaryFormat(t *testing.T) {
 	)
 
 	buf := bytes.NewReader(result)
-	binary.Read(buf, binary.LittleEndian, &shareID)
-	binary.Read(buf, binary.LittleEndian, &pad1)
-	binary.Read(buf, binary.LittleEndian, &streamID)
-	binary.Read(buf, binary.LittleEndian, &uncompressedLen)
-	binary.Read(buf, binary.LittleEndian, &pduType2)
-	binary.Read(buf, binary.LittleEndian, &compressedType)
-	binary.Read(buf, binary.LittleEndian, &compressedLength)
+	_ = binary.Read(buf, binary.LittleEndian, &shareID)
+	_ = binary.Read(buf, binary.LittleEndian, &pad1)
+	_ = binary.Read(buf, binary.LittleEndian, &streamID)
+	_ = binary.Read(buf, binary.LittleEndian, &uncompressedLen)
+	_ = binary.Read(buf, binary.LittleEndian, &pduType2)
+	_ = binary.Read(buf, binary.LittleEndian, &compressedType)
+	_ = binary.Read(buf, binary.LittleEndian, &compressedLength)
 
 	assert.Equal(t, uint32(0xDEADBEEF), shareID)
 	assert.Equal(t, uint8(0), pad1)
@@ -159,15 +159,15 @@ func TestBuildShareControlHeader_BinaryFormat(t *testing.T) {
 
 	// Parse the header manually
 	var (
-		totalLength       uint16
-		pduTypeWithVer    uint16
-		pduSource         uint16
+		totalLength    uint16
+		pduTypeWithVer uint16
+		pduSource      uint16
 	)
 
 	buf := bytes.NewReader(result)
-	binary.Read(buf, binary.LittleEndian, &totalLength)
-	binary.Read(buf, binary.LittleEndian, &pduTypeWithVer)
-	binary.Read(buf, binary.LittleEndian, &pduSource)
+	_ = binary.Read(buf, binary.LittleEndian, &totalLength)
+	_ = binary.Read(buf, binary.LittleEndian, &pduTypeWithVer)
+	_ = binary.Read(buf, binary.LittleEndian, &pduSource)
 
 	assert.Equal(t, uint16(7), totalLength) // 6 header + 1 data
 	assert.Equal(t, uint16(0x001A), pduTypeWithVer) // 0x000A | (1 << 4)

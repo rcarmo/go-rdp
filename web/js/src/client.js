@@ -81,7 +81,7 @@ applyMixin(AudioMixin);
  */
 Client.prototype.connect = function() {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        console.warn("Connection already established");
+        Logger.warn("Connection", "Already established");
         return;
     }
 
@@ -90,7 +90,7 @@ Client.prototype.connect = function() {
     const password = this.passwordEl.value;
 
     if (!this.validateHostname(host)) {
-        console.error('Invalid hostname format');
+        Logger.error("Connection", "Invalid hostname format");
         return;
     }
 
@@ -117,24 +117,44 @@ Client.prototype.connect = function() {
     const enableAudioEl = document.getElementById('enableAudio');
     const enableAudio = enableAudioEl ? enableAudioEl.checked : false;
 
+    Logger.info("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
+
+    // Build URL with non-sensitive parameters only (no password!)
     const url = new URL(this.websocketURL);
-    url.searchParams.set('host', host);
-    url.searchParams.set('user', user);
-    url.searchParams.set('password', password);
     url.searchParams.set('width', screenWidth);
     url.searchParams.set('height', screenHeight);
     url.searchParams.set('colorDepth', colorDepth);
     if (disableNLA) {
         url.searchParams.set('disableNLA', 'true');
+        Logger.info("Connection", "NLA disabled");
     }
     if (enableAudio) {
         url.searchParams.set('audio', 'true');
         this.enableAudio();
+        Logger.info("Audio", "Audio redirection enabled");
     }
+
+    // Store credentials to send after connection opens
+    this._pendingCredentials = { host, user, password };
 
     this.socket = new WebSocket(url.toString());
 
     this.socket.onopen = () => {
+        Logger.info("Connection", "WebSocket opened, sending credentials");
+        
+        // Send credentials securely via WebSocket (not URL)
+        if (this._pendingCredentials) {
+            const credMsg = JSON.stringify({
+                type: 'credentials',
+                host: this._pendingCredentials.host,
+                user: this._pendingCredentials.user,
+                password: this._pendingCredentials.password
+            });
+            this.socket.send(credMsg);
+            // Clear credentials from memory
+            this._pendingCredentials = null;
+        }
+        
         this.initialize();
     };
 
@@ -162,7 +182,7 @@ Client.prototype.connect = function() {
     };
 
     this.socket.onclose = (e) => {
-        this.logError('WebSocket connection closed', {code: e.code, reason: e.reason, wasClean: e.wasClean});
+        Logger.info("Connection", `WebSocket closed (code=${e.code}, reason=${e.reason || 'none'})`);
 
         this.emitEvent('disconnected', {
             code: e.code,
@@ -223,9 +243,10 @@ Client.prototype.sendAuthentication = function() {
         };
 
         this.socket.send(JSON.stringify(authData));
+        Logger.debug("Connection", "Authentication data sent");
     } catch (error) {
         this.showUserError('Failed to send authentication data');
-        console.error('Authentication send error:', error);
+        Logger.error("Connection", "Authentication send error:", error);
     }
 };
 
@@ -351,6 +372,7 @@ Client.prototype.handleMessage = function(arrayBuffer) {
         const message = JSON.parse(text);
         
         if (message.type === 'clipboard_response') {
+            Logger.info("Clipboard", "Received remote clipboard data");
             this.handleRemoteClipboard(message.data);
             return;
         }
@@ -365,6 +387,17 @@ Client.prototype.handleMessage = function(arrayBuffer) {
             this.emitEvent('error', {message: message.message});
             return;
         }
+        
+        if (message.type === 'capabilities') {
+            // Sync log level with backend
+            if (message.logLevel) {
+                Logger.setLevel(message.logLevel);
+                Logger.info("Config", `Log level synced: ${message.logLevel}`);
+            }
+            Logger.info("Capabilities", `Server: codecs=${message.codecs?.join(',') || 'none'}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
+            this.serverCapabilities = message;
+            return;
+        }
     } catch (e) {
         // Not JSON, handle as binary RDP data
     }
@@ -372,10 +405,10 @@ Client.prototype.handleMessage = function(arrayBuffer) {
     const r = new BinaryReader(arrayBuffer);
     const header = parseUpdateHeader(r);
     
-    Logger.debug('[RDP] Update received, code:', header.updateCode, 'isPointer:', header.isPointer());
+    Logger.debug("Update", `code=${header.updateCode}, pointer=${header.isPointer()}`);
 
     if (header.isCompressed()) {
-        console.warn("compressing is not supported");
+        Logger.warn("Update", "Compression not supported");
         return;
     }
 
@@ -390,6 +423,7 @@ Client.prototype.handleMessage = function(arrayBuffer) {
     }
 
     if (header.isSynchronize()) {
+        Logger.debug("Update", "Synchronize received");
         return;
     }
 
@@ -402,7 +436,7 @@ Client.prototype.handleMessage = function(arrayBuffer) {
         return;
     }
 
-    console.warn("unknown update:", header.updateCode);
+    Logger.debug("Update", `Unknown update code: ${header.updateCode}`);
 };
 
 /**

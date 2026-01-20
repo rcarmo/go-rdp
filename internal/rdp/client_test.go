@@ -77,8 +77,8 @@ func TestClient_NewClient_Validation(t *testing.T) {
 func TestClient_getServerName(t *testing.T) {
 	// Create a mock connection for testing
 	conn1, conn2 := net.Pipe()
-	defer conn1.Close()
-	defer conn2.Close()
+	defer func() { _ = conn1.Close() }()
+	defer func() { _ = conn2.Close() }()
 
 	client := &Client{
 		conn: conn1,

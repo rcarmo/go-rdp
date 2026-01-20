@@ -42,11 +42,7 @@ func (c *Client) connectionFinalization() error {
 		wire    io.Reader
 	)
 
-	for {
-		if serverSynchronizeReceived && controlCooperateReceived && grantedControlReceived && fontMapReceived {
-			break
-		}
-
+	for !serverSynchronizeReceived || !controlCooperateReceived || !grantedControlReceived || !fontMapReceived {
 		_, wire, err = c.mcsLayer.Receive()
 		if err != nil {
 			return err

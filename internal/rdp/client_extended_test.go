@@ -42,7 +42,7 @@ func TestClient_getServerName_extended(t *testing.T) {
 				conn: conn,
 			}
 			if conn != nil {
-				defer conn.Close()
+				defer func() { _ = conn.Close() }()
 			}
 
 			result := client.getServerName()

@@ -160,18 +160,18 @@ func TestServerDemandActive_Deserialize_Basic(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	// ShareControlHeader
-	binary.Write(buf, binary.LittleEndian, uint16(26)) // totalLength
-	binary.Write(buf, binary.LittleEndian, uint16(0x11)) // pduType
-	binary.Write(buf, binary.LittleEndian, uint16(1001)) // pduSource
+	_ = binary.Write(buf, binary.LittleEndian, uint16(26)) // totalLength
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x11)) // pduType
+	_ = binary.Write(buf, binary.LittleEndian, uint16(1001)) // pduSource
 
 	// DemandActivePDU data
-	binary.Write(buf, binary.LittleEndian, uint32(0x00010002)) // shareId
-	binary.Write(buf, binary.LittleEndian, uint16(4))          // lengthSourceDescriptor
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x00010002)) // shareId
+	_ = binary.Write(buf, binary.LittleEndian, uint16(4))          // lengthSourceDescriptor
 	buf.Write([]byte("RDP\x00"))                               // sourceDescriptor
-	binary.Write(buf, binary.LittleEndian, uint16(4))          // lengthCombinedCapabilities
-	binary.Write(buf, binary.LittleEndian, uint16(0))          // numberCapabilities
-	binary.Write(buf, binary.LittleEndian, uint16(0))          // pad2Octets
-	binary.Write(buf, binary.LittleEndian, uint32(0))          // sessionId
+	_ = binary.Write(buf, binary.LittleEndian, uint16(4))          // lengthCombinedCapabilities
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0))          // numberCapabilities
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0))          // pad2Octets
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0))          // sessionId
 
 	var resp pdu.ServerDemandActive
 	err := resp.Deserialize(buf)
@@ -383,18 +383,18 @@ func TestServerLicenseError_Deserialize(t *testing.T) {
 			buf := new(bytes.Buffer)
 
 			// Security header with SEC_LICENSE_PKT flag (0x0080)
-			binary.Write(buf, binary.LittleEndian, uint32(0x0080))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x0080))
 
 			// Preamble
-			binary.Write(buf, binary.LittleEndian, tt.msgType)
-			binary.Write(buf, binary.LittleEndian, uint8(0x02))
-			binary.Write(buf, binary.LittleEndian, uint16(20))
+			_ = binary.Write(buf, binary.LittleEndian, tt.msgType)
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0x02))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(20))
 
 			// ValidClientMessage
-			binary.Write(buf, binary.LittleEndian, uint32(0x00000007))
-			binary.Write(buf, binary.LittleEndian, uint32(0x00000002))
-			binary.Write(buf, binary.LittleEndian, uint16(0))
-			binary.Write(buf, binary.LittleEndian, uint16(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x00000007))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x00000002))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 
 			var resp pdu.ServerLicenseError
 			err := resp.Deserialize(buf, true)
@@ -421,33 +421,33 @@ func TestData_Deserialize_Extended(t *testing.T) {
 			buf := new(bytes.Buffer)
 
 			// ShareControlHeader
-			binary.Write(buf, binary.LittleEndian, uint16(30))
-			binary.Write(buf, binary.LittleEndian, uint16(0x17))
-			binary.Write(buf, binary.LittleEndian, uint16(1001))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(30))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0x17))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(1001))
 
 			// ShareDataHeader
-			binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
-			binary.Write(buf, binary.LittleEndian, uint8(0))
-			binary.Write(buf, binary.LittleEndian, uint8(1))
-			binary.Write(buf, binary.LittleEndian, uint16(14))
-			binary.Write(buf, binary.LittleEndian, tt.pduType2)
-			binary.Write(buf, binary.LittleEndian, uint8(0))
-			binary.Write(buf, binary.LittleEndian, uint16(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint8(1))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(14))
+			_ = binary.Write(buf, binary.LittleEndian, tt.pduType2)
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 
 			// PDU-specific data
 			switch tt.pduType2 {
 			case 0x1F: // Synchronize
-				binary.Write(buf, binary.LittleEndian, uint16(1))
-				binary.Write(buf, binary.LittleEndian, uint16(1001))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(1))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(1001))
 			case 0x14: // Control
-				binary.Write(buf, binary.LittleEndian, uint16(4)) // action=COOPERATE
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint32(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(4)) // action=COOPERATE
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint32(0))
 			case 0x28: // Fontmap
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 			}
 
 			dataPDU := &pdu.Data{}
@@ -496,9 +496,9 @@ func TestClientUserDataSet_Creation(t *testing.T) {
 // TestShareControlHeader_Deserialize tests ShareControlHeader deserialization
 func TestShareControlHeader_Deserialize(t *testing.T) {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, uint16(20))   // totalLength
-	binary.Write(buf, binary.LittleEndian, uint16(0x17)) // pduType
-	binary.Write(buf, binary.LittleEndian, uint16(1001)) // pduSource
+	_ = binary.Write(buf, binary.LittleEndian, uint16(20))   // totalLength
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x17)) // pduType
+	_ = binary.Write(buf, binary.LittleEndian, uint16(1001)) // pduSource
 
 	var header pdu.ShareControlHeader
 	err := header.Deserialize(buf)

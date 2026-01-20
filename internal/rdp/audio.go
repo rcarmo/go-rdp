@@ -2,8 +2,8 @@ package rdp
 
 import (
 	"bytes"
-	"log"
 
+	"github.com/rcarmo/rdp-html5/internal/logging"
 	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
 )
 
@@ -98,10 +98,10 @@ func (h *AudioHandler) HandleChannelData(data []byte) error {
 	case audio.SND_WAVE2:
 		return h.handleWave2(body)
 	case audio.SND_CLOSE:
-		log.Println("Audio: Server closed audio channel")
+		logging.Info("Audio: Server closed audio channel")
 		return nil
 	default:
-		log.Printf("Audio: Unknown RDPSND message type: 0x%02X", header.MsgType)
+		logging.Debug("Audio: Unknown RDPSND message type: 0x%02X", header.MsgType)
 	}
 
 	return nil
@@ -114,14 +114,14 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 		return err
 	}
 
-	log.Printf("Audio: Server offers %d formats (version %d)", serverFormats.NumFormats, serverFormats.Version)
+	logging.Info("Audio: Server offers %d formats (version %d)", serverFormats.NumFormats, serverFormats.Version)
 
 	h.serverFormats = serverFormats.Formats
 
 	// Find a format we support - prefer PCM for simplicity with Web Audio
 	selectedIndex := -1
 	for i, format := range serverFormats.Formats {
-		log.Printf("Audio:   Format %d: %s", i, format.String())
+		logging.Debug("Audio:   Format %d: %s", i, format.String())
 		// We can handle PCM directly in Web Audio
 		if format.FormatTag == audio.WAVE_FORMAT_PCM {
 			if selectedIndex == -1 {
@@ -135,17 +135,17 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 	}
 
 	if selectedIndex == -1 {
-		log.Println("Audio: No compatible format found, using first available")
+		logging.Debug("Audio: No compatible format found, using first available")
 		selectedIndex = 0
 	}
 
 	if len(h.serverFormats) == 0 {
-		log.Println("Audio: No formats available from server")
+		logging.Warn("Audio: No formats available from server")
 		return nil
 	}
 
 	h.selectedFormat = selectedIndex
-	log.Printf("Audio: Selected format %d: %s", selectedIndex, h.serverFormats[selectedIndex].String())
+	logging.Info("Audio: Selected format %d: %s", selectedIndex, h.serverFormats[selectedIndex].String())
 
 	// Send client response with supported formats
 	return h.sendClientFormats(serverFormats.Formats, serverFormats.Version)
@@ -183,7 +183,7 @@ func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version ui
 	// Send on rdpsnd channel
 	channelID, ok := h.client.channelIDMap[audio.ChannelRDPSND]
 	if !ok {
-		log.Println("Audio: rdpsnd channel not found")
+		logging.Warn("Audio: rdpsnd channel not found")
 		return nil
 	}
 
@@ -197,7 +197,7 @@ func (h *AudioHandler) handleTraining(body []byte) error {
 		return err
 	}
 
-	log.Printf("Audio: Training packet timestamp=%d size=%d", training.Timestamp, training.PackSize)
+	logging.Debug("Audio: Training packet timestamp=%d size=%d", training.Timestamp, training.PackSize)
 
 	// Send confirmation
 	confirm := audio.TrainingConfirmPDU{

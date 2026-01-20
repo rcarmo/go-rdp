@@ -31,14 +31,14 @@ func TestClient_handleRail_SysParam(t *testing.T) {
 	// Build a SysParam PDU
 	buf := new(bytes.Buffer)
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Rail header
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
-	binary.Write(buf, binary.LittleEndian, uint16(17))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(17))
 	// SysParam data
-	binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
-	binary.Write(buf, binary.LittleEndian, uint8(0x42))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
+	_ = binary.Write(buf, binary.LittleEndian, uint8(0x42))
 
 	err := client.handleRail(buf)
 	assert.NoError(t, err)
@@ -126,8 +126,8 @@ func TestRailPDU_Deserialize_ChannelHeaderError(t *testing.T) {
 func TestRailPDU_Deserialize_RailHeaderError(t *testing.T) {
 	// Only channel header, no rail header
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Missing rail header
 
 	pdu := &RailPDU{}
@@ -190,11 +190,11 @@ func TestRailPDUSystemParameters_DeserializeError(t *testing.T) {
 func TestRailPDU_Deserialize_HandshakeError(t *testing.T) {
 	buf := new(bytes.Buffer)
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Rail header
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderHandshake))
-	binary.Write(buf, binary.LittleEndian, uint16(16))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderHandshake))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(16))
 	// Missing handshake data
 
 	pdu := &RailPDU{}
@@ -205,11 +205,11 @@ func TestRailPDU_Deserialize_HandshakeError(t *testing.T) {
 func TestRailPDU_Deserialize_SysParamError(t *testing.T) {
 	buf := new(bytes.Buffer)
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Rail header
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
-	binary.Write(buf, binary.LittleEndian, uint16(17))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(17))
 	// Missing sysparam data
 
 	pdu := &RailPDU{}
@@ -220,11 +220,11 @@ func TestRailPDU_Deserialize_SysParamError(t *testing.T) {
 func TestRailPDU_Deserialize_ExecResultError(t *testing.T) {
 	buf := new(bytes.Buffer)
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Rail header
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderExecResult))
-	binary.Write(buf, binary.LittleEndian, uint16(32))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderExecResult))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(32))
 	// Missing exec result data
 
 	pdu := &RailPDU{}

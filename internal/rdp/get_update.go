@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 
+	"github.com/rcarmo/rdp-html5/internal/logging"
 	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 )
@@ -115,11 +115,11 @@ func (c *Client) getX224Update() (*Update, error) {
 			// Read all data from wire
 			var buf bytes.Buffer
 			if _, err := io.Copy(&buf, wire); err != nil {
-				log.Printf("Audio: Error reading channel data: %v", err)
+				logging.Debug("Audio: Error reading channel data: %v", err)
 				return nil, nil
 			}
 			if err := c.audioHandler.HandleChannelData(buf.Bytes()); err != nil {
-				log.Printf("Audio: Error handling channel data: %v", err)
+				logging.Debug("Audio: Error handling channel data: %v", err)
 			}
 		}
 		return nil, nil
@@ -144,13 +144,13 @@ func (c *Client) getX224Update() (*Update, error) {
 	var compressedType uint8
 	var compressedLength uint16
 
-	binary.Read(wire, binary.LittleEndian, &shareID)
-	binary.Read(wire, binary.LittleEndian, &padding)
-	binary.Read(wire, binary.LittleEndian, &streamID)
-	binary.Read(wire, binary.LittleEndian, &uncompressedLength)
-	binary.Read(wire, binary.LittleEndian, &pduType2)
-	binary.Read(wire, binary.LittleEndian, &compressedType)
-	binary.Read(wire, binary.LittleEndian, &compressedLength)
+	_ = binary.Read(wire, binary.LittleEndian, &shareID)
+	_ = binary.Read(wire, binary.LittleEndian, &padding)
+	_ = binary.Read(wire, binary.LittleEndian, &streamID)
+	_ = binary.Read(wire, binary.LittleEndian, &uncompressedLength)
+	_ = binary.Read(wire, binary.LittleEndian, &pduType2)
+	_ = binary.Read(wire, binary.LittleEndian, &compressedType)
+	_ = binary.Read(wire, binary.LittleEndian, &compressedLength)
 
 	// Handle bitmap updates (PDUTYPE2_UPDATE = 0x02)
 	if pduType2.IsUpdate() {
@@ -161,7 +161,7 @@ func (c *Client) getX224Update() (*Update, error) {
 	if pduType2.IsErrorInfo() {
 		var errorInfo pdu.ErrorInfoPDUData
 		if err := errorInfo.Deserialize(wire); err == nil {
-			log.Printf("received error info: %s\n", errorInfo.String())
+			logging.Warn("Received error info: %s", errorInfo.String())
 		}
 	}
 

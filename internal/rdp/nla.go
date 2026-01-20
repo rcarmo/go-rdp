@@ -5,13 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/rcarmo/rdp-html5/internal/auth"
 	"github.com/rcarmo/rdp-html5/internal/config"
+	"github.com/rcarmo/rdp-html5/internal/logging"
 )
 
 // StartNLA performs Network Level Authentication using CredSSP/NTLMv2
@@ -23,7 +23,7 @@ func (c *Client) StartNLA() error {
 
 	// Parse domain from username if present (DOMAIN\user or user@domain)
 	domain, user := c.parseDomainUser()
-	log.Printf("NLA: Authenticating as domain=%q user=%q", domain, user)
+	logging.Info("NLA: Authenticating as domain=%q user=%q", domain, user)
 
 	// Create NTLMv2 context
 	ntlmCtx := auth.NewNTLMv2(domain, user, c.password)
@@ -41,7 +41,7 @@ func (c *Client) StartNLA() error {
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send negotiate message: %w", err)
 	}
-	log.Printf("NLA: Sent negotiate message (%d bytes)", len(tsReq))
+	logging.Debug("NLA: Sent negotiate message (%d bytes)", len(tsReq))
 
 	// Step 2: Receive server challenge
 	resp := make([]byte, 4096)
@@ -49,13 +49,13 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to read challenge: %w", err)
 	}
-	log.Printf("NLA: Received challenge (%d bytes)", n)
+	logging.Debug("NLA: Received challenge (%d bytes)", n)
 
 	tsResp, err := auth.DecodeTSRequest(resp[:n])
 	if err != nil {
 		return fmt.Errorf("NLA: failed to decode challenge: %w", err)
 	}
-	log.Printf("NLA: Server version=%d, errorCode=%d", tsResp.Version, tsResp.ErrorCode)
+	logging.Debug("NLA: Server version=%d, errorCode=%d", tsResp.Version, tsResp.ErrorCode)
 
 	if len(tsResp.NegoTokens) == 0 {
 		return fmt.Errorf("NLA: no challenge token received from server")
@@ -72,28 +72,28 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to get TLS public key: %w", err)
 	}
-	log.Printf("NLA: Got TLS SubjectPublicKey (%d bytes, first 20: %x)", len(pubKey), pubKey[:min(20, len(pubKey))])
+	logging.Debug("NLA: Got TLS SubjectPublicKey (%d bytes)", len(pubKey))
 
 	// For version 5+, compute hash-based pubKeyAuth
 	// SHA256(ClientServerHashMagic || clientNonce || publicKey)
 	var pubKeyData []byte
 	if tsResp.Version >= 5 {
 		pubKeyData = auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, clientNonce)
-		log.Printf("NLA: Using version %d hash-based pubKeyAuth (len=%d, first 20: %x)", tsResp.Version, len(pubKeyData), pubKeyData[:min(20, len(pubKeyData))])
+		logging.Debug("NLA: Using version %d hash-based pubKeyAuth", tsResp.Version)
 	} else {
 		pubKeyData = pubKey
-		log.Printf("NLA: Using version %d raw pubKey", tsResp.Version)
+		logging.Debug("NLA: Using version %d raw pubKey", tsResp.Version)
 	}
 
 	encryptedPubKey := ntlmSec.GssEncrypt(pubKeyData)
-	log.Printf("NLA: Encrypted pubKeyAuth len=%d", len(encryptedPubKey))
+	logging.Debug("NLA: Encrypted pubKeyAuth len=%d", len(encryptedPubKey))
 
 	// Send authenticate message with encrypted public key and client nonce
 	tsReq = auth.EncodeTSRequestWithNonce([][]byte{authMsg}, nil, encryptedPubKey, clientNonce)
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send authenticate message: %w", err)
 	}
-	log.Printf("NLA: Sent authenticate message (%d bytes), authMsg len=%d", len(tsReq), len(authMsg))
+	logging.Debug("NLA: Sent authenticate message (%d bytes)", len(tsReq))
 
 	// Step 4: Receive public key verification from server
 	resp = make([]byte, 4096)
@@ -101,7 +101,7 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		return fmt.Errorf("NLA: failed to read public key response: %w", err)
 	}
-	log.Printf("NLA: Received public key response (%d bytes)", n)
+	logging.Debug("NLA: Received public key response (%d bytes)", n)
 
 	tsResp, err = auth.DecodeTSRequest(resp[:n])
 	if err != nil {
@@ -114,13 +114,13 @@ func (c *Client) StartNLA() error {
 		if decryptedPubKeyAuth == nil {
 			return fmt.Errorf("NLA: failed to decrypt server pubKeyAuth")
 		}
-		log.Printf("NLA: Decrypted server pubKeyAuth (%d bytes)", len(decryptedPubKeyAuth))
+		logging.Debug("NLA: Decrypted server pubKeyAuth (%d bytes)", len(decryptedPubKeyAuth))
 
 		// Verify the server's response
 		if !auth.VerifyServerPubKeyAuth(tsResp.Version, decryptedPubKeyAuth, pubKey, clientNonce) {
 			return fmt.Errorf("NLA: server pubKeyAuth verification failed")
 		}
-		log.Printf("NLA: Server pubKeyAuth verified successfully")
+		logging.Debug("NLA: Server pubKeyAuth verified successfully")
 	}
 
 	// Step 5: Send credentials
@@ -128,13 +128,13 @@ func (c *Client) StartNLA() error {
 	domainBytes, userBytes, passBytes := ntlmCtx.GetCredSSPCredentials()
 	credentials := auth.EncodeCredentials(domainBytes, userBytes, passBytes)
 	encryptedCreds := ntlmSec.GssEncrypt(credentials)
-	log.Printf("NLA: Sending encrypted credentials (%d bytes)", len(encryptedCreds))
+	logging.Debug("NLA: Sending encrypted credentials")
 
 	tsReq = auth.EncodeTSRequest(nil, encryptedCreds, nil)
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send credentials: %w", err)
 	}
-	log.Printf("NLA: Credentials sent successfully")
+	logging.Info("NLA: Authentication completed successfully")
 
 	// Step 6: Wait for final server response (optional - some servers send a final TSRequest)
 	// Set a short timeout for this read - if no data comes, credentials were accepted
@@ -147,7 +147,7 @@ func (c *Client) StartNLA() error {
 	if err != nil {
 		// Timeout is expected and OK - means server accepted credentials silently
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
-			log.Printf("NLA: No final response from server (timeout - expected)")
+			logging.Debug("NLA: No final response from server (timeout - expected)")
 			// Clear the deadline
 			if tcpConn, ok := c.conn.(*tls.Conn); ok {
 				_ = tcpConn.SetReadDeadline(time.Time{})
@@ -155,7 +155,7 @@ func (c *Client) StartNLA() error {
 			return nil
 		}
 		// Other errors might indicate authentication failure
-		log.Printf("NLA: Error reading final response: %v", err)
+		logging.Debug("NLA: Error reading final response: %v", err)
 		// Try to continue anyway - some servers don't send a final response
 		if tcpConn, ok := c.conn.(*tls.Conn); ok {
 			_ = tcpConn.SetReadDeadline(time.Time{})
@@ -170,13 +170,13 @@ func (c *Client) StartNLA() error {
 
 	// If we got data, check if it's an error response
 	if n > 0 {
-		log.Printf("NLA: Received final response (%d bytes)", n)
+		logging.Debug("NLA: Received final response (%d bytes)", n)
 		finalTsResp, err := auth.DecodeTSRequest(finalResp[:n])
 		if err == nil {
 			if finalTsResp.ErrorCode != 0 {
 				return fmt.Errorf("NLA: server returned error code: 0x%08X", finalTsResp.ErrorCode)
 			}
-			log.Printf("NLA: Final response indicates success (version=%d)", finalTsResp.Version)
+			logging.Debug("NLA: Final response indicates success (version=%d)", finalTsResp.Version)
 		}
 	}
 

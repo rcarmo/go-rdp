@@ -20,7 +20,7 @@ func NewMultifragmentUpdateCapabilitySet() CapabilitySet {
 func (s *MultifragmentUpdateCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, &s.MaxRequestSize)
+	_ = binary.Write(buf, binary.LittleEndian, &s.MaxRequestSize)
 
 	return buf.Bytes()
 }
@@ -237,7 +237,7 @@ func NewRailCapabilitySet() CapabilitySet {
 func (s *RailCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, s.RailSupportLevel)
+	_ = binary.Write(buf, binary.LittleEndian, s.RailSupportLevel)
 
 	return buf.Bytes()
 }
@@ -260,9 +260,9 @@ func NewWindowListCapabilitySet() CapabilitySet {
 func (s *WindowListCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, s.WndSupportLevel)
-	binary.Write(buf, binary.LittleEndian, s.NumIconCaches)
-	binary.Write(buf, binary.LittleEndian, s.NumIconCacheEntries)
+	_ = binary.Write(buf, binary.LittleEndian, s.WndSupportLevel)
+	_ = binary.Write(buf, binary.LittleEndian, s.NumIconCaches)
+	_ = binary.Write(buf, binary.LittleEndian, s.NumIconCacheEntries)
 
 	return buf.Bytes()
 }

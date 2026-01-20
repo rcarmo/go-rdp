@@ -81,7 +81,7 @@ func newClientCoreData(selectedProtocol uint32, desktopWidth, desktopHeight uint
 	// Set color depth values based on requested depth
 	var highColorDepth uint16
 	var supportedColorDepths uint16
-	var earlyCapabilityFlags uint16 = ECFSupportErrInfoPDU
+	earlyCapabilityFlags := ECFSupportErrInfoPDU
 
 	switch colorDepth {
 	case 32:
@@ -209,37 +209,37 @@ func (data ClientCoreData) Serialize() []byte {
 
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(0xC001)) // header type CS_CORE
-	binary.Write(buf, binary.LittleEndian, dataLen)        // packet size
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0xC001)) // header type CS_CORE
+	_ = binary.Write(buf, binary.LittleEndian, dataLen)        // packet size
 
-	binary.Write(buf, binary.LittleEndian, data.Version)
-	binary.Write(buf, binary.LittleEndian, data.DesktopWidth)
-	binary.Write(buf, binary.LittleEndian, data.DesktopHeight)
-	binary.Write(buf, binary.LittleEndian, data.ColorDepth)
-	binary.Write(buf, binary.LittleEndian, data.SASSequence)
-	binary.Write(buf, binary.LittleEndian, data.KeyboardLayout)
-	binary.Write(buf, binary.LittleEndian, data.ClientBuild)
-	binary.Write(buf, binary.LittleEndian, data.ClientName)
-	binary.Write(buf, binary.LittleEndian, data.KeyboardType)
-	binary.Write(buf, binary.LittleEndian, data.KeyboardSubType)
-	binary.Write(buf, binary.LittleEndian, data.KeyboardFunctionKey)
-	binary.Write(buf, binary.LittleEndian, data.ImeFileName)
-	binary.Write(buf, binary.LittleEndian, data.PostBeta2ColorDepth)
-	binary.Write(buf, binary.LittleEndian, data.ClientProductId)
-	binary.Write(buf, binary.LittleEndian, data.SerialNumber)
-	binary.Write(buf, binary.LittleEndian, data.HighColorDepth)
-	binary.Write(buf, binary.LittleEndian, data.SupportedColorDepths)
-	binary.Write(buf, binary.LittleEndian, data.EarlyCapabilityFlags)
-	binary.Write(buf, binary.LittleEndian, data.ClientDigProductId)
-	binary.Write(buf, binary.LittleEndian, data.ConnectionType)
-	binary.Write(buf, binary.LittleEndian, data.Pad1octet)
-	binary.Write(buf, binary.LittleEndian, data.ServerSelectedProtocol)
+	_ = binary.Write(buf, binary.LittleEndian, data.Version)
+	_ = binary.Write(buf, binary.LittleEndian, data.DesktopWidth)
+	_ = binary.Write(buf, binary.LittleEndian, data.DesktopHeight)
+	_ = binary.Write(buf, binary.LittleEndian, data.ColorDepth)
+	_ = binary.Write(buf, binary.LittleEndian, data.SASSequence)
+	_ = binary.Write(buf, binary.LittleEndian, data.KeyboardLayout)
+	_ = binary.Write(buf, binary.LittleEndian, data.ClientBuild)
+	_ = binary.Write(buf, binary.LittleEndian, data.ClientName)
+	_ = binary.Write(buf, binary.LittleEndian, data.KeyboardType)
+	_ = binary.Write(buf, binary.LittleEndian, data.KeyboardSubType)
+	_ = binary.Write(buf, binary.LittleEndian, data.KeyboardFunctionKey)
+	_ = binary.Write(buf, binary.LittleEndian, data.ImeFileName)
+	_ = binary.Write(buf, binary.LittleEndian, data.PostBeta2ColorDepth)
+	_ = binary.Write(buf, binary.LittleEndian, data.ClientProductId)
+	_ = binary.Write(buf, binary.LittleEndian, data.SerialNumber)
+	_ = binary.Write(buf, binary.LittleEndian, data.HighColorDepth)
+	_ = binary.Write(buf, binary.LittleEndian, data.SupportedColorDepths)
+	_ = binary.Write(buf, binary.LittleEndian, data.EarlyCapabilityFlags)
+	_ = binary.Write(buf, binary.LittleEndian, data.ClientDigProductId)
+	_ = binary.Write(buf, binary.LittleEndian, data.ConnectionType)
+	_ = binary.Write(buf, binary.LittleEndian, data.Pad1octet)
+	_ = binary.Write(buf, binary.LittleEndian, data.ServerSelectedProtocol)
 	// Optional extended fields (MS-RDPBCGR 2.2.1.3.2)
-	binary.Write(buf, binary.LittleEndian, data.DesktopPhysicalWidth)
-	binary.Write(buf, binary.LittleEndian, data.DesktopPhysicalHeight)
-	binary.Write(buf, binary.LittleEndian, data.DesktopOrientation)
-	binary.Write(buf, binary.LittleEndian, data.DesktopScaleFactor)
-	binary.Write(buf, binary.LittleEndian, data.DeviceScaleFactor)
+	_ = binary.Write(buf, binary.LittleEndian, data.DesktopPhysicalWidth)
+	_ = binary.Write(buf, binary.LittleEndian, data.DesktopPhysicalHeight)
+	_ = binary.Write(buf, binary.LittleEndian, data.DesktopOrientation)
+	_ = binary.Write(buf, binary.LittleEndian, data.DesktopScaleFactor)
+	_ = binary.Write(buf, binary.LittleEndian, data.DeviceScaleFactor)
 
 	return buf.Bytes()
 }
@@ -263,11 +263,11 @@ func (data ClientSecurityData) Serialize() []byte {
 
 	buf := bytes.NewBuffer(make([]byte, 0, 6))
 
-	binary.Write(buf, binary.LittleEndian, uint16(0xC002)) // header type CS_SECURITY
-	binary.Write(buf, binary.LittleEndian, dataLen)        // packet size
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0xC002)) // header type CS_SECURITY
+	_ = binary.Write(buf, binary.LittleEndian, dataLen)        // packet size
 
-	binary.Write(buf, binary.LittleEndian, data.EncryptionMethods)
-	binary.Write(buf, binary.LittleEndian, data.ExtEncryptionMethods)
+	_ = binary.Write(buf, binary.LittleEndian, data.EncryptionMethods)
+	_ = binary.Write(buf, binary.LittleEndian, data.ExtEncryptionMethods)
 
 	return buf.Bytes()
 }
@@ -275,8 +275,8 @@ func (data ClientSecurityData) Serialize() []byte {
 func (s ChannelDefinitionStructure) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, s.Name)
-	binary.Write(buf, binary.LittleEndian, s.Options)
+	_ = binary.Write(buf, binary.LittleEndian, s.Name)
+	_ = binary.Write(buf, binary.LittleEndian, s.Options)
 
 	return buf.Bytes()
 }
@@ -311,10 +311,10 @@ func (data ClientNetworkData) Serialize() []byte {
 
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(0xC003))                // header type CS_NET
-	binary.Write(buf, binary.LittleEndian, uint16(headerLen+chBuf.Len())) // packet size
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0xC003))                // header type CS_NET
+	_ = binary.Write(buf, binary.LittleEndian, uint16(headerLen+chBuf.Len())) // packet size
 
-	binary.Write(buf, binary.LittleEndian, data.ChannelCount)
+	_ = binary.Write(buf, binary.LittleEndian, data.ChannelCount)
 
 	buf.Write(chBuf.Bytes())
 
@@ -326,11 +326,11 @@ func (d ClientClusterData) Serialize() []byte {
 
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(0xC004)) // header type CS_CLUSTER
-	binary.Write(buf, binary.LittleEndian, dataLen)        // packet size
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0xC004)) // header type CS_CLUSTER
+	_ = binary.Write(buf, binary.LittleEndian, dataLen)        // packet size
 
-	binary.Write(buf, binary.LittleEndian, d.Flags)
-	binary.Write(buf, binary.LittleEndian, d.RedirectedSessionID)
+	_ = binary.Write(buf, binary.LittleEndian, d.Flags)
+	_ = binary.Write(buf, binary.LittleEndian, d.RedirectedSessionID)
 
 	return buf.Bytes()
 }

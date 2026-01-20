@@ -14,7 +14,7 @@ func TestErrUnsupportedRequestedProtocol(t *testing.T) {
 }
 
 func TestErrUnsupportedRequestedProtocol_ErrorInterface(t *testing.T) {
-	var err error = ErrUnsupportedRequestedProtocol
+	err := error(ErrUnsupportedRequestedProtocol)
 
 	assert.NotNil(t, err)
 	assert.IsType(t, ErrUnsupportedRequestedProtocol, err)

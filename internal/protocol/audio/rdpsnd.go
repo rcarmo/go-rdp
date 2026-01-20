@@ -209,18 +209,18 @@ type ClientAudioFormats struct {
 
 func (c *ClientAudioFormats) Serialize() []byte {
 	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, c.Version)
-	binary.Write(&buf, binary.LittleEndian, c.Padding)
-	binary.Write(&buf, binary.LittleEndian, c.VolumePDUFlags)
-	binary.Write(&buf, binary.LittleEndian, c.Padding2)
-	binary.Write(&buf, binary.LittleEndian, c.NumFormats)
-	binary.Write(&buf, binary.LittleEndian, c.CbMaxPDUSize)
-	binary.Write(&buf, binary.LittleEndian, c.Pad)
-	
+	_ = binary.Write(&buf, binary.LittleEndian, c.Version)
+	_ = binary.Write(&buf, binary.LittleEndian, c.Padding)
+	_ = binary.Write(&buf, binary.LittleEndian, c.VolumePDUFlags)
+	_ = binary.Write(&buf, binary.LittleEndian, c.Padding2)
+	_ = binary.Write(&buf, binary.LittleEndian, c.NumFormats)
+	_ = binary.Write(&buf, binary.LittleEndian, c.CbMaxPDUSize)
+	_ = binary.Write(&buf, binary.LittleEndian, c.Pad)
+
 	for _, format := range c.Formats {
 		buf.Write(format.Serialize())
 	}
-	
+
 	return buf.Bytes()
 }
 

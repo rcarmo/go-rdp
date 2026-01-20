@@ -228,18 +228,18 @@ func TestParseChallengeMessage(t *testing.T) {
 			name: "valid challenge without target info",
 			data: func() []byte {
 				buf := &bytes.Buffer{}
-				buf.Write(ntlmSignature)                               // Signature (8)
-				binary.Write(buf, binary.LittleEndian, uint32(2))      // MessageType (4)
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // TargetNameLen
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // TargetNameMaxLen
-				binary.Write(buf, binary.LittleEndian, uint32(0))      // TargetNameOffset
-				binary.Write(buf, binary.LittleEndian, uint32(0x1234)) // NegotiateFlags
-				buf.Write([]byte{1, 2, 3, 4, 5, 6, 7, 8})              // ServerChallenge
-				buf.Write(make([]byte, 8))                             // Reserved
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // TargetInfoLen
-				binary.Write(buf, binary.LittleEndian, uint16(0))      // TargetInfoMaxLen
-				binary.Write(buf, binary.LittleEndian, uint32(0))      // TargetInfoOffset
-				buf.Write(make([]byte, 16))                            // Padding to reach 56 bytes
+				buf.Write(ntlmSignature)                                // Signature (8)
+				_ = binary.Write(buf, binary.LittleEndian, uint32(2))   // MessageType (4)
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))   // TargetNameLen
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))   // TargetNameMaxLen
+				_ = binary.Write(buf, binary.LittleEndian, uint32(0))   // TargetNameOffset
+				_ = binary.Write(buf, binary.LittleEndian, uint32(0x1234)) // NegotiateFlags
+				buf.Write([]byte{1, 2, 3, 4, 5, 6, 7, 8})               // ServerChallenge
+				buf.Write(make([]byte, 8))                              // Reserved
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))   // TargetInfoLen
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))   // TargetInfoMaxLen
+				_ = binary.Write(buf, binary.LittleEndian, uint32(0))   // TargetInfoOffset
+				buf.Write(make([]byte, 16))                             // Padding to reach 56 bytes
 				return buf.Bytes()
 			}(),
 			wantErr: false,
@@ -257,17 +257,17 @@ func TestParseChallengeMessage(t *testing.T) {
 			name: "valid challenge with target info and timestamp",
 			data: func() []byte {
 				buf := &bytes.Buffer{}
-				buf.Write(ntlmSignature)                                    // Signature (8)
-				binary.Write(buf, binary.LittleEndian, uint32(2))           // MessageType (4)
-				binary.Write(buf, binary.LittleEndian, uint16(0))           // TargetNameLen
-				binary.Write(buf, binary.LittleEndian, uint16(0))           // TargetNameMaxLen
-				binary.Write(buf, binary.LittleEndian, uint32(0))           // TargetNameOffset
-				binary.Write(buf, binary.LittleEndian, uint32(0xabcd1234))  // NegotiateFlags
+				buf.Write(ntlmSignature)                                         // Signature (8)
+				_ = binary.Write(buf, binary.LittleEndian, uint32(2))            // MessageType (4)
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))            // TargetNameLen
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))            // TargetNameMaxLen
+				_ = binary.Write(buf, binary.LittleEndian, uint32(0))            // TargetNameOffset
+				_ = binary.Write(buf, binary.LittleEndian, uint32(0xabcd1234))   // NegotiateFlags
 				buf.Write([]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}) // ServerChallenge
-				buf.Write(make([]byte, 8))                                  // Reserved
-				binary.Write(buf, binary.LittleEndian, uint16(16))          // TargetInfoLen
-				binary.Write(buf, binary.LittleEndian, uint16(16))          // TargetInfoMaxLen
-				binary.Write(buf, binary.LittleEndian, uint32(56))          // TargetInfoOffset
+				buf.Write(make([]byte, 8))                                       // Reserved
+				_ = binary.Write(buf, binary.LittleEndian, uint16(16))           // TargetInfoLen
+				_ = binary.Write(buf, binary.LittleEndian, uint16(16))           // TargetInfoMaxLen
+				_ = binary.Write(buf, binary.LittleEndian, uint32(56))           // TargetInfoOffset
 
 				// Pad to offset 56
 				for buf.Len() < 56 {
@@ -275,11 +275,11 @@ func TestParseChallengeMessage(t *testing.T) {
 				}
 
 				// TargetInfo with timestamp
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvTimestamp)) // AvId
-				binary.Write(buf, binary.LittleEndian, uint16(8))              // AvLen
-				buf.Write([]byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11}) // Timestamp
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))       // AvId (EOL)
-				binary.Write(buf, binary.LittleEndian, uint16(0))              // AvLen
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvTimestamp)) // AvId
+				_ = binary.Write(buf, binary.LittleEndian, uint16(8))              // AvLen
+				buf.Write([]byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00, 0x11})  // Timestamp
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))       // AvId (EOL)
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))              // AvLen
 
 				return buf.Bytes()
 			}(),
@@ -331,8 +331,8 @@ func TestExtractTimestamp(t *testing.T) {
 			name: "target info with only EOL",
 			targetInfo: func() []byte {
 				buf := &bytes.Buffer{}
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 				return buf.Bytes()
 			}(),
 			wantTimestamp: nil,
@@ -341,11 +341,11 @@ func TestExtractTimestamp(t *testing.T) {
 			name: "target info with timestamp",
 			targetInfo: func() []byte {
 				buf := &bytes.Buffer{}
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvTimestamp))
-				binary.Write(buf, binary.LittleEndian, uint16(8))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvTimestamp))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(8))
 				buf.Write([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08})
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 				return buf.Bytes()
 			}(),
 			wantTimestamp: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
@@ -355,16 +355,16 @@ func TestExtractTimestamp(t *testing.T) {
 			targetInfo: func() []byte {
 				buf := &bytes.Buffer{}
 				// NbComputerName
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvNbComputerName))
-				binary.Write(buf, binary.LittleEndian, uint16(4))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvNbComputerName))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(4))
 				buf.Write([]byte{0xAA, 0xBB, 0xCC, 0xDD})
 				// Timestamp
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvTimestamp))
-				binary.Write(buf, binary.LittleEndian, uint16(8))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvTimestamp))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(8))
 				buf.Write([]byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88})
 				// EOL
-				binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(MsvAvEOL))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 				return buf.Bytes()
 			}(),
 			wantTimestamp: []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88},
@@ -624,26 +624,26 @@ func TestGetAuthenticateMessage(t *testing.T) {
 	challengeData := func() []byte {
 		buf := &bytes.Buffer{}
 		buf.Write(ntlmSignature)
-		binary.Write(buf, binary.LittleEndian, uint32(2))
-		binary.Write(buf, binary.LittleEndian, uint16(0))
-		binary.Write(buf, binary.LittleEndian, uint16(0))
-		binary.Write(buf, binary.LittleEndian, uint32(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint32(2))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint32(0))
 		flags := uint32(NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_NEGOTIATE_NTLM)
-		binary.Write(buf, binary.LittleEndian, flags)
+		_ = binary.Write(buf, binary.LittleEndian, flags)
 		buf.Write([]byte{1, 2, 3, 4, 5, 6, 7, 8}) // challenge
 		buf.Write(make([]byte, 8))                // reserved
 
 		// TargetInfo with timestamp
 		targetInfo := &bytes.Buffer{}
-		binary.Write(targetInfo, binary.LittleEndian, uint16(MsvAvTimestamp))
-		binary.Write(targetInfo, binary.LittleEndian, uint16(8))
+		_ = binary.Write(targetInfo, binary.LittleEndian, uint16(MsvAvTimestamp))
+		_ = binary.Write(targetInfo, binary.LittleEndian, uint16(8))
 		targetInfo.Write([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08})
-		binary.Write(targetInfo, binary.LittleEndian, uint16(MsvAvEOL))
-		binary.Write(targetInfo, binary.LittleEndian, uint16(0))
+		_ = binary.Write(targetInfo, binary.LittleEndian, uint16(MsvAvEOL))
+		_ = binary.Write(targetInfo, binary.LittleEndian, uint16(0))
 
-		binary.Write(buf, binary.LittleEndian, uint16(targetInfo.Len()))
-		binary.Write(buf, binary.LittleEndian, uint16(targetInfo.Len()))
-		binary.Write(buf, binary.LittleEndian, uint32(56))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(targetInfo.Len()))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(targetInfo.Len()))
+		_ = binary.Write(buf, binary.LittleEndian, uint32(56))
 
 		for buf.Len() < 56 {
 			buf.WriteByte(0)
@@ -684,16 +684,16 @@ func TestGssEncrypt(t *testing.T) {
 	challengeData := func() []byte {
 		buf := &bytes.Buffer{}
 		buf.Write(ntlmSignature)
-		binary.Write(buf, binary.LittleEndian, uint32(2))
-		binary.Write(buf, binary.LittleEndian, uint16(0))
-		binary.Write(buf, binary.LittleEndian, uint16(0))
-		binary.Write(buf, binary.LittleEndian, uint32(0))
-		binary.Write(buf, binary.LittleEndian, uint32(NTLMSSP_NEGOTIATE_UNICODE))
+		_ = binary.Write(buf, binary.LittleEndian, uint32(2))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint32(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint32(NTLMSSP_NEGOTIATE_UNICODE))
 		buf.Write([]byte{1, 2, 3, 4, 5, 6, 7, 8})
 		buf.Write(make([]byte, 8))
-		binary.Write(buf, binary.LittleEndian, uint16(0))
-		binary.Write(buf, binary.LittleEndian, uint16(0))
-		binary.Write(buf, binary.LittleEndian, uint32(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+		_ = binary.Write(buf, binary.LittleEndian, uint32(0))
 		for buf.Len() < 56 {
 			buf.WriteByte(0)
 		}

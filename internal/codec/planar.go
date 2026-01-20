@@ -132,10 +132,11 @@ func decompressPlanarPlaneRLE(src []byte, dst []byte, width, height int) int {
 			cRawBytes := int((controlByte >> 4) & 0x0F)
 
 			// Extended run lengths
-			if nRunLength == 1 {
+			switch nRunLength {
+			case 1:
 				nRunLength = cRawBytes + 16
 				cRawBytes = 0
-			} else if nRunLength == 2 {
+			case 2:
 				nRunLength = cRawBytes + 32
 				cRawBytes = 0
 			}

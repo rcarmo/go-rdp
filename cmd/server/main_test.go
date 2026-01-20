@@ -63,7 +63,7 @@ func TestApplySecurityMiddleware(t *testing.T) {
 	// Create a test handler
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	middleware := applySecurityMiddleware(testHandler, cfg)
@@ -96,7 +96,7 @@ func TestApplySecurityMiddleware(t *testing.T) {
 func TestSecurityHeadersMiddleware(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	middleware := securityHeadersMiddleware(testHandler)
@@ -119,7 +119,7 @@ func TestSecurityHeadersMiddleware(t *testing.T) {
 func TestCorsMiddleware(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	tests := []struct {
@@ -275,7 +275,7 @@ func TestStartServer(t *testing.T) {
 	// Test that server is responding
 	resp, err := http.Get(server.Addr)
 	if err == nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	}
 
@@ -306,7 +306,7 @@ func TestShowHelp(t *testing.T) {
 
 	// Restore stdout
 	os.Stdout = oldStdout
-	w.Close()
+	_ = w.Close()
 
 	// Read captured output
 	output := make([]byte, 1024)
@@ -332,7 +332,7 @@ func TestShowVersion(t *testing.T) {
 
 	// Restore stdout
 	os.Stdout = oldStdout
-	w.Close()
+	_ = w.Close()
 
 	// Read captured output
 	output := make([]byte, 1024)
@@ -340,7 +340,7 @@ func TestShowVersion(t *testing.T) {
 
 	// Verify version contains expected content
 	captured := string(output[:n])
-	assert.Contains(t, captured, "RDP HTML5 Client v2.0.0")
+	assert.Contains(t, captured, "RDP HTML5 Client 1.0.0")
 	assert.Contains(t, captured, "Built with Go")
 	assert.Contains(t, captured, "Protocol: RDP 10.x")
 }
@@ -355,7 +355,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	middleware := rateLimitMiddleware(testHandler, cfg.Security.RateLimitPerMinute)
@@ -387,7 +387,7 @@ func TestMainFunction(t *testing.T) {
 func TestCorsMiddlewareOptionsRequest(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	middleware := corsMiddleware(testHandler, []string{"https://example.com"})
@@ -410,7 +410,7 @@ func TestCorsMiddlewareOptionsRequest(t *testing.T) {
 func TestCorsMiddlewareEmptyOrigin(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	middleware := corsMiddleware(testHandler, []string{"https://example.com"})
@@ -483,7 +483,7 @@ func TestIsOriginAllowed(t *testing.T) {
 func TestApplySecurityMiddlewareNilConfig(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	// Test with nil config
@@ -513,7 +513,7 @@ func TestApplySecurityMiddlewareRateLimitDisabled(t *testing.T) {
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	middleware := applySecurityMiddleware(testHandler, cfg)
@@ -532,7 +532,7 @@ func TestApplySecurityMiddlewareRateLimitDisabled(t *testing.T) {
 func TestRequestLoggingMiddleware(t *testing.T) {
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	middleware := requestLoggingMiddleware(testHandler)
@@ -574,7 +574,7 @@ func TestStartServerAlreadyInUse(t *testing.T) {
 	// Start first server on a specific port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	port := listener.Addr().(*net.TCPAddr).Port
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
@@ -612,7 +612,7 @@ func TestRunWithValidConfig(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	port := listener.Addr().(*net.TCPAddr).Port
-	listener.Close()
+	_ = listener.Close()
 
 	args := parsedArgs{
 		host:     "127.0.0.1",
@@ -646,7 +646,7 @@ func TestRunWithServerError(t *testing.T) {
 	// Occupy a port first
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	port := listener.Addr().(*net.TCPAddr).Port
 
 	args := parsedArgs{
@@ -722,8 +722,8 @@ func TestParseFlagsWithArgs(t *testing.T) {
 			args, action := parseFlagsWithArgs(tt.args)
 
 			os.Stdout = oldStdout
-			w.Close()
-			r.Close()
+			_ = w.Close()
+			_ = r.Close()
 
 			assert.Equal(t, tt.expectedAction, action)
 			if tt.checkArgs != nil {

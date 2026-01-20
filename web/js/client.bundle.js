@@ -1,0 +1,1691 @@
+var RDP = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // index.js
+  var src_exports = {};
+  __export(src_exports, {
+    Client: () => Client,
+    Logger: () => Logger2,
+    default: () => src_default
+  });
+
+  // logger.js
+  var LogLevel = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3,
+    NONE: 4
+  };
+  var Logger2 = {
+    level: LogLevel.INFO,
+    // Default to INFO level
+    /**
+     * Set log level from string
+     * @param {string} levelStr - 'debug', 'info', 'warn', 'error', 'none'
+     */
+    setLevel(levelStr) {
+      const levels = {
+        "debug": LogLevel.DEBUG,
+        "info": LogLevel.INFO,
+        "warn": LogLevel.WARN,
+        "warning": LogLevel.WARN,
+        "error": LogLevel.ERROR,
+        "none": LogLevel.NONE
+      };
+      this.level = levels[levelStr.toLowerCase()] ?? LogLevel.INFO;
+    },
+    /**
+     * Log debug message (protocol details, byte dumps)
+     * @param {string} category - Log category (e.g., 'Cursor', 'Bitmap')
+     * @param {...any} args - Log arguments
+     */
+    debug(category, ...args) {
+      if (this.level <= LogLevel.DEBUG) {
+        console.log(`[${category}]`, ...args);
+      }
+    },
+    /**
+     * Log info message (connection state, key events)
+     * @param {string} category - Log category
+     * @param {...any} args - Log arguments
+     */
+    info(category, ...args) {
+      if (this.level <= LogLevel.INFO) {
+        console.info(`[${category}]`, ...args);
+      }
+    },
+    /**
+     * Log warning message (recoverable issues)
+     * @param {string} category - Log category
+     * @param {...any} args - Log arguments
+     */
+    warn(category, ...args) {
+      if (this.level <= LogLevel.WARN) {
+        console.warn(`[${category}]`, ...args);
+      }
+    },
+    /**
+     * Log error message (failures)
+     * @param {string} category - Log category
+     * @param {...any} args - Log arguments
+     */
+    error(category, ...args) {
+      if (this.level <= LogLevel.ERROR) {
+        console.error(`[${category}]`, ...args);
+      }
+    },
+    /**
+     * Enable debug logging (convenience method)
+     */
+    enableDebug() {
+      this.level = LogLevel.DEBUG;
+    },
+    /**
+     * Disable all logging except errors
+     */
+    quiet() {
+      this.level = LogLevel.ERROR;
+    }
+  };
+
+  // session.js
+  function generateSessionId() {
+    return "session_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+  }
+  var SessionMixin = {
+    /**
+     * Initialize session management
+     */
+    initSession() {
+      this.reconnectAttempts = 0;
+      this.maxReconnectAttempts = 5;
+      this.reconnectDelay = 2e3;
+      this.reconnectTimeout = null;
+      this.lastConnectionTime = null;
+      this.manualDisconnect = false;
+      this.sessionId = generateSessionId();
+      this.maxSessionTime = 8 * 60 * 60 * 1e3;
+      this.maxIdleTime = 30 * 60 * 1e3;
+      this.lastActivityTime = null;
+      this.sessionTimeout = null;
+      this.idleTimeout = null;
+      this.warningTimeout = null;
+      this.warningShown = false;
+      this.loadSession();
+    },
+    /**
+     * Check if auto-reconnect should be attempted
+     * @returns {boolean}
+     */
+    shouldAutoReconnect() {
+      return false;
+    },
+    /**
+     * Save session data to cookies
+     */
+    saveSession() {
+      try {
+        const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toUTCString();
+        document.cookie = `rdp_host=${encodeURIComponent(this.hostEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
+        document.cookie = `rdp_user=${encodeURIComponent(this.userEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
+      } catch (e) {
+        Logger2.warn("Session", `Failed to save: ${e.message}`);
+      }
+    },
+    /**
+     * Load session data from cookies
+     */
+    loadSession() {
+      try {
+        const cookies = document.cookie.split(";").reduce((acc, cookie) => {
+          const [key, value] = cookie.trim().split("=");
+          if (key && value)
+            acc[key] = decodeURIComponent(value);
+          return acc;
+        }, {});
+        if (cookies.rdp_host)
+          this.hostEl.value = cookies.rdp_host;
+        if (cookies.rdp_user)
+          this.userEl.value = cookies.rdp_user;
+      } catch (e) {
+        Logger2.debug("Session", `Failed to load: ${e.message}`);
+      }
+    },
+    /**
+     * Verify session data integrity
+     * @param {Object} session
+     * @returns {boolean}
+     */
+    verifySessionIntegrity(session) {
+      const requiredFields = ["host", "user", "timestamp", "sessionId"];
+      return requiredFields.every((field) => session.hasOwnProperty(field));
+    },
+    /**
+     * Clear session data
+     */
+    clearSession() {
+      document.cookie = "rdp_host=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie = "rdp_user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      this.manualDisconnect = true;
+    },
+    /**
+     * Schedule a reconnection attempt
+     * @param {number} delay - Delay in milliseconds
+     */
+    scheduleReconnect(delay) {
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+      }
+      if (this.reconnectAttempts >= this.maxReconnectAttempts || this.manualDisconnect) {
+        return;
+      }
+      this.reconnectTimeout = setTimeout(() => {
+        if (this.shouldAutoReconnect() && !this.connected) {
+          Logger2.info("Session", `Reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+          this.attemptReconnect();
+        }
+      }, delay);
+    },
+    /**
+     * Attempt to reconnect to the server
+     */
+    attemptReconnect() {
+      if (!this.hostEl.value || !this.userEl.value) {
+        return;
+      }
+      this.reconnectAttempts++;
+      const url = new URL(this.websocketURL);
+      url.searchParams.set("host", this.hostEl.value);
+      url.searchParams.set("user", this.userEl.value);
+      url.searchParams.set("password", this.passwordEl.value || "");
+      url.searchParams.set("width", this.canvas.width);
+      url.searchParams.set("height", this.canvas.height);
+      url.searchParams.set("sessionId", this.sessionId);
+      this.socket = new WebSocket(url.toString());
+      this.socket.onopen = this.initialize;
+      this.socket.onmessage = (e) => {
+        e.data.arrayBuffer().then((arrayBuffer) => this.handleMessage(arrayBuffer));
+      };
+      this.socket.onerror = (e) => {
+        Logger2.warn("Session", "Reconnection error");
+      };
+      this.socket.onclose = (e) => {
+        if (!this.manualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+          const exponentialDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+          this.scheduleReconnect(Math.min(exponentialDelay, 3e4));
+        }
+      };
+    },
+    /**
+     * Start session and idle timeout tracking
+     */
+    startTimeoutTracking() {
+      this.lastConnectionTime = Date.now();
+      this.lastActivityTime = Date.now();
+      this.sessionTimeout = setTimeout(() => {
+        this.handleSessionTimeout();
+      }, this.maxSessionTime);
+      this.resetIdleTimeout();
+    },
+    /**
+     * Update activity timestamp
+     */
+    updateActivity() {
+      this.lastActivityTime = Date.now();
+      this.warningShown = false;
+      const warning = document.getElementById("idle-warning");
+      if (warning) {
+        warning.style.display = "none";
+      }
+      this.resetIdleTimeout();
+    },
+    /**
+     * Reset idle timeout
+     */
+    resetIdleTimeout() {
+      if (this.idleTimeout) {
+        clearTimeout(this.idleTimeout);
+      }
+      if (this.warningTimeout) {
+        clearTimeout(this.warningTimeout);
+      }
+      this.warningTimeout = setTimeout(() => {
+        this.showIdleWarning();
+      }, this.maxIdleTime - 5 * 60 * 1e3);
+      this.idleTimeout = setTimeout(() => {
+        this.handleIdleTimeout();
+      }, this.maxIdleTime);
+    },
+    /**
+     * Show idle warning to user
+     */
+    showIdleWarning() {
+      if (this.warningShown)
+        return;
+      this.warningShown = true;
+      let warning = document.getElementById("idle-warning");
+      if (!warning) {
+        warning = document.createElement("div");
+        warning.id = "idle-warning";
+        warning.className = "idle-warning";
+        warning.innerHTML = "Session will disconnect in 5 minutes due to inactivity. Move mouse or press a key to stay connected.";
+        document.body.appendChild(warning);
+      }
+      warning.style.display = "block";
+    },
+    /**
+     * Handle idle timeout
+     */
+    handleIdleTimeout() {
+      Logger2.info("Session", "Disconnected due to inactivity");
+      this.showUserWarning("Session disconnected due to inactivity");
+      this.disconnect();
+    },
+    /**
+     * Handle session timeout
+     */
+    handleSessionTimeout() {
+      Logger2.info("Session", "Maximum session time reached (8 hours)");
+      this.showUserWarning("Session disconnected - maximum session time reached (8 hours)");
+      this.disconnect();
+    },
+    /**
+     * Clear all session timeouts
+     */
+    clearAllTimeouts() {
+      if (this.sessionTimeout) {
+        clearTimeout(this.sessionTimeout);
+        this.sessionTimeout = null;
+      }
+      if (this.idleTimeout) {
+        clearTimeout(this.idleTimeout);
+        this.idleTimeout = null;
+      }
+      if (this.warningTimeout) {
+        clearTimeout(this.warningTimeout);
+        this.warningTimeout = null;
+      }
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
+    }
+  };
+
+  // input.js
+  function elementOffset(el) {
+    let x = 0;
+    let y = 0;
+    while (el && !isNaN(el.offsetLeft) && !isNaN(el.offsetTop)) {
+      x += el.offsetLeft - el.scrollLeft;
+      y += el.offsetTop - el.scrollTop;
+      el = el.offsetParent;
+    }
+    return { top: y, left: x };
+  }
+  function mouseButtonMap(button) {
+    switch (button) {
+      case 0:
+        return 1;
+      case 1:
+        return 3;
+      case 2:
+        return 2;
+      default:
+        return 1;
+    }
+  }
+  var InputMixin = {
+    /**
+     * Initialize input handling
+     */
+    initInput() {
+      this.isDragging = false;
+      this.inputQueue = [];
+      this.inputFlushPending = false;
+      this.lastMouseMove = null;
+      this.mouseThrottleMs = 16;
+      this.lastMouseSendTime = 0;
+      this.lastActivityUpdate = null;
+      this.lastTouchUpdate = null;
+      this.handleKeyDown = this.handleKeyDown.bind(this);
+      this.handleKeyUp = this.handleKeyUp.bind(this);
+      this.handleMouseMove = this.handleMouseMove.bind(this);
+      this.handleMouseDown = this.handleMouseDown.bind(this);
+      this.handleMouseUp = this.handleMouseUp.bind(this);
+      this.handleWheel = this.handleWheel.bind(this);
+      this.handleTouchStart = this.handleTouchStart.bind(this);
+      this.handleTouchMove = this.handleTouchMove.bind(this);
+      this.handleTouchEnd = this.handleTouchEnd.bind(this);
+    },
+    /**
+     * Convert screen coordinates to desktop coordinates
+     * @param {number} screenX
+     * @param {number} screenY
+     * @returns {{x: number, y: number}}
+     */
+    screenToDesktop(screenX, screenY) {
+      const offset = elementOffset(this.canvas);
+      const x = Math.floor(screenX - offset.left);
+      const y = Math.floor(screenY - offset.top);
+      return { x, y };
+    },
+    /**
+     * Queue an input event for sending
+     * @param {ArrayBuffer} data
+     * @param {boolean} isMouseMove
+     */
+    queueInput(data, isMouseMove) {
+      if (isMouseMove) {
+        this.lastMouseMove = data;
+      } else {
+        this.inputQueue.push(data);
+      }
+      if (!this.inputFlushPending) {
+        this.inputFlushPending = true;
+        setTimeout(() => this.flushInputQueue(), 0);
+      }
+    },
+    /**
+     * Flush queued input events to the server
+     */
+    flushInputQueue() {
+      this.inputFlushPending = false;
+      if (!this.connected || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        this.inputQueue = [];
+        this.lastMouseMove = null;
+        return;
+      }
+      while (this.inputQueue.length > 0) {
+        const data = this.inputQueue.shift();
+        try {
+          this.socket.send(data);
+        } catch (e) {
+          this.inputQueue = [];
+          break;
+        }
+      }
+      const now = Date.now();
+      if (this.lastMouseMove && now - this.lastMouseSendTime >= this.mouseThrottleMs) {
+        try {
+          this.socket.send(this.lastMouseMove);
+          this.lastMouseSendTime = now;
+        } catch (e) {
+        }
+        this.lastMouseMove = null;
+      } else if (this.lastMouseMove) {
+        if (!this.inputFlushPending) {
+          this.inputFlushPending = true;
+          setTimeout(() => this.flushInputQueue(), this.mouseThrottleMs);
+        }
+      }
+    },
+    /**
+     * Handle keydown event
+     * @param {KeyboardEvent} e
+     */
+    handleKeyDown(e) {
+      if (!this.connected) {
+        this.showUserError("Cannot send keystrokes: not connected to server");
+        return;
+      }
+      this.updateActivity();
+      const event = new KeyboardEventKeyDown(e.code);
+      if (event.keyCode === void 0) {
+        this.logError("Key mapping error", { code: e.code, key: e.key });
+        this.showUserError("Unsupported key: " + e.key);
+        e.preventDefault();
+        return false;
+      }
+      try {
+        const data = event.serialize();
+        this.queueInput(data, false);
+      } catch (error) {
+        this.logError("Key send error", { code: e.code, error: error.message });
+        this.showUserError("Failed to send keystroke");
+      }
+      e.preventDefault();
+      return false;
+    },
+    /**
+     * Handle keyup event
+     * @param {KeyboardEvent} e
+     */
+    handleKeyUp(e) {
+      if (!this.connected) {
+        return;
+      }
+      this.updateActivity();
+      const event = new KeyboardEventKeyUp(e.code);
+      if (event.keyCode === void 0) {
+        Logger2.debug("[Input] Undefined key up:", e.code);
+        e.preventDefault();
+        return false;
+      }
+      const data = event.serialize();
+      this.queueInput(data, false);
+      e.preventDefault();
+      return false;
+    },
+    /**
+     * Handle mouse move event
+     * @param {MouseEvent} e
+     */
+    handleMouseMove(e) {
+      if (!this.lastActivityUpdate || Date.now() - this.lastActivityUpdate > 1e3) {
+        this.updateActivity();
+        this.lastActivityUpdate = Date.now();
+      }
+      try {
+        const pos = this.screenToDesktop(e.clientX, e.clientY);
+        const event = new MouseMoveEvent(pos.x, pos.y);
+        const data = event.serialize();
+        this.queueInput(data, true);
+      } catch (error) {
+        this.logError("Mouse move error", { x: e.clientX, y: e.clientY, error: error.message });
+      }
+      e.preventDefault();
+      return false;
+    },
+    /**
+     * Handle mouse down event
+     * @param {MouseEvent} e
+     */
+    handleMouseDown(e) {
+      this.updateActivity();
+      this.isDragging = true;
+      const pos = this.screenToDesktop(e.clientX, e.clientY);
+      const event = new MouseDownEvent(pos.x, pos.y, mouseButtonMap(e.button));
+      const data = event.serialize();
+      this.queueInput(data, false);
+      document.addEventListener("mousemove", this.handleMouseMove);
+      document.addEventListener("mouseup", this.handleMouseUp);
+      e.preventDefault();
+      return false;
+    },
+    /**
+     * Handle mouse up event
+     * @param {MouseEvent} e
+     */
+    handleMouseUp(e) {
+      this.isDragging = false;
+      const pos = this.screenToDesktop(e.clientX, e.clientY);
+      const event = new MouseUpEvent(pos.x, pos.y, mouseButtonMap(e.button));
+      const data = event.serialize();
+      this.queueInput(data, false);
+      document.removeEventListener("mousemove", this.handleMouseMove);
+      document.removeEventListener("mouseup", this.handleMouseUp);
+      e.preventDefault();
+      return false;
+    },
+    /**
+     * Handle wheel event
+     * @param {WheelEvent} e
+     */
+    handleWheel(e) {
+      this.updateActivity();
+      const pos = this.screenToDesktop(e.clientX, e.clientY);
+      const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      const delta = isHorizontal ? e.deltaX : e.deltaY;
+      const step = Math.round(Math.abs(delta) * 15 / 8);
+      const event = new MouseWheelEvent(pos.x, pos.y, step, delta > 0, isHorizontal);
+      const data = event.serialize();
+      this.queueInput(data, false);
+      e.preventDefault();
+      return false;
+    },
+    /**
+     * Handle touch start event
+     * @param {TouchEvent} e
+     */
+    handleTouchStart(e) {
+      if (!this.connected)
+        return;
+      e.preventDefault();
+      this.updateActivity();
+      const touch = e.touches[0];
+      const mouseEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        button: 0,
+        preventDefault: () => {
+        }
+      };
+      return this.handleMouseDown(mouseEvent);
+    },
+    /**
+     * Handle touch move event
+     * @param {TouchEvent} e
+     */
+    handleTouchMove(e) {
+      if (!this.connected)
+        return;
+      e.preventDefault();
+      if (!this.lastTouchUpdate || Date.now() - this.lastTouchUpdate > 16) {
+        this.updateActivity();
+        this.lastTouchUpdate = Date.now();
+        const touch = e.touches[0];
+        const mouseEvent = {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          preventDefault: () => {
+          }
+        };
+        return this.handleMouseMove(mouseEvent);
+      }
+    },
+    /**
+     * Handle touch end event
+     * @param {TouchEvent} e
+     */
+    handleTouchEnd(e) {
+      if (!this.connected)
+        return;
+      e.preventDefault();
+      this.updateActivity();
+      const touch = e.changedTouches[0];
+      const mouseEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        button: 0,
+        preventDefault: () => {
+        }
+      };
+      return this.handleMouseUp(mouseEvent);
+    },
+    /**
+     * Attach input event listeners to canvas
+     */
+    attachInputListeners() {
+      this.canvas.addEventListener("keydown", this.handleKeyDown, false);
+      this.canvas.addEventListener("keyup", this.handleKeyUp, false);
+      this.canvas.addEventListener("mousemove", this.handleMouseMove, false);
+      this.canvas.addEventListener("mousedown", this.handleMouseDown, false);
+      this.canvas.addEventListener("mouseup", this.handleMouseUp, false);
+      this.canvas.addEventListener("wheel", this.handleWheel, false);
+      this.canvas.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        return false;
+      });
+      this.canvas.addEventListener("touchstart", this.handleTouchStart, { passive: false });
+      this.canvas.addEventListener("touchmove", this.handleTouchMove, { passive: false });
+      this.canvas.addEventListener("touchend", this.handleTouchEnd, { passive: false });
+    },
+    /**
+     * Detach input event listeners from canvas
+     */
+    detachInputListeners() {
+      this.canvas.removeEventListener("keydown", this.handleKeyDown);
+      this.canvas.removeEventListener("keyup", this.handleKeyUp);
+      this.canvas.removeEventListener("mousemove", this.handleMouseMove);
+      this.canvas.removeEventListener("mousedown", this.handleMouseDown);
+      this.canvas.removeEventListener("mouseup", this.handleMouseUp);
+      this.canvas.removeEventListener("wheel", this.handleWheel);
+      this.canvas.removeEventListener("touchstart", this.handleTouchStart);
+      this.canvas.removeEventListener("touchmove", this.handleTouchMove);
+      this.canvas.removeEventListener("touchend", this.handleTouchEnd);
+      document.removeEventListener("mousemove", this.handleMouseMove);
+      document.removeEventListener("mouseup", this.handleMouseUp);
+    }
+  };
+
+  // graphics.js
+  var GraphicsMixin = {
+    /**
+     * Initialize graphics subsystem
+     */
+    initGraphics() {
+      this.canvasShown = false;
+      this.pointerCache = {};
+      this.bitmapCacheEnabled = true;
+      this.bitmapCache = /* @__PURE__ */ new Map();
+      this.bitmapCacheMaxSize = 1e3;
+      this.bitmapCacheHits = 0;
+      this.bitmapCacheMisses = 0;
+      this.originalWidth = 0;
+      this.originalHeight = 0;
+      this.resizeTimeout = null;
+      this.handleResize = this.handleResize.bind(this);
+    },
+    /**
+     * Handle palette update
+     * @param {Reader} r - Binary reader
+     */
+    handlePalette(r) {
+      const updateType = r.uint16(true);
+      const pad = r.uint16(true);
+      const numberColors = r.uint32(true);
+      if (numberColors > 256 || numberColors === 0) {
+        Logger2.warn("Palette", `Invalid color count: ${numberColors}`);
+        return;
+      }
+      Logger2.info("Palette", `Received ${numberColors} colors`);
+      const paletteData = r.blob(numberColors * 3);
+      if (typeof goRLE !== "undefined" && goRLE.setPalette) {
+        goRLE.setPalette(new Uint8Array(paletteData), numberColors);
+        Logger2.debug("Palette", "Updated via WASM");
+      } else {
+        Logger2.warn("Palette", "WASM not available");
+      }
+    },
+    /**
+     * Handle bitmap update
+     * @param {Reader} r - Binary reader
+     */
+    handleBitmap(r) {
+      const bitmap = parseBitmapUpdate(r);
+      if (!this.canvasShown) {
+        this.showCanvas();
+        this.canvasShown = true;
+      }
+      if (this.multiMonitorMode && !this.multiMonitorMessageShown) {
+        this.showUserSuccess("Multi-monitor environment detected");
+        this.multiMonitorMessageShown = true;
+      }
+      bitmap.rectangles.forEach((bitmapData) => {
+        this.processBitmapData(bitmapData);
+      });
+    },
+    /**
+     * Process a single bitmap rectangle
+     * @param {Object} bitmapData
+     */
+    processBitmapData(bitmapData) {
+      const width = bitmapData.width;
+      const height = bitmapData.height;
+      const bpp = bitmapData.bitsPerPixel;
+      const size = width * height;
+      const bytesPerPixel = bpp / 8;
+      const rowDelta = width * bytesPerPixel;
+      const isCompressed = bitmapData.isCompressed();
+      let rgba = new Uint8ClampedArray(size * 4);
+      if (typeof goRLE !== "undefined" && goRLE.processBitmap) {
+        const srcData = new Uint8Array(bitmapData.bitmapDataStream);
+        const result = goRLE.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
+        if (result) {
+          this.ctx.putImageData(
+            new ImageData(rgba, width, height),
+            bitmapData.destLeft,
+            bitmapData.destTop
+          );
+          if (this.bitmapCacheEnabled) {
+            this.cacheBitmap(bitmapData, rgba);
+          }
+          return;
+        }
+        Logger2.debug("Bitmap", `WASM processBitmap failed, bpp=${bpp}, compressed=${isCompressed}`);
+      } else {
+        Logger2.error("Bitmap", "WASM not loaded");
+      }
+    },
+    /**
+     * Initialize bitmap cache
+     */
+    initBitmapCache() {
+      this.bitmapCacheEnabled = true;
+      this.bitmapCache = /* @__PURE__ */ new Map();
+      this.bitmapCacheMaxSize = 1e3;
+      this.bitmapCacheHits = 0;
+      this.bitmapCacheMisses = 0;
+    },
+    /**
+     * Cache a bitmap for future use
+     * @param {Object} bitmapData
+     * @param {Uint8ClampedArray} rgba
+     */
+    cacheBitmap(bitmapData, rgba) {
+      const key = this.getBitmapCacheKey(bitmapData);
+      if (this.bitmapCache.size >= this.bitmapCacheMaxSize) {
+        const firstKey = this.bitmapCache.keys().next().value;
+        this.bitmapCache.delete(firstKey);
+      }
+      this.bitmapCache.set(key, {
+        imageData: new ImageData(new Uint8ClampedArray(rgba), bitmapData.width, bitmapData.height),
+        width: bitmapData.width,
+        height: bitmapData.height,
+        timestamp: Date.now()
+      });
+    },
+    /**
+     * Get a cached bitmap
+     * @param {Object} bitmapData
+     * @returns {ImageData|null}
+     */
+    getCachedBitmap(bitmapData) {
+      const key = this.getBitmapCacheKey(bitmapData);
+      const cached = this.bitmapCache.get(key);
+      if (cached) {
+        this.bitmapCacheHits++;
+        this.bitmapCache.delete(key);
+        this.bitmapCache.set(key, cached);
+        return cached.imageData;
+      }
+      this.bitmapCacheMisses++;
+      return null;
+    },
+    /**
+     * Generate cache key for bitmap
+     * @param {Object} bitmapData
+     * @returns {string}
+     */
+    getBitmapCacheKey(bitmapData) {
+      const sample = bitmapData.bitmapDataStream.slice(0, Math.min(64, bitmapData.bitmapDataStream.length));
+      let hash = 0;
+      for (let i = 0; i < sample.length; i++) {
+        hash = (hash << 5) - hash + sample[i];
+        hash = hash & hash;
+      }
+      return `${bitmapData.width}x${bitmapData.height}x${bitmapData.bitsPerPixel}:${hash}`;
+    },
+    /**
+     * Clear bitmap cache
+     */
+    clearBitmapCache() {
+      if (this.bitmapCache) {
+        this.bitmapCache.clear();
+      }
+      this.bitmapCacheHits = 0;
+      this.bitmapCacheMisses = 0;
+    },
+    /**
+     * Get bitmap cache statistics
+     * @returns {Object}
+     */
+    getBitmapCacheStats() {
+      return {
+        size: this.bitmapCache ? this.bitmapCache.size : 0,
+        hits: this.bitmapCacheHits || 0,
+        misses: this.bitmapCacheMisses || 0,
+        hitRate: this.bitmapCacheHits && this.bitmapCacheMisses ? (this.bitmapCacheHits / (this.bitmapCacheHits + this.bitmapCacheMisses) * 100).toFixed(1) + "%" : "N/A"
+      };
+    },
+    /**
+     * Handle pointer/cursor update
+     * @param {Object} header
+     * @param {Reader} r
+     */
+    handlePointer(header, r) {
+      try {
+        Logger2.debug("Cursor", `Update type: ${header.updateCode}`);
+        if (header.isPTRNull()) {
+          Logger2.debug("Cursor", "Hidden");
+          this.canvas.className = "pointer-cache-null";
+          return;
+        }
+        if (header.isPTRDefault()) {
+          Logger2.debug("Cursor", "Default");
+          this.canvas.className = "pointer-cache-default";
+          return;
+        }
+        if (header.isPTRColor()) {
+          return;
+        }
+        if (header.isPTRNew()) {
+          const newPointerUpdate = parseNewPointerUpdate(r);
+          Logger2.debug("Cursor", `New cursor: cache=${newPointerUpdate.cacheIndex}, hotspot=(${newPointerUpdate.x},${newPointerUpdate.y}), size=${newPointerUpdate.width}x${newPointerUpdate.height}`);
+          this.pointerCacheCanvasCtx.putImageData(newPointerUpdate.getImageData(this.pointerCacheCanvasCtx), 0, 0);
+          const url = this.pointerCacheCanvas.toDataURL("image/png");
+          if (this.pointerCache.hasOwnProperty(newPointerUpdate.cacheIndex)) {
+            document.getElementsByTagName("head")[0].removeChild(this.pointerCache[newPointerUpdate.cacheIndex]);
+            delete this.pointerCache[newPointerUpdate.cacheIndex];
+          }
+          const style = document.createElement("style");
+          const className = "pointer-cache-" + newPointerUpdate.cacheIndex;
+          style.innerHTML = "." + className + ' {cursor:url("' + url + '") ' + newPointerUpdate.x + " " + newPointerUpdate.y + ", auto !important}";
+          document.getElementsByTagName("head")[0].appendChild(style);
+          this.pointerCache[newPointerUpdate.cacheIndex] = style;
+          this.canvas.className = className;
+          return;
+        }
+        if (header.isPTRCached()) {
+          const cacheIndex = r.uint16(true);
+          Logger2.debug("Cursor", `Cached index: ${cacheIndex}`);
+          const className = "pointer-cache-" + cacheIndex;
+          this.canvas.className = className;
+          return;
+        }
+        if (header.isPTRPosition()) {
+          Logger2.debug("Cursor", "Position update (ignored)");
+          return;
+        }
+        Logger2.debug("Cursor", "Unknown pointer type");
+      } catch (error) {
+        Logger2.error("Cursor", `Error: ${error.message}`);
+      }
+    },
+    /**
+     * Handle window resize
+     */
+    handleResize() {
+      if (!this.connected) {
+        return;
+      }
+      if (this.resizeTimeout) {
+        clearTimeout(this.resizeTimeout);
+      }
+      this.resizeTimeout = setTimeout(() => {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight;
+        if (newWidth !== this.originalWidth || newHeight !== this.originalHeight) {
+          Logger2.info("Resize", `${newWidth}x${newHeight}, reconnecting...`);
+          this.showUserInfo("Resizing desktop...");
+          this.reconnectWithNewSize(newWidth, newHeight);
+        }
+      }, 500);
+    },
+    /**
+     * Show the canvas (hide login form)
+     */
+    showCanvas() {
+      Logger2.info("Connection", "First bitmap received - session active");
+      const loginForm = document.getElementById("login-form");
+      const canvasContainer = document.getElementById("canvas-container");
+      if (loginForm) {
+        loginForm.style.display = "none";
+      }
+      if (canvasContainer) {
+        canvasContainer.style.display = "block";
+      }
+      this.canvas.tabIndex = 1e3;
+      this.canvas.focus();
+    },
+    /**
+     * Hide the canvas (show login form)
+     */
+    hideCanvas() {
+      const loginForm = document.getElementById("login-form");
+      const canvasContainer = document.getElementById("canvas-container");
+      if (canvasContainer) {
+        canvasContainer.style.display = "none";
+      }
+      if (loginForm) {
+        loginForm.style.display = "block";
+      }
+    },
+    /**
+     * Clear the canvas
+     */
+    clearCanvas() {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.canvas.className = "";
+    }
+  };
+
+  // clipboard.js
+  var ClipboardMixin = {
+    /**
+     * Initialize clipboard support
+     */
+    initClipboardSupport() {
+      this.clipboardApiSupported = !!(navigator.clipboard && navigator.clipboard.writeText);
+      Logger2.info("Clipboard", `API supported: ${this.clipboardApiSupported}`);
+    },
+    /**
+     * Type text to remote by sending key events
+     * This simulates typing the text character by character
+     * @param {string} text
+     */
+    typeTextToRemote(text) {
+      if (!this.connected || !text)
+        return;
+      const maxLength = 4096;
+      if (text.length > maxLength) {
+        text = text.substring(0, maxLength);
+        this.showUserWarning("Text truncated to " + maxLength + " characters");
+      }
+      Logger2.info("Clipboard", `Typing ${text.length} chars to remote`);
+      let index = 0;
+      const typeNext = () => {
+        if (index >= text.length || !this.connected)
+          return;
+        const char = text[index];
+        this.sendCharacter(char);
+        index++;
+        if (index < text.length) {
+          setTimeout(typeNext, 10);
+        }
+      };
+      typeNext();
+    },
+    /**
+     * Send a single character as key press
+     * @param {string} char
+     */
+    sendCharacter(char) {
+      const code = this.charToKeyCode(char);
+      if (!code) {
+        Logger2.debug("Clipboard", `No mapping for char code: ${char.charCodeAt(0)}`);
+        return;
+      }
+      const needsShift = this.charNeedsShift(char);
+      if (needsShift) {
+        const shiftDown = new KeyboardEventKeyDown("ShiftLeft");
+        if (shiftDown.keyCode !== void 0) {
+          this.queueInput(shiftDown.serialize(), false);
+        }
+      }
+      const keyDown = new KeyboardEventKeyDown(code);
+      const keyUp = new KeyboardEventKeyUp(code);
+      if (keyDown.keyCode !== void 0) {
+        this.queueInput(keyDown.serialize(), false);
+        this.queueInput(keyUp.serialize(), false);
+      }
+      if (needsShift) {
+        const shiftUp = new KeyboardEventKeyUp("ShiftLeft");
+        if (shiftUp.keyCode !== void 0) {
+          this.queueInput(shiftUp.serialize(), false);
+        }
+      }
+    },
+    /**
+     * Check if character needs shift key
+     * @param {string} char
+     * @returns {boolean}
+     */
+    charNeedsShift(char) {
+      if (char >= "A" && char <= "Z")
+        return true;
+      const shiftedChars = '!@#$%^&*()_+{}|:"<>?~';
+      return shiftedChars.includes(char);
+    },
+    /**
+     * Map character to JavaScript key code
+     * @param {string} char
+     * @returns {string|null}
+     */
+    charToKeyCode(char) {
+      const charCode = char.charCodeAt(0);
+      if (charCode >= 65 && charCode <= 90 || charCode >= 97 && charCode <= 122) {
+        return "Key" + char.toUpperCase();
+      }
+      if (charCode >= 48 && charCode <= 57) {
+        return "Digit" + char;
+      }
+      const specialMap = {
+        " ": "Space",
+        "\n": "Enter",
+        "\r": "Enter",
+        "	": "Tab",
+        ".": "Period",
+        ",": "Comma",
+        ";": "Semicolon",
+        ":": "Semicolon",
+        // Shift+;
+        "'": "Quote",
+        '"': "Quote",
+        // Shift+'
+        "/": "Slash",
+        "?": "Slash",
+        // Shift+/
+        "\\": "Backslash",
+        "|": "Backslash",
+        // Shift+\
+        "[": "BracketLeft",
+        "{": "BracketLeft",
+        // Shift+[
+        "]": "BracketRight",
+        "}": "BracketRight",
+        // Shift+]
+        "-": "Minus",
+        "_": "Minus",
+        // Shift+-
+        "=": "Equal",
+        "+": "Equal",
+        // Shift+=
+        "`": "Backquote",
+        "~": "Backquote",
+        // Shift+`
+        "!": "Digit1",
+        // Shift+1
+        "@": "Digit2",
+        // Shift+2
+        "#": "Digit3",
+        // Shift+3
+        "$": "Digit4",
+        // Shift+4
+        "%": "Digit5",
+        // Shift+5
+        "^": "Digit6",
+        // Shift+6
+        "&": "Digit7",
+        // Shift+7
+        "*": "Digit8",
+        // Shift+8
+        "(": "Digit9",
+        // Shift+9
+        ")": "Digit0",
+        // Shift+0
+        "<": "Comma",
+        // Shift+,
+        ">": "Period"
+        // Shift+.
+      };
+      return specialMap[char] || null;
+    },
+    /**
+     * Copy text to local clipboard (for UI use)
+     * @param {string} text
+     */
+    async copyToLocalClipboard(text) {
+      if (!this.clipboardApiSupported)
+        return false;
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (err) {
+        Logger2.warn("Clipboard", `Write failed: ${err.message}`);
+        return false;
+      }
+    }
+  };
+
+  // ui.js
+  var UIMixin = {
+    /**
+     * Initialize UI state
+     */
+    initUI() {
+      this.csrfToken = null;
+    },
+    /**
+     * Sanitize user input
+     * @param {string} input
+     * @returns {string}
+     */
+    sanitizeInput(input) {
+      if (!input)
+        return "";
+      return input.replace(/[<>'"&]/g, "").trim();
+    },
+    /**
+     * Validate hostname format
+     * @param {string} hostname
+     * @returns {boolean}
+     */
+    validateHostname(hostname) {
+      if (!hostname)
+        return false;
+      const pattern = /^([a-zA-Z0-9.-]+|(\d{1,3}\.){3}\d{1,3})(:\d{1,5})?$/;
+      return pattern.test(hostname) && hostname.length <= 253;
+    },
+    /**
+     * Generate CSRF token
+     * @returns {string}
+     */
+    generateCSRFToken() {
+      return crypto.getRandomValues(new Uint8Array(16)).reduce((hex, byte) => hex + byte.toString(16).padStart(2, "0"), "");
+    },
+    /**
+     * Show error message to user
+     * @param {string} message
+     */
+    showUserError(message) {
+      if (window.showToast) {
+        window.showToast(message, "error", "Connection Error", 8e3);
+      }
+      const status = document.getElementById("status");
+      if (status) {
+        status.style.display = "block";
+        status.className = "status-indicator status-disconnected";
+        status.textContent = message;
+        setTimeout(() => {
+          if (status.textContent === message) {
+            status.style.display = "none";
+          }
+        }, 1e4);
+      }
+    },
+    /**
+     * Show success message to user
+     * @param {string} message
+     */
+    showUserSuccess(message) {
+      if (window.showToast) {
+        window.showToast(message, "success", "Success", 5e3);
+      }
+      const status = document.getElementById("status");
+      if (status) {
+        status.style.display = "block";
+        status.className = "status-indicator status-connected";
+        status.textContent = message;
+        setTimeout(() => {
+          if (status.textContent === message) {
+            status.style.display = "none";
+          }
+        }, 5e3);
+      }
+    },
+    /**
+     * Show warning message to user
+     * @param {string} message
+     */
+    showUserWarning(message) {
+      if (window.showToast) {
+        window.showToast(message, "info", "Warning", 6e3);
+      }
+    },
+    /**
+     * Show info message to user
+     * @param {string} message
+     */
+    showUserInfo(message) {
+      if (window.showToast) {
+        window.showToast(message, "info", "Info", 4e3);
+      }
+    },
+    /**
+     * Log error with context
+     * @param {string} context
+     * @param {Object} details
+     */
+    logError(context, details) {
+      Logger2.error("RDP", `${context}:`, details);
+    },
+    /**
+     * Emit custom event
+     * @param {string} name
+     * @param {Object} detail
+     */
+    emitEvent(name, detail = {}) {
+      try {
+        document.dispatchEvent(new CustomEvent("rdp:" + name, { detail }));
+      } catch (error) {
+        Logger2.debug("Event", `Dispatch failed: ${error.message}`);
+      }
+    }
+  };
+
+  // audio.js
+  var AudioMixin = {
+    initAudio() {
+      this.audioContext = null;
+      this.audioEnabled = false;
+      this.audioFormat = null;
+      this.audioQueue = [];
+      this.audioPlaying = false;
+      this.audioGain = null;
+      this.audioVolume = 1;
+      this.audioBufferSize = 4096;
+      this.audioSampleRate = 44100;
+      this.audioChannels = 2;
+      this.audioBitsPerSample = 16;
+    },
+    enableAudio() {
+      if (this.audioContext) {
+        return;
+      }
+      try {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.audioGain = this.audioContext.createGain();
+        this.audioGain.connect(this.audioContext.destination);
+        this.audioGain.gain.value = this.audioVolume;
+        this.audioEnabled = true;
+        Logger.info("Audio", `Initialized: ${this.audioContext.sampleRate}Hz`);
+      } catch (e) {
+        Logger.error("Audio", `Failed to initialize: ${e.message}`);
+        this.audioEnabled = false;
+      }
+    },
+    disableAudio() {
+      if (this.audioContext) {
+        this.audioContext.close();
+        this.audioContext = null;
+      }
+      this.audioEnabled = false;
+      this.audioQueue = [];
+      Logger.info("Audio", "Disabled");
+    },
+    setAudioVolume(volume) {
+      this.audioVolume = Math.max(0, Math.min(1, volume));
+      if (this.audioGain) {
+        this.audioGain.gain.value = this.audioVolume;
+      }
+    },
+    handleAudioMessage(data) {
+      if (!this.audioEnabled || !this.audioContext) {
+        return;
+      }
+      if (data.length < 4) {
+        return;
+      }
+      const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      const msgType = data[1];
+      const timestamp = view.getUint16(2, true);
+      let offset = 4;
+      if (msgType === 2 && data.length >= 12) {
+        this.audioChannels = view.getUint16(4, true);
+        this.audioSampleRate = view.getUint32(6, true);
+        this.audioBitsPerSample = view.getUint16(10, true);
+        offset = 12;
+        Logger.info("Audio", `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);
+      }
+      const pcmData = data.slice(offset);
+      if (pcmData.length === 0) {
+        return;
+      }
+      this.queueAudio(pcmData, timestamp);
+    },
+    queueAudio(pcmData, timestamp) {
+      const samples = this.pcmToFloat32(pcmData);
+      if (!samples || samples.length === 0) {
+        return;
+      }
+      const frameCount = Math.floor(samples.length / this.audioChannels);
+      if (frameCount === 0) {
+        return;
+      }
+      try {
+        const audioBuffer = this.audioContext.createBuffer(
+          this.audioChannels,
+          frameCount,
+          this.audioSampleRate
+        );
+        for (let channel = 0; channel < this.audioChannels; channel++) {
+          const channelData = audioBuffer.getChannelData(channel);
+          for (let i = 0; i < frameCount; i++) {
+            channelData[i] = samples[i * this.audioChannels + channel];
+          }
+        }
+        this.audioQueue.push({
+          buffer: audioBuffer,
+          timestamp
+        });
+        if (!this.audioPlaying) {
+          this.playNextAudio();
+        }
+      } catch (e) {
+        Logger.error("Audio", `Buffer creation failed: ${e.message}`);
+      }
+    },
+    pcmToFloat32(pcmData) {
+      const view = new DataView(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength);
+      const samples = [];
+      if (this.audioBitsPerSample === 16) {
+        const sampleCount = Math.floor(pcmData.length / 2);
+        for (let i = 0; i < sampleCount; i++) {
+          const sample = view.getInt16(i * 2, true);
+          samples.push(sample / 32768);
+        }
+      } else if (this.audioBitsPerSample === 8) {
+        for (let i = 0; i < pcmData.length; i++) {
+          const sample = pcmData[i];
+          samples.push((sample - 128) / 128);
+        }
+      } else {
+        Logger.warn("Audio", `Unsupported bit depth: ${this.audioBitsPerSample}`);
+        return null;
+      }
+      return samples;
+    },
+    playNextAudio() {
+      if (this.audioQueue.length === 0) {
+        this.audioPlaying = false;
+        return;
+      }
+      this.audioPlaying = true;
+      const item = this.audioQueue.shift();
+      const source = this.audioContext.createBufferSource();
+      source.buffer = item.buffer;
+      source.connect(this.audioGain);
+      source.onended = () => {
+        this.playNextAudio();
+      };
+      const startTime = this.audioContext.currentTime;
+      source.start(startTime);
+    },
+    // Resume audio context after user interaction (required by browsers)
+    resumeAudioContext() {
+      if (this.audioContext && this.audioContext.state === "suspended") {
+        this.audioContext.resume().then(() => {
+          Logger.info("Audio", "Context resumed");
+        });
+      }
+    }
+  };
+  var audio_default = AudioMixin;
+
+  // client.js
+  function applyMixin(mixin) {
+    Object.keys(mixin).forEach((key) => {
+      if (typeof mixin[key] === "function") {
+        Client.prototype[key] = mixin[key];
+      }
+    });
+  }
+  function Client(websocketURL, canvasID, hostID, userID, passwordID) {
+    this.websocketURL = websocketURL;
+    this.canvas = document.getElementById(canvasID);
+    this.hostEl = document.getElementById(hostID);
+    this.userEl = document.getElementById(userID);
+    this.passwordEl = document.getElementById(passwordID);
+    this.ctx = this.canvas.getContext("2d");
+    this.pointerCacheCanvas = document.getElementById("pointer-cache");
+    this.pointerCacheCanvasCtx = this.pointerCacheCanvas.getContext("2d");
+    this.connected = false;
+    this.socket = null;
+    this.initSession();
+    this.initInput();
+    this.initGraphics();
+    this.initUI();
+    this.initAudio();
+    this.initialize = this.initialize.bind(this);
+    this.handleMessage = this.handleMessage.bind(this);
+    this.deinitialize = this.deinitialize.bind(this);
+    this.loadSession();
+    if (this.shouldAutoReconnect()) {
+      this.scheduleReconnect(100);
+    }
+  }
+  applyMixin(SessionMixin);
+  applyMixin(InputMixin);
+  applyMixin(GraphicsMixin);
+  applyMixin(ClipboardMixin);
+  applyMixin(UIMixin);
+  applyMixin(audio_default);
+  Client.prototype.connect = function() {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      Logger2.warn("Connection", "Already established");
+      return;
+    }
+    const host = this.sanitizeInput(this.hostEl.value);
+    const user = this.sanitizeInput(this.userEl.value);
+    const password = this.passwordEl.value;
+    if (!this.validateHostname(host)) {
+      Logger2.error("Connection", "Invalid hostname format");
+      return;
+    }
+    this.reconnectAttempts = 0;
+    this.manualDisconnect = false;
+    this.lastConnectionTime = Date.now();
+    this.csrfToken = this.generateCSRFToken();
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    this.originalWidth = screenWidth;
+    this.originalHeight = screenHeight;
+    this.canvas.width = screenWidth;
+    this.canvas.height = screenHeight;
+    const colorDepthEl = document.getElementById("colorDepth");
+    const colorDepth = colorDepthEl ? colorDepthEl.value : "16";
+    const disableNLAEl = document.getElementById("disableNLA");
+    const disableNLA = disableNLAEl ? disableNLAEl.checked : false;
+    const enableAudioEl = document.getElementById("enableAudio");
+    const enableAudio = enableAudioEl ? enableAudioEl.checked : false;
+    Logger2.info("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
+    const url = new URL(this.websocketURL);
+    url.searchParams.set("host", host);
+    url.searchParams.set("user", user);
+    url.searchParams.set("password", password);
+    url.searchParams.set("width", screenWidth);
+    url.searchParams.set("height", screenHeight);
+    url.searchParams.set("colorDepth", colorDepth);
+    if (disableNLA) {
+      url.searchParams.set("disableNLA", "true");
+      Logger2.info("Connection", "NLA disabled");
+    }
+    if (enableAudio) {
+      url.searchParams.set("audio", "true");
+      this.enableAudio();
+      Logger2.info("Audio", "Audio redirection enabled");
+    }
+    this.socket = new WebSocket(url.toString());
+    this.socket.onopen = () => {
+      Logger2.info("Connection", "WebSocket opened");
+      this.initialize();
+    };
+    this.socket.onmessage = (e) => {
+      e.data.arrayBuffer().then((arrayBuffer) => this.handleMessage(arrayBuffer));
+    };
+    this.socket.onerror = (e) => {
+      const errorMsg = e.message || "";
+      this.logError("WebSocket connection error", { error: errorMsg, code: e.code });
+      if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
+        this.showUserError("Authentication failed: Invalid username or password");
+      } else if (errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
+        this.showUserError("Access denied: You do not have permission to connect");
+      } else if (errorMsg.includes("404") || errorMsg.includes("Not Found")) {
+        this.showUserError("Server not found: Check the server address");
+      } else if (errorMsg.includes("timeout")) {
+        this.showUserError("Connection timeout: Server is not responding");
+      } else {
+        this.showUserError("Connection failed: Unable to connect to server");
+      }
+      this.emitEvent("error", { message: errorMsg, code: e.code });
+    };
+    this.socket.onclose = (e) => {
+      Logger2.info("Connection", `WebSocket closed (code=${e.code}, reason=${e.reason || "none"})`);
+      this.emitEvent("disconnected", {
+        code: e.code,
+        reason: e.reason,
+        wasClean: e.wasClean,
+        manual: this.manualDisconnect
+      });
+      if (this.manualDisconnect) {
+        this.showUserSuccess("Disconnected successfully");
+        return;
+      }
+      if (e.code === 1e3) {
+        return;
+      } else if (e.code === 1001) {
+        this.showUserError("Connection closed: Going away");
+      } else if (e.code === 1002) {
+        this.showUserError("Connection closed: Protocol error");
+      } else if (e.code === 1003) {
+        this.showUserError("Connection closed: Unsupported data type");
+      } else if (e.code === 1006) {
+        this.showUserError("Connection closed abnormally: Check your network connection");
+      } else if (e.code === 1015) {
+        this.showUserError("TLS handshake failed: Certificate validation error");
+      } else {
+        this.showUserError(`Connection lost (code: ${e.code})`);
+      }
+      if (!this.manualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
+        const exponentialDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
+        this.scheduleReconnect(Math.min(exponentialDelay, 3e4));
+      }
+      this.deinitialize();
+    };
+    this.saveSession();
+  };
+  Client.prototype.sendAuthentication = function() {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      this.showUserError("Connection lost during authentication");
+      return;
+    }
+    try {
+      const authData = {
+        type: "auth",
+        user: this.sanitizeInput(this.userEl.value),
+        password: this.passwordEl.value,
+        host: this.sanitizeInput(this.hostEl.value),
+        sessionId: this.sessionId,
+        csrfToken: this.csrfToken,
+        timestamp: Date.now()
+      };
+      this.socket.send(JSON.stringify(authData));
+      Logger2.debug("Connection", "Authentication data sent");
+    } catch (error) {
+      this.showUserError("Failed to send authentication data");
+      Logger2.error("Connection", "Authentication send error:", error);
+    }
+  };
+  Client.prototype.initialize = function() {
+    if (this.connected) {
+      return;
+    }
+    this.reconnectAttempts = 0;
+    this.lastConnectionTime = Date.now();
+    window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keyup", this.handleKeyUp);
+    this.canvas.addEventListener("mousemove", this.handleMouseMove);
+    this.canvas.addEventListener("mousedown", this.handleMouseDown);
+    this.canvas.addEventListener("mouseup", this.handleMouseUp);
+    this.canvas.addEventListener("contextmenu", this.handleMouseUp);
+    this.canvas.addEventListener("click", () => {
+      this.canvas.focus();
+      this.resumeAudioContext();
+    });
+    this.canvas.addEventListener("wheel", this.handleWheel);
+    this.canvas.addEventListener("touchstart", this.handleTouchStart, { passive: false });
+    this.canvas.addEventListener("touchmove", this.handleTouchMove, { passive: false });
+    this.canvas.addEventListener("touchend", this.handleTouchEnd, { passive: false });
+    window.addEventListener("resize", this.handleResize);
+    this.connected = true;
+  };
+  Client.prototype.showCanvas = function() {
+    const canvasContainer = document.getElementById("canvas-container");
+    const formContainer = document.querySelector(".container");
+    if (formContainer) {
+      formContainer.style.display = "none";
+    }
+    if (canvasContainer) {
+      canvasContainer.style.cssText = "display: block !important; position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 9999 !important; background: #000 !important;";
+      void canvasContainer.offsetHeight;
+    }
+    this.canvas.style.cssText = "display: block !important; visibility: visible !important; opacity: 1 !important; position: absolute !important; top: 0 !important; left: 0 !important; width: " + this.canvas.width + "px !important; height: " + this.canvas.height + "px !important;";
+    this.canvas.setAttribute("tabindex", "0");
+    this.canvas.style.outline = "none";
+    this.canvas.focus();
+    void this.canvas.offsetHeight;
+    this.initBitmapCache();
+    this.initClipboardSupport();
+    this.startTimeoutTracking();
+    this.emitEvent("connected", {
+      host: this.sanitizeInput(this.hostEl.value),
+      user: this.sanitizeInput(this.userEl.value)
+    });
+  };
+  Client.prototype.deinitialize = function() {
+    this.connected = false;
+    this.canvasShown = false;
+    window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keyup", this.handleKeyUp);
+    this.canvas.removeEventListener("mousemove", this.handleMouseMove);
+    this.canvas.removeEventListener("mousedown", this.handleMouseDown);
+    this.canvas.removeEventListener("mouseup", this.handleMouseUp);
+    this.canvas.removeEventListener("contextmenu", this.handleMouseUp);
+    this.canvas.removeEventListener("wheel", this.handleWheel);
+    this.canvas.removeEventListener("touchstart", this.handleTouchStart);
+    this.canvas.removeEventListener("touchmove", this.handleTouchMove);
+    this.canvas.removeEventListener("touchend", this.handleTouchEnd);
+    window.removeEventListener("resize", this.handleResize);
+    this.clearAllTimeouts();
+    this.clearBitmapCache();
+    this.disableAudio();
+    Object.entries(this.pointerCache).forEach(([index, style]) => {
+      document.getElementsByTagName("head")[0].removeChild(style);
+    });
+    this.pointerCache = {};
+    this.canvas.classList = [];
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  };
+  Client.prototype.handleMessage = function(arrayBuffer) {
+    if (!this.connected) {
+      return;
+    }
+    const firstByte = new Uint8Array(arrayBuffer)[0];
+    if (firstByte === 254 && this.audioEnabled) {
+      this.handleAudioMessage(new Uint8Array(arrayBuffer));
+      return;
+    }
+    try {
+      const text = new TextDecoder().decode(arrayBuffer);
+      const message = JSON.parse(text);
+      if (message.type === "clipboard_response") {
+        Logger2.info("Clipboard", "Received remote clipboard data");
+        this.handleRemoteClipboard(message.data);
+        return;
+      }
+      if (message.type === "file_transfer_status") {
+        this.updateFileStatus(message.message);
+        return;
+      }
+      if (message.type === "error") {
+        this.showUserError(message.message);
+        this.emitEvent("error", { message: message.message });
+        return;
+      }
+      if (message.type === "capabilities") {
+        Logger2.info("Capabilities", `Server: codecs=${message.codecs?.join(",") || "none"}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
+        return;
+      }
+    } catch (e) {
+    }
+    const r = new BinaryReader(arrayBuffer);
+    const header = parseUpdateHeader(r);
+    Logger2.debug("Update", `code=${header.updateCode}, pointer=${header.isPointer()}`);
+    if (header.isCompressed()) {
+      Logger2.warn("Update", "Compression not supported");
+      return;
+    }
+    if (header.isBitmap()) {
+      this.handleBitmap(r);
+      return;
+    }
+    if (header.isPointer()) {
+      this.handlePointer(header, r);
+      return;
+    }
+    if (header.isSynchronize()) {
+      Logger2.debug("Update", "Synchronize received");
+      return;
+    }
+    if (header.isPalette()) {
+      this.handlePalette(r);
+      return;
+    }
+    if (header.updateCode === 15) {
+      return;
+    }
+    Logger2.debug("Update", `Unknown update code: ${header.updateCode}`);
+  };
+  Client.prototype.disconnect = function() {
+    if (!this.socket) {
+      return;
+    }
+    this.manualDisconnect = true;
+    this.clearSession();
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    this.deinitialize();
+    this.socket.close(1e3);
+  };
+  Client.prototype.reconnectWithNewSize = function(width, height) {
+    this.originalWidth = width;
+    this.originalHeight = height;
+    if (this.socket) {
+      this.manualDisconnect = true;
+      this.socket.close(1e3);
+    }
+    setTimeout(() => {
+      this.manualDisconnect = false;
+      this.connect();
+    }, 500);
+  };
+
+  // index.js
+  if (typeof window !== "undefined") {
+    window.Client = Client;
+    window.Logger = Logger2;
+  }
+  var src_default = Client;
+  return __toCommonJS(src_exports);
+})();

@@ -2,7 +2,7 @@
 
 A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssembly.
 
-> ⚠️ **Note**: While functional, this implementation has known limitations. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for details.
+> ⚠️ **Note**: While functional, this implementation has known limitations.
 
 ## Quick Start
 

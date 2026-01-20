@@ -145,11 +145,11 @@ func TestIsAllowedOrigin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up environment before test
-			os.Unsetenv("ALLOWED_ORIGINS")
+			_ = os.Unsetenv("ALLOWED_ORIGINS")
 			if tt.envOrigins != "" {
-				os.Setenv("ALLOWED_ORIGINS", tt.envOrigins)
+				_ = os.Setenv("ALLOWED_ORIGINS", tt.envOrigins)
 			}
-			defer os.Unsetenv("ALLOWED_ORIGINS")
+			defer func() { _ = os.Unsetenv("ALLOWED_ORIGINS") }()
 
 			result := isAllowedOrigin(tt.origin)
 			assert.Equal(t, tt.expectedResult, result, "expected %v for origin %q with env %q", tt.expectedResult, tt.origin, tt.envOrigins)
@@ -159,8 +159,8 @@ func TestIsAllowedOrigin(t *testing.T) {
 
 // TestConnect_ForbiddenOrigin tests that disallowed origins are rejected
 func TestConnect_ForbiddenOrigin(t *testing.T) {
-	os.Setenv("ALLOWED_ORIGINS", "http://allowed.com")
-	defer os.Unsetenv("ALLOWED_ORIGINS")
+	_ = os.Setenv("ALLOWED_ORIGINS", "http://allowed.com")
+	defer func() { _ = os.Unsetenv("ALLOWED_ORIGINS") }()
 
 	req := httptest.NewRequest(http.MethodGet, "/connect?width=800&height=600&host=test&user=test&password=test", nil)
 	req.Header.Set("Origin", "http://malicious.com")
@@ -181,7 +181,7 @@ func TestConnect_NoOriginHeader(t *testing.T) {
 	// Make a regular HTTP request (not WebSocket) - should fail upgrade but not be 403
 	resp, err := http.Get(server.URL + "/connect?width=800&height=600")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Without proper WebSocket headers, it won't upgrade, but it shouldn't be 403
 	assert.NotEqual(t, http.StatusForbidden, resp.StatusCode)
@@ -199,7 +199,7 @@ func TestConnect_WebSocketUpgrade(t *testing.T) {
 	// This will fail at the RDP connection stage since "nonexistent" isn't a real host
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 	// The WebSocket should at least attempt to connect (handshake succeeds)
 	// The error will be from RDP connection failure or disconnect
@@ -328,7 +328,7 @@ func TestRdpToWs_WebSocketSendSuccess(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Read the sent data
 	var received []byte
@@ -345,7 +345,7 @@ func TestRdpToWs_WebSocketSendError(t *testing.T) {
 
 	// Create server that closes connection immediately
 	server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		ws.Close() // Close immediately to trigger send error
+		_ = ws.Close() // Close immediately to trigger send error
 		ctx := context.Background()
 		rdpToWs(ctx, mockRDP, ws)
 	}))
@@ -354,7 +354,7 @@ func TestRdpToWs_WebSocketSendError(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -385,7 +385,7 @@ func TestWsToRdp_ContextCancellation(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -406,7 +406,7 @@ func TestWsToRdp_ReceiveAndForward(t *testing.T) {
 
 		// Wait a bit for the receiver to start, then close
 		time.Sleep(100 * time.Millisecond)
-		ws.Close()
+		_ = ws.Close()
 	}))
 	defer server.Close()
 
@@ -420,7 +420,7 @@ func TestWsToRdp_ReceiveAndForward(t *testing.T) {
 
 	// Wait for processing
 	time.Sleep(50 * time.Millisecond)
-	ws.Close()
+	_ = ws.Close()
 
 	select {
 	case <-done:
@@ -470,7 +470,7 @@ func TestWsToRdp_SendInputError(t *testing.T) {
 		t.Fatal("wsToRdp did not return after send error")
 	}
 
-	ws.Close()
+	_ = ws.Close()
 }
 
 // TestWsToRdp_WebSocketEOF tests handling of WebSocket EOF (client disconnect)
@@ -496,7 +496,7 @@ func TestWsToRdp_WebSocketEOF(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close client side to trigger EOF on server
-	ws.Close()
+	_ = ws.Close()
 
 	select {
 	case <-done:
@@ -514,7 +514,7 @@ func TestRdpToWs_ClosedConnectionError(t *testing.T) {
 
 	done := make(chan struct{})
 	server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
-		ws.Close() // Close immediately
+		_ = ws.Close() // Close immediately
 
 		ctx := context.Background()
 		go func() {
@@ -527,7 +527,7 @@ func TestRdpToWs_ClosedConnectionError(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 
 	select {
@@ -540,8 +540,8 @@ func TestRdpToWs_ClosedConnectionError(t *testing.T) {
 
 // TestConnect_LocalhostOriginWithEnvSet tests that localhost is always allowed
 func TestConnect_LocalhostOriginWithEnvSet(t *testing.T) {
-	os.Setenv("ALLOWED_ORIGINS", "http://production.com")
-	defer os.Unsetenv("ALLOWED_ORIGINS")
+	_ = os.Setenv("ALLOWED_ORIGINS", "http://production.com")
+	defer func() { _ = os.Unsetenv("ALLOWED_ORIGINS") }()
 
 	// Test isAllowedOrigin directly since Connect requires WebSocket hijacking
 	result := isAllowedOrigin("http://localhost:3000")
@@ -593,7 +593,7 @@ func TestRdpToWs_MultipleUpdates(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Receive all updates
 	for i := 0; i < len(updates); i++ {
@@ -639,7 +639,7 @@ func TestWsToRdp_MultipleInputs(t *testing.T) {
 
 	// Small delay to ensure messages are processed
 	time.Sleep(100 * time.Millisecond)
-	ws.Close()
+	_ = ws.Close()
 
 	select {
 	case <-done:
@@ -686,8 +686,8 @@ func TestConnect_AllowedOriginWithProtocolVariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("ALLOWED_ORIGINS", tt.envOrigins)
-			defer os.Unsetenv("ALLOWED_ORIGINS")
+			_ = os.Setenv("ALLOWED_ORIGINS", tt.envOrigins)
+			defer func() { _ = os.Unsetenv("ALLOWED_ORIGINS") }()
 
 			result := isAllowedOrigin(tt.origin)
 			assert.Equal(t, tt.allowed, result)
@@ -707,7 +707,7 @@ func TestRdpToWs_ConcurrentSends(t *testing.T) {
 			go func(idx int) {
 				defer wg.Done()
 				wsMutex.Lock()
-				websocket.Message.Send(ws, []byte{byte(idx)})
+				_ = websocket.Message.Send(ws, []byte{byte(idx)}) //nolint:errcheck // test helper
 				wsMutex.Unlock()
 			}(i)
 		}
@@ -718,7 +718,7 @@ func TestRdpToWs_ConcurrentSends(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Read all messages
 	received := 0
@@ -746,8 +746,8 @@ func TestConnect_InvalidWidthParameter(t *testing.T) {
 	if err == nil {
 		// Connection established but should be closed quickly due to invalid width
 		var data []byte
-		websocket.Message.Receive(ws, &data) // Will fail or timeout
-		ws.Close()
+		_ = websocket.Message.Receive(ws, &data) //nolint:errcheck // test helper
+		_ = ws.Close()
 	}
 	// Error is expected due to invalid width parameter handling
 }
@@ -763,8 +763,8 @@ func TestConnect_InvalidHeightParameter(t *testing.T) {
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
 		var data []byte
-		websocket.Message.Receive(ws, &data)
-		ws.Close()
+		_ = websocket.Message.Receive(ws, &data) //nolint:errcheck // test helper
+		_ = ws.Close()
 	}
 }
 
@@ -779,8 +779,8 @@ func TestConnect_MissingWidthParameter(t *testing.T) {
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
 		var data []byte
-		websocket.Message.Receive(ws, &data)
-		ws.Close()
+		_ = websocket.Message.Receive(ws, &data) //nolint:errcheck // test helper
+		_ = ws.Close()
 	}
 }
 
@@ -811,7 +811,7 @@ func TestConnect_ColorDepthParameter(t *testing.T) {
 
 			ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 			if err == nil {
-				ws.Close()
+				_ = ws.Close()
 			}
 			// The connection attempt is expected to fail at RDP stage
 		})
@@ -828,15 +828,15 @@ func TestConnect_WithValidParameters(t *testing.T) {
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 	// Expected to fail at RDP connection stage, but parameters should be parsed correctly
 }
 
 // TestConnect_AllowedOriginHeader tests WebSocket with allowed origin header
 func TestConnect_AllowedOriginHeader(t *testing.T) {
-	os.Setenv("ALLOWED_ORIGINS", "http://example.com")
-	defer os.Unsetenv("ALLOWED_ORIGINS")
+	_ = os.Setenv("ALLOWED_ORIGINS", "http://example.com")
+	defer func() { _ = os.Unsetenv("ALLOWED_ORIGINS") }()
 
 	server := httptest.NewServer(http.HandlerFunc(Connect))
 	defer server.Close()
@@ -846,7 +846,7 @@ func TestConnect_AllowedOriginHeader(t *testing.T) {
 	// websocket.Dial uses the third parameter as origin
 	ws, err := websocket.Dial(wsURL, "", "http://example.com")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -859,7 +859,7 @@ func TestConnect_EmptyHost(t *testing.T) {
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -879,14 +879,14 @@ func TestWsToRdp_ReadError(t *testing.T) {
 
 		// Close immediately to cause read error
 		time.Sleep(10 * time.Millisecond)
-		ws.Close()
+		_ = ws.Close()
 	}))
 	defer server.Close()
 
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 
 	select {
@@ -914,7 +914,7 @@ func TestRdpToWs_SendWithUpdate(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Read first update
 	var received []byte
@@ -949,7 +949,7 @@ func TestRdpToWs_NilUpdate(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		defer ws.Close()
+		defer func() { _ = ws.Close() }()
 	}
 
 	select {
@@ -975,7 +975,7 @@ func TestConnect_WebSocketHandshakeWithOrigin(t *testing.T) {
 
 	ws, err := websocket.DialConfig(config)
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -1005,7 +1005,7 @@ func TestWsToRdp_ClosedNetworkConnectionError(t *testing.T) {
 
 	<-serverReady
 	// Close from client side to trigger "use of closed network connection" error
-	ws.Close()
+	_ = ws.Close()
 
 	select {
 	case <-done:
@@ -1028,7 +1028,7 @@ func TestRdpToWs_ClosedNetworkConnectionSendError(t *testing.T) {
 		// Close the WebSocket connection mid-send
 		go func() {
 			time.Sleep(50 * time.Millisecond)
-			ws.Close()
+			_ = ws.Close()
 		}()
 		rdpToWs(ctx, mockRDP, ws)
 		close(done)
@@ -1038,7 +1038,7 @@ func TestRdpToWs_ClosedNetworkConnectionSendError(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		defer ws.Close()
+		defer func() { _ = ws.Close() }()
 	}
 
 	select {
@@ -1080,7 +1080,7 @@ func TestWsToRdp_LargeData(t *testing.T) {
 	require.NoError(t, err)
 
 	time.Sleep(100 * time.Millisecond)
-	ws.Close()
+	_ = ws.Close()
 
 	select {
 	case <-done:
@@ -1116,7 +1116,7 @@ func TestRdpToWs_LargeUpdate(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	var received []byte
 	err = websocket.Message.Receive(ws, &received)
@@ -1135,8 +1135,8 @@ func TestConnect_MissingHeightParameter(t *testing.T) {
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
 		var data []byte
-		websocket.Message.Receive(ws, &data)
-		ws.Close()
+		_ = websocket.Message.Receive(ws, &data) //nolint:errcheck // test helper
+		_ = ws.Close()
 	}
 }
 
@@ -1182,11 +1182,11 @@ func TestIsAllowedOrigin_MoreEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Unsetenv("ALLOWED_ORIGINS")
+			_ = os.Unsetenv("ALLOWED_ORIGINS")
 			if tt.envOrigins != "" {
-				os.Setenv("ALLOWED_ORIGINS", tt.envOrigins)
+				_ = os.Setenv("ALLOWED_ORIGINS", tt.envOrigins)
 			}
-			defer os.Unsetenv("ALLOWED_ORIGINS")
+			defer func() { _ = os.Unsetenv("ALLOWED_ORIGINS") }()
 
 			result := isAllowedOrigin(tt.origin)
 			assert.Equal(t, tt.expected, result, "origin=%q env=%q", tt.origin, tt.envOrigins)
@@ -1225,7 +1225,7 @@ func TestRdpToWs_ContextCancelledDuringLoop(t *testing.T) {
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
 		// Read what we can
-		ws.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+		_ = ws.SetReadDeadline(time.Now().Add(500 * time.Millisecond)) //nolint:errcheck // test helper
 		var data []byte
 		for {
 			err := websocket.Message.Receive(ws, &data)
@@ -1233,7 +1233,7 @@ func TestRdpToWs_ContextCancelledDuringLoop(t *testing.T) {
 				break
 			}
 		}
-		ws.Close()
+		_ = ws.Close()
 	}
 
 	select {
@@ -1270,7 +1270,7 @@ func TestWsToRdp_ContextCancelledWhileWaiting(t *testing.T) {
 	<-serverReady
 	// Close client connection after server is ready - this will cause Receive to return error
 	time.Sleep(50 * time.Millisecond)
-	ws.Close()
+	_ = ws.Close()
 
 	select {
 	case <-done:
@@ -1303,7 +1303,7 @@ func TestConnect_ServerHandshakeFunction(t *testing.T) {
 
 		handler := func(wsConn *websocket.Conn) {
 			// Just close immediately for test
-			wsConn.Close()
+			_ = wsConn.Close()
 		}
 
 		wsServer := websocket.Server{
@@ -1320,7 +1320,7 @@ func TestConnect_ServerHandshakeFunction(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://customorigin.com")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -1335,7 +1335,7 @@ func TestConnect_FullQueryParameters(t *testing.T) {
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 	// Will fail at RDP connection but parameters are all parsed
 }
@@ -1355,7 +1355,7 @@ func TestWsToRdp_GenericReadError(t *testing.T) {
 
 		// Wait for a bit then close to trigger error
 		time.Sleep(100 * time.Millisecond)
-		ws.Close()
+		_ = ws.Close()
 	}))
 	defer server.Close()
 
@@ -1363,8 +1363,8 @@ func TestWsToRdp_GenericReadError(t *testing.T) {
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
 		// Send some data then close abruptly
-		websocket.Message.Send(ws, []byte{1, 2, 3})
-		ws.Close()
+		_ = websocket.Message.Send(ws, []byte{1, 2, 3}) //nolint:errcheck // test helper
+		_ = ws.Close()
 	}
 
 	select {
@@ -1389,7 +1389,7 @@ func TestRdpToWs_GenericSendError(t *testing.T) {
 		// Close after a delay to trigger send error
 		go func() {
 			time.Sleep(50 * time.Millisecond)
-			ws.Close()
+			_ = ws.Close()
 		}()
 
 		rdpToWs(ctx, mockRDP, ws)
@@ -1401,7 +1401,7 @@ func TestRdpToWs_GenericSendError(t *testing.T) {
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
 		// Read what we can before server closes
-		ws.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
+		_ = ws.SetReadDeadline(time.Now().Add(200 * time.Millisecond)) //nolint:errcheck // test helper
 		var data []byte
 		for {
 			err := websocket.Message.Receive(ws, &data)
@@ -1409,7 +1409,7 @@ func TestRdpToWs_GenericSendError(t *testing.T) {
 				break
 			}
 		}
-		ws.Close()
+		_ = ws.Close()
 	}
 
 	select {
@@ -1429,7 +1429,7 @@ func TestConnect_ZeroDimensions(t *testing.T) {
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -1442,7 +1442,7 @@ func TestConnect_NegativeDimensions(t *testing.T) {
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -1455,7 +1455,7 @@ func TestConnect_VeryLargeDimensions(t *testing.T) {
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 }
 
@@ -1475,7 +1475,7 @@ func TestRdpToWs_RapidUpdates(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Read all updates
 	count := 0
@@ -1521,7 +1521,7 @@ func TestWsToRdp_RapidInputs(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	ws.Close()
+	_ = ws.Close()
 
 	select {
 	case <-done:
@@ -1637,7 +1637,7 @@ func TestSendCapabilitiesInfo_NilCapabilities(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	select {
 	case <-done:
@@ -1671,7 +1671,7 @@ func TestSendCapabilitiesInfo_Success(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	// Receive the capabilities message
 	var received []byte
@@ -1706,7 +1706,7 @@ func TestSendCapabilitiesInfo_SendError(t *testing.T) {
 	done := make(chan struct{})
 	server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
 		// Close connection before sending to trigger error
-		ws.Close()
+		_ = ws.Close()
 		sendCapabilitiesInfo(ws, mockCaps)
 		close(done)
 	}))
@@ -1715,7 +1715,7 @@ func TestSendCapabilitiesInfo_SendError(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
-		ws.Close()
+		_ = ws.Close()
 	}
 
 	select {
@@ -1746,7 +1746,7 @@ func TestSendCapabilitiesInfo_EmptyCodecs(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	require.NoError(t, err)
-	defer ws.Close()
+	defer func() { _ = ws.Close() }()
 
 	var received []byte
 	err = websocket.Message.Receive(ws, &received)
@@ -1778,7 +1778,7 @@ defer server.Close()
 wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
 ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 require.NoError(t, err)
-defer ws.Close()
+defer func() { _ = ws.Close() }()
 
 sendAudioData(ws, []byte{0x01, 0x02, 0x03, 0x04}, nil, 16)
 time.Sleep(100 * time.Millisecond)
@@ -1804,7 +1804,7 @@ defer server.Close()
 wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
 ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 require.NoError(t, err)
-defer ws.Close()
+defer func() { _ = ws.Close() }()
 
 format := &audio.AudioFormat{
 Channels:      2,

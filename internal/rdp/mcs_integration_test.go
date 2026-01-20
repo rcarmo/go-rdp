@@ -79,18 +79,18 @@ func TestClient_capabilitiesExchange_Success(t *testing.T) {
 	demandActiveBuf := new(bytes.Buffer)
 	
 	// ShareControlHeader
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint16(40)) // totalLength
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint16(0x11)) // pduType (demand active)
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint16(1001)) // pduSource
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint16(40)) // totalLength
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint16(0x11)) // pduType (demand active)
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint16(1001)) // pduSource
 	
 	// DemandActivePDU
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint32(0x12345678)) // shareId
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint16(4)) // lengthSourceDescriptor
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint32(0x12345678)) // shareId
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint16(4)) // lengthSourceDescriptor
 	demandActiveBuf.Write([]byte("RDP\x00")) // sourceDescriptor
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint16(4)) // lengthCombinedCapabilities
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint16(0)) // numberCapabilities
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint16(0)) // pad2Octets
-	binary.Write(demandActiveBuf, binary.LittleEndian, uint32(0)) // sessionId
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint16(4)) // lengthCombinedCapabilities
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint16(0)) // numberCapabilities
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint16(0)) // pad2Octets
+	_ = binary.Write(demandActiveBuf, binary.LittleEndian, uint32(0)) // sessionId
 
 	mockMCS := &testMCSLayer{
 		receiveFunc: func() (uint16, io.Reader, error) {
@@ -279,15 +279,15 @@ func TestClient_connectionFinalization_SynchronizeReceived(t *testing.T) {
 			buf := new(bytes.Buffer)
 			
 			// ShareControlHeader
-			binary.Write(buf, binary.LittleEndian, uint16(22))
-			binary.Write(buf, binary.LittleEndian, uint16(0x17)) // PDUTYPE_DATAPDU
-			binary.Write(buf, binary.LittleEndian, uint16(1001))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(22))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0x17)) // PDUTYPE_DATAPDU
+			_ = binary.Write(buf, binary.LittleEndian, uint16(1001))
 			
 			// ShareDataHeader
-			binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
-			binary.Write(buf, binary.LittleEndian, uint8(0))
-			binary.Write(buf, binary.LittleEndian, uint8(1))
-			binary.Write(buf, binary.LittleEndian, uint16(8))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint8(1))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(8))
 			
 			var pduType2 uint8
 			switch callCount {
@@ -303,28 +303,28 @@ func TestClient_connectionFinalization_SynchronizeReceived(t *testing.T) {
 				return 0, nil, io.EOF
 			}
 			
-			binary.Write(buf, binary.LittleEndian, pduType2)
-			binary.Write(buf, binary.LittleEndian, uint8(0))
-			binary.Write(buf, binary.LittleEndian, uint16(0))
+			_ = binary.Write(buf, binary.LittleEndian, pduType2)
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 			
 			// PDU data
 			switch pduType2 {
 			case 0x1F: // Synchronize
-				binary.Write(buf, binary.LittleEndian, uint16(1))
-				binary.Write(buf, binary.LittleEndian, uint16(1001))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(1))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(1001))
 			case 0x14: // Control
 				if callCount == 2 {
-					binary.Write(buf, binary.LittleEndian, uint16(4)) // cooperate
+					_ = binary.Write(buf, binary.LittleEndian, uint16(4)) // cooperate
 				} else {
-					binary.Write(buf, binary.LittleEndian, uint16(2)) // granted
+					_ = binary.Write(buf, binary.LittleEndian, uint16(2)) // granted
 				}
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint32(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint32(0))
 			case 0x28: // Fontmap
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
-				binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+				_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 			}
 			
 			return 1003, buf, nil
@@ -408,18 +408,18 @@ func TestClient_licensing_ValidClient(t *testing.T) {
 			buf := new(bytes.Buffer)
 			
 			// Security header with SEC_LICENSE_PKT flag
-			binary.Write(buf, binary.LittleEndian, uint32(0x0080))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x0080))
 			
 			// Preamble
-			binary.Write(buf, binary.LittleEndian, uint8(0xFF)) // ERROR_ALERT
-			binary.Write(buf, binary.LittleEndian, uint8(0x02))
-			binary.Write(buf, binary.LittleEndian, uint16(20))
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0xFF)) // ERROR_ALERT
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0x02))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(20))
 			
 			// ValidClientMessage
-			binary.Write(buf, binary.LittleEndian, uint32(0x00000007)) // STATUS_VALID_CLIENT
-			binary.Write(buf, binary.LittleEndian, uint32(0x00000002)) // ST_NO_TRANSITION
-			binary.Write(buf, binary.LittleEndian, uint16(0)) // BlobType
-			binary.Write(buf, binary.LittleEndian, uint16(0)) // BlobLen
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x00000007)) // STATUS_VALID_CLIENT
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x00000002)) // ST_NO_TRANSITION
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // BlobType
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // BlobLen
 			
 			return 1003, buf, nil
 		},
@@ -441,18 +441,18 @@ func TestClient_licensing_NewLicense(t *testing.T) {
 			buf := new(bytes.Buffer)
 			
 			// Security header
-			binary.Write(buf, binary.LittleEndian, uint32(0x0080))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x0080))
 			
 			// Preamble with NEW_LICENSE
-			binary.Write(buf, binary.LittleEndian, uint8(0x03)) // NEW_LICENSE
-			binary.Write(buf, binary.LittleEndian, uint8(0x02))
-			binary.Write(buf, binary.LittleEndian, uint16(4))
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0x03)) // NEW_LICENSE
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0x02))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(4))
 			
 			// Dummy data for ValidClientMessage
-			binary.Write(buf, binary.LittleEndian, uint32(0))
-			binary.Write(buf, binary.LittleEndian, uint32(0))
-			binary.Write(buf, binary.LittleEndian, uint16(0))
-			binary.Write(buf, binary.LittleEndian, uint16(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0))
 			
 			return 1003, buf, nil
 		},

@@ -28,7 +28,7 @@ func TestClient_handleSlowPathGraphicsUpdate_DataSizes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, tt.updateType)
+			_ = binary.Write(buf, binary.LittleEndian, tt.updateType)
 			buf.Write(make([]byte, tt.dataSize))
 
 			client := &Client{}
@@ -116,12 +116,12 @@ func TestClient_handleRail_States(t *testing.T) {
 
 			// Build a SysParam PDU (which is ignored)
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, uint32(13))
-			binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
-			binary.Write(buf, binary.LittleEndian, uint16(tt.orderType))
-			binary.Write(buf, binary.LittleEndian, uint16(17))
-			binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
-			binary.Write(buf, binary.LittleEndian, uint8(0x42))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(13))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(tt.orderType))
+			_ = binary.Write(buf, binary.LittleEndian, uint16(17))
+			_ = binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
+			_ = binary.Write(buf, binary.LittleEndian, uint8(0x42))
 
 			err := client.handleRail(buf)
 			assert.NoError(t, err)
@@ -242,11 +242,11 @@ func TestRailPDUExecResult_Deserialize_Extended(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, tt.flags)
-			binary.Write(buf, binary.LittleEndian, tt.execResult)
-			binary.Write(buf, binary.LittleEndian, tt.rawResult)
-			binary.Write(buf, binary.LittleEndian, uint16(0)) // padding
-			binary.Write(buf, binary.LittleEndian, uint16(len(tt.exeOrFile)))
+			_ = binary.Write(buf, binary.LittleEndian, tt.flags)
+			_ = binary.Write(buf, binary.LittleEndian, tt.execResult)
+			_ = binary.Write(buf, binary.LittleEndian, tt.rawResult)
+			_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // padding
+			_ = binary.Write(buf, binary.LittleEndian, uint16(len(tt.exeOrFile)))
 			buf.Write([]byte(tt.exeOrFile))
 
 			execResult := &RailPDUExecResult{}

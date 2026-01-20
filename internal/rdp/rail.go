@@ -203,8 +203,8 @@ type RailPDUHeader struct {
 func (h *RailPDUHeader) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(h.OrderType))
-	binary.Write(buf, binary.LittleEndian, h.OrderLength)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(h.OrderType))
+	_ = binary.Write(buf, binary.LittleEndian, h.OrderLength)
 
 	return buf.Bytes()
 }
@@ -248,7 +248,7 @@ func NewRailHandshakePDU() *RailPDU {
 func (pdu *RailPDUHandshake) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, pdu.buildNumber)
+	_ = binary.Write(buf, binary.LittleEndian, pdu.buildNumber)
 
 	return buf.Bytes()
 }
@@ -283,7 +283,7 @@ func NewRailClientInfoPDU() *RailPDU {
 func (pdu *RailPDUClientInfo) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, pdu.Flags)
+	_ = binary.Write(buf, binary.LittleEndian, pdu.Flags)
 
 	return buf.Bytes()
 }
@@ -311,8 +311,8 @@ func NewRailPDUClientSystemParamUpdate(systemParam uint32, body uint8) *RailPDU 
 func (pdu *RailPDUClientSystemParamUpdate) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, pdu.SystemParam)
-	binary.Write(buf, binary.LittleEndian, pdu.Body)
+	_ = binary.Write(buf, binary.LittleEndian, pdu.SystemParam)
+	_ = binary.Write(buf, binary.LittleEndian, pdu.Body)
 
 	return buf.Bytes()
 }
@@ -395,13 +395,13 @@ func (pdu *RailPDUClientExecute) Serialize() []byte {
 
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, pdu.Flags)
-	binary.Write(buf, binary.LittleEndian, exeOrFileLength)
-	binary.Write(buf, binary.LittleEndian, workingDirLength)
-	binary.Write(buf, binary.LittleEndian, argumentsLen)
-	binary.Write(buf, binary.LittleEndian, exeOrFile)
-	binary.Write(buf, binary.LittleEndian, workingDir)
-	binary.Write(buf, binary.LittleEndian, arguments)
+	_ = binary.Write(buf, binary.LittleEndian, pdu.Flags)
+	_ = binary.Write(buf, binary.LittleEndian, exeOrFileLength)
+	_ = binary.Write(buf, binary.LittleEndian, workingDirLength)
+	_ = binary.Write(buf, binary.LittleEndian, argumentsLen)
+	_ = binary.Write(buf, binary.LittleEndian, exeOrFile)
+	_ = binary.Write(buf, binary.LittleEndian, workingDir)
+	_ = binary.Write(buf, binary.LittleEndian, arguments)
 
 	return buf.Bytes()
 }

@@ -60,7 +60,7 @@ func TestConferenceCreateRequestSerialize(t *testing.T) {
 			}
 
 			// Verify the serialized data contains the user data
-			if tt.userData != nil && len(tt.userData) > 0 {
+			if len(tt.userData) > 0 {
 				if !bytes.Contains(serialized, tt.userData) {
 					t.Error("serialized data does not contain user data")
 				}

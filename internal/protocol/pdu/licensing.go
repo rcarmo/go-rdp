@@ -15,8 +15,12 @@ type LicensingBinaryBlob struct {
 }
 
 func (b *LicensingBinaryBlob) Deserialize(wire io.Reader) error {
-	binary.Read(wire, binary.LittleEndian, &b.BlobType)
-	binary.Read(wire, binary.LittleEndian, &b.BlobLen)
+	if err := binary.Read(wire, binary.LittleEndian, &b.BlobType); err != nil {
+		return err
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &b.BlobLen); err != nil {
+		return err
+	}
 
 	if b.BlobLen == 0 {
 		return nil
@@ -38,8 +42,12 @@ type LicensingErrorMessage struct {
 }
 
 func (m *LicensingErrorMessage) Deserialize(wire io.Reader) error {
-	binary.Read(wire, binary.LittleEndian, &m.ErrorCode)
-	binary.Read(wire, binary.LittleEndian, &m.StateTransition)
+	if err := binary.Read(wire, binary.LittleEndian, &m.ErrorCode); err != nil {
+		return err
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &m.StateTransition); err != nil {
+		return err
+	}
 
 	return m.ErrorInfo.Deserialize(wire)
 }
@@ -51,11 +59,13 @@ type LicensingPreamble struct {
 }
 
 func (p *LicensingPreamble) Deserialize(wire io.Reader) error {
-	binary.Read(wire, binary.LittleEndian, &p.MsgType)
-	binary.Read(wire, binary.LittleEndian, &p.Flags)
-	binary.Read(wire, binary.LittleEndian, &p.MsgSize)
-
-	return nil
+	if err := binary.Read(wire, binary.LittleEndian, &p.MsgType); err != nil {
+		return err
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &p.Flags); err != nil {
+		return err
+	}
+	return binary.Read(wire, binary.LittleEndian, &p.MsgSize)
 }
 
 type ServerLicenseError struct {

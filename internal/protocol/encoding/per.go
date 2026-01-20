@@ -242,33 +242,33 @@ func PerWriteOctetStream(oStr string, minValue int, w io.Writer) {
 func PerWriteInteger(value int, w io.Writer) {
 	if value <= 0xff {
 		PerWriteLength(1, w)
-		w.Write([]byte{uint8(value)})
+		_, _ = w.Write([]byte{uint8(value)})
 
 		return
 	}
 
 	if value < 0xffff {
 		PerWriteLength(2, w)
-		binary.Write(w, binary.BigEndian, uint16(value))
+		_ = binary.Write(w, binary.BigEndian, uint16(value))
 
 		return
 	}
 
 	PerWriteLength(4, w)
-	binary.Write(w, binary.BigEndian, uint32(value))
+	_ = binary.Write(w, binary.BigEndian, uint32(value))
 }
 
 func PerWriteInteger16(value, minimum uint16, w io.Writer) {
 	value -= minimum
 
-	binary.Write(w, binary.BigEndian, value)
+	_ = binary.Write(w, binary.BigEndian, value)
 }
 
 // BerWriteInteger16 writes a 16-bit integer in BER format
 func BerWriteInteger16(n uint16, w io.Writer) {
-	w.Write([]byte{0x02}) // tag integer
+	_, _ = w.Write([]byte{0x02}) // tag integer
 	BerWriteLength(2, w)
-	binary.Write(w, binary.BigEndian, n)
+	_ = binary.Write(w, binary.BigEndian, n)
 }
 
 // BerReadInteger16 reads a 16-bit integer in BER format

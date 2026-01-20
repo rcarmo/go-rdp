@@ -21,14 +21,14 @@ func TestClient_handleRail_InitializingState(t *testing.T) {
 	// Build a SysParam PDU (which returns early)
 	buf := new(bytes.Buffer)
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Rail header (SysParam)
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
-	binary.Write(buf, binary.LittleEndian, uint16(17))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(17))
 	// SysParam data
-	binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
-	binary.Write(buf, binary.LittleEndian, uint8(0x42))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
+	_ = binary.Write(buf, binary.LittleEndian, uint8(0x42))
 
 	// SysParam should return early without calling railHandshake
 	err := client.handleRail(buf)
@@ -44,17 +44,17 @@ func TestClient_handleRail_ExecuteAppState(t *testing.T) {
 	// Build an exec result PDU
 	buf := new(bytes.Buffer)
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Rail header
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderExecResult))
-	binary.Write(buf, binary.LittleEndian, uint16(32))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderExecResult))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(32))
 	// ExecResult data
-	binary.Write(buf, binary.LittleEndian, uint16(0x0001))      // Flags
-	binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // ExecResult
-	binary.Write(buf, binary.LittleEndian, uint32(0x00000000))  // RawResult
-	binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // Padding
-	binary.Write(buf, binary.LittleEndian, uint16(4))           // ExeOrFileLength
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0001))      // Flags
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // ExecResult
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x00000000))  // RawResult
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // Padding
+	_ = binary.Write(buf, binary.LittleEndian, uint16(4))           // ExeOrFileLength
 	buf.Write([]byte("test"))                                   // ExeOrFile
 
 	err := client.handleRail(buf)
@@ -71,11 +71,11 @@ func TestClient_handleRail_WaitForDataState(t *testing.T) {
 	// Build a non-sysparam PDU that won't match any state handler
 	buf := new(bytes.Buffer)
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 	// Rail header with unknown order type
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderActivate))
-	binary.Write(buf, binary.LittleEndian, uint16(12))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderActivate))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(12))
 
 	err := client.handleRail(buf)
 	// Should not error, just return nil (no matching state handler)

@@ -119,15 +119,7 @@ export const UIMixin = {
      * @param {Object} details
      */
     logError(context, details) {
-        const errorInfo = {
-            context: context,
-            details: details,
-            timestamp: new Date().toISOString(),
-            sessionId: this.sessionId,
-            userAgent: navigator.userAgent
-        };
-        
-        console.error('RDP Client Error:', errorInfo);
+        Logger.error("RDP", `${context}:`, details);
     },
     
     /**
@@ -139,7 +131,7 @@ export const UIMixin = {
         try {
             document.dispatchEvent(new CustomEvent('rdp:' + name, {detail: detail}));
         } catch (error) {
-            console.warn('Event dispatch failed', error);
+            Logger.debug("Event", `Dispatch failed: ${error.message}`);
         }
     }
 };

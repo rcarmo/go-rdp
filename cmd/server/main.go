@@ -13,11 +13,12 @@ import (
 
 	"github.com/rcarmo/rdp-html5/internal/config"
 	"github.com/rcarmo/rdp-html5/internal/handler"
+	"github.com/rcarmo/rdp-html5/internal/logging"
 )
 
 const (
 	appName    = "RDP HTML5 Client"
-	appVersion = "v2.0.0"
+	appVersion = "1.0.0"
 )
 
 func main() {
@@ -99,7 +100,7 @@ func run(args parsedArgs) error {
 	setupLogging(cfg.Logging)
 
 	server := createServer(cfg)
-	log.Printf("starting server on %s:%s (TLS=%t)", cfg.Server.Host, cfg.Server.Port, cfg.Security.EnableTLS)
+	logging.Info("Starting server on %s:%s (TLS=%t)", cfg.Server.Host, cfg.Server.Port, cfg.Security.EnableTLS)
 
 	if err := startServer(server, cfg); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
@@ -202,16 +203,23 @@ func rateLimitMiddleware(next http.Handler, _ int) http.Handler {
 	})
 }
 
-func setupLogging(_ config.LoggingConfig) {
+func setupLogging(cfg config.LoggingConfig) {
 	log.SetFlags(log.LstdFlags | log.LUTC)
 	log.SetOutput(log.Writer())
+	
+	// Set leveled logging level - default to "info" if not configured
+	level := cfg.Level
+	if level == "" {
+		level = "info"
+	}
+	logging.SetLevelFromString(level)
 }
 
 func requestLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(start))
+		logging.Debug("%s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(start))
 	})
 }
 

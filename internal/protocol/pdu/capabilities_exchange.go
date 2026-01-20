@@ -333,7 +333,7 @@ type FrameAcknowledgeCapabilitySet struct {
 
 func (s *FrameAcknowledgeCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, s.MaxUnacknowledgedFrames)
+	_ = binary.Write(buf, binary.LittleEndian, s.MaxUnacknowledgedFrames)
 	return buf.Bytes()
 }
 

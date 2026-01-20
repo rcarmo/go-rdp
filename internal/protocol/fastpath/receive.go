@@ -44,11 +44,6 @@ type Update struct {
 	compression      Compression
 	compressionFlags uint8
 	size             uint16
-
-	paletteUpdateData         *paletteUpdateData
-	bitmapUpdateData          *bitmapUpdateData
-	pointerPositionUpdateData *pointerPositionUpdateData
-	colorPointerUpdateData    *colorPointerUpdateData
 }
 
 func (u *Update) Deserialize(wire io.Reader) error {

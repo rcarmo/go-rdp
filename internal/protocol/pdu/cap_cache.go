@@ -178,8 +178,8 @@ type ColorCacheCapabilitySet struct {
 func (s *ColorCacheCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, &s.ColorTableCacheSize)
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // padding
+	_ = binary.Write(buf, binary.LittleEndian, &s.ColorTableCacheSize)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // padding
 
 	return buf.Bytes()
 }

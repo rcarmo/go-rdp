@@ -92,16 +92,16 @@ func (n *NTLMv2) GetNegotiateMessage() []byte {
 
 	buf := &bytes.Buffer{}
 	buf.Write(ntlmSignature)
-	binary.Write(buf, binary.LittleEndian, uint32(1)) // MessageType
-	binary.Write(buf, binary.LittleEndian, flags)
+	_ = binary.Write(buf, binary.LittleEndian, uint32(1)) // MessageType
+	_ = binary.Write(buf, binary.LittleEndian, flags)
 	// DomainNameFields (8 bytes - all zeros)
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // DomainNameLen
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // DomainNameMaxLen
-	binary.Write(buf, binary.LittleEndian, uint32(0)) // DomainNameBufferOffset
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // DomainNameLen
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // DomainNameMaxLen
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0)) // DomainNameBufferOffset
 	// WorkstationFields (8 bytes - all zeros)
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // WorkstationLen
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // WorkstationMaxLen
-	binary.Write(buf, binary.LittleEndian, uint32(0)) // WorkstationBufferOffset
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // WorkstationLen
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // WorkstationMaxLen
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0)) // WorkstationBufferOffset
 	// Version (8 bytes)
 	buf.Write([]byte{0x06, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F}) // Windows Vista, NTLMSSP_REVISION_W2K3
 
@@ -271,7 +271,9 @@ func (n *NTLMv2) GetAuthenticateMessage(challengeData []byte) ([]byte, *Security
 
 	// Generate client challenge
 	clientChallenge := make([]byte, 8)
-	rand.Read(clientChallenge)
+	if _, err := rand.Read(clientChallenge); err != nil {
+		return nil, nil
+	}
 
 	// Modify TargetInfo to include MIC_PROVIDED flag when MIC will be computed
 	targetInfo := challenge.TargetInfo
@@ -285,7 +287,9 @@ func (n *NTLMv2) GetAuthenticateMessage(challengeData []byte) ([]byte, *Security
 
 	// Key exchange
 	exportedSessionKey := make([]byte, 16)
-	rand.Read(exportedSessionKey)
+	if _, err := rand.Read(exportedSessionKey); err != nil {
+		return nil, nil
+	}
 
 	encryptedRandomSessionKey := make([]byte, 16)
 	rc, _ := rc4.NewCipher(sessionBaseKey)
@@ -365,47 +369,47 @@ func (n *NTLMv2) buildAuthenticateMessage(flags uint32, domain, user, workstatio
 
 	buf := &bytes.Buffer{}
 	buf.Write(ntlmSignature)
-	binary.Write(buf, binary.LittleEndian, uint32(3)) // MessageType
+	_ = binary.Write(buf, binary.LittleEndian, uint32(3)) // MessageType
 
 	currentOffset := payloadOffset
 
 	// LmChallengeResponseFields
-	binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))
-	binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))
-	binary.Write(buf, binary.LittleEndian, currentOffset)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))
+	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
 	currentOffset += uint32(len(lmResponse))
 
 	// NtChallengeResponseFields
-	binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))
-	binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))
-	binary.Write(buf, binary.LittleEndian, currentOffset)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))
+	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
 	currentOffset += uint32(len(ntResponse))
 
 	// DomainNameFields
-	binary.Write(buf, binary.LittleEndian, uint16(len(domain)))
-	binary.Write(buf, binary.LittleEndian, uint16(len(domain)))
-	binary.Write(buf, binary.LittleEndian, currentOffset)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(domain)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(domain)))
+	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
 	currentOffset += uint32(len(domain))
 
 	// UserNameFields
-	binary.Write(buf, binary.LittleEndian, uint16(len(user)))
-	binary.Write(buf, binary.LittleEndian, uint16(len(user)))
-	binary.Write(buf, binary.LittleEndian, currentOffset)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(user)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(user)))
+	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
 	currentOffset += uint32(len(user))
 
 	// WorkstationFields
-	binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))
-	binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))
-	binary.Write(buf, binary.LittleEndian, currentOffset)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))
+	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
 	currentOffset += uint32(len(workstation))
 
 	// EncryptedRandomSessionKeyFields
-	binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))
-	binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))
-	binary.Write(buf, binary.LittleEndian, currentOffset)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))
+	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
 
 	// NegotiateFlags
-	binary.Write(buf, binary.LittleEndian, flags)
+	_ = binary.Write(buf, binary.LittleEndian, flags)
 
 	// Version (8 bytes)
 	buf.Write([]byte{0x06, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F})
@@ -475,9 +479,9 @@ func (s *Security) GssEncrypt(data []byte) []byte {
 
 	// Build GSS token: Version(4) + Checksum(8) + SeqNum(4) + EncryptedData
 	result := &bytes.Buffer{}
-	binary.Write(result, binary.LittleEndian, uint32(0x00000001)) // Version
+	_ = binary.Write(result, binary.LittleEndian, uint32(0x00000001)) // Version
 	result.Write(checksum)
-	binary.Write(result, binary.LittleEndian, s.seqNum)
+	_ = binary.Write(result, binary.LittleEndian, s.seqNum)
 	result.Write(encrypted)
 
 	s.seqNum++

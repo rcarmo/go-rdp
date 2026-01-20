@@ -256,11 +256,11 @@ func TestRailPDUSystemParameters_Deserialize(t *testing.T) {
 func TestRailPDUExecResult_Deserialize(t *testing.T) {
 	// Build a valid exec result packet
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, uint16(0x0001))      // Flags
-	binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // ExecResult (success)
-	binary.Write(buf, binary.LittleEndian, uint32(0x00000000))  // RawResult
-	binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // Padding
-	binary.Write(buf, binary.LittleEndian, uint16(16))          // ExeOrFileLength
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0001))      // Flags
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // ExecResult (success)
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x00000000))  // RawResult
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // Padding
+	_ = binary.Write(buf, binary.LittleEndian, uint16(16))          // ExeOrFileLength
 	buf.Write([]byte("notepad.exe\x00\x00\x00\x00\x00"))        // ExeOrFile (padded to 16)
 
 	execResult := &RailPDUExecResult{}
@@ -348,15 +348,15 @@ func TestRailPDU_Deserialize_Handshake(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	// Channel header (8 bytes)
-	binary.Write(buf, binary.LittleEndian, uint32(8))  // length
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))  // length
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 
 	// Rail header (4 bytes)
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderHandshake))
-	binary.Write(buf, binary.LittleEndian, uint16(16))  // OrderLength
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderHandshake))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(16))  // OrderLength
 
 	// Handshake data (4 bytes)
-	binary.Write(buf, binary.LittleEndian, uint32(0x00001DB0))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x00001DB0))
 
 	pdu := &RailPDU{}
 	err := pdu.Deserialize(bytes.NewReader(buf.Bytes()))
@@ -371,16 +371,16 @@ func TestRailPDU_Deserialize_SysParam(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 
 	// Rail header
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
-	binary.Write(buf, binary.LittleEndian, uint16(17))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderSysParam))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(17))
 
 	// SysParam data
-	binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
-	binary.Write(buf, binary.LittleEndian, uint8(0x42))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x12345678))
+	_ = binary.Write(buf, binary.LittleEndian, uint8(0x42))
 
 	pdu := &RailPDU{}
 	err := pdu.Deserialize(bytes.NewReader(buf.Bytes()))
@@ -396,19 +396,19 @@ func TestRailPDU_Deserialize_ExecResult(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 
 	// Rail header
-	binary.Write(buf, binary.LittleEndian, uint16(RailOrderExecResult))
-	binary.Write(buf, binary.LittleEndian, uint16(32))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(RailOrderExecResult))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(32))
 
 	// ExecResult data
-	binary.Write(buf, binary.LittleEndian, uint16(0x0001))      // Flags
-	binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // ExecResult
-	binary.Write(buf, binary.LittleEndian, uint32(0x00000000))  // RawResult
-	binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // Padding
-	binary.Write(buf, binary.LittleEndian, uint16(4))           // ExeOrFileLength
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0001))      // Flags
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // ExecResult
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0x00000000))  // RawResult
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0000))      // Padding
+	_ = binary.Write(buf, binary.LittleEndian, uint16(4))           // ExeOrFileLength
 	buf.Write([]byte("test"))                                   // ExeOrFile
 
 	pdu := &RailPDU{}
@@ -424,12 +424,12 @@ func TestRailPDU_Deserialize_UnknownOrderType(t *testing.T) {
 	buf := new(bytes.Buffer)
 
 	// Channel header
-	binary.Write(buf, binary.LittleEndian, uint32(8))
-	binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(8))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(ChannelFlagFirst|ChannelFlagLast))
 
 	// Rail header with unknown order type
-	binary.Write(buf, binary.LittleEndian, uint16(0xFFFF))  // Unknown order type
-	binary.Write(buf, binary.LittleEndian, uint16(12))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0xFFFF))  // Unknown order type
+	_ = binary.Write(buf, binary.LittleEndian, uint16(12))
 
 	pdu := &RailPDU{}
 	err := pdu.Deserialize(bytes.NewReader(buf.Bytes()))

@@ -55,9 +55,9 @@ func newShareControlHeader(pduType Type, pduSource uint16) *ShareControlHeader {
 func (header *ShareControlHeader) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, header.TotalLength)
-	binary.Write(buf, binary.LittleEndian, uint16(header.PDUType))
-	binary.Write(buf, binary.LittleEndian, header.PDUSource)
+	_ = binary.Write(buf, binary.LittleEndian, header.TotalLength)
+	_ = binary.Write(buf, binary.LittleEndian, uint16(header.PDUType))
+	_ = binary.Write(buf, binary.LittleEndian, header.PDUSource)
 
 	return buf.Bytes()
 }
@@ -162,13 +162,13 @@ func (header *ShareDataHeader) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
 	buf.Write(header.ShareControlHeader.Serialize())
-	binary.Write(buf, binary.LittleEndian, header.ShareID)
-	binary.Write(buf, binary.LittleEndian, uint8(0)) // padding
-	binary.Write(buf, binary.LittleEndian, header.StreamID)
-	binary.Write(buf, binary.LittleEndian, header.UncompressedLength)
-	binary.Write(buf, binary.LittleEndian, uint8(header.PDUType2))
-	binary.Write(buf, binary.LittleEndian, header.CompressedType)
-	binary.Write(buf, binary.LittleEndian, header.CompressedLength)
+	_ = binary.Write(buf, binary.LittleEndian, header.ShareID)
+	_ = binary.Write(buf, binary.LittleEndian, uint8(0)) // padding
+	_ = binary.Write(buf, binary.LittleEndian, header.StreamID)
+	_ = binary.Write(buf, binary.LittleEndian, header.UncompressedLength)
+	_ = binary.Write(buf, binary.LittleEndian, uint8(header.PDUType2))
+	_ = binary.Write(buf, binary.LittleEndian, header.CompressedType)
+	_ = binary.Write(buf, binary.LittleEndian, header.CompressedLength)
 
 	return buf.Bytes()
 }

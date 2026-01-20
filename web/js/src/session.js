@@ -4,6 +4,8 @@
  * @module session
  */
 
+import { Logger } from './logger.js';
+
 /**
  * Generate a unique session ID
  * @returns {string}
@@ -57,7 +59,7 @@ export const SessionMixin = {
             document.cookie = `rdp_host=${encodeURIComponent(this.hostEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
             document.cookie = `rdp_user=${encodeURIComponent(this.userEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
         } catch (e) {
-            console.error('Failed to save session:', e);
+            Logger.warn("Session", `Failed to save: ${e.message}`);
         }
     },
     
@@ -75,7 +77,7 @@ export const SessionMixin = {
             if (cookies.rdp_host) this.hostEl.value = cookies.rdp_host;
             if (cookies.rdp_user) this.userEl.value = cookies.rdp_user;
         } catch (e) {
-            console.warn('Failed to load saved session:', e);
+            Logger.debug("Session", `Failed to load: ${e.message}`);
         }
     },
     
@@ -113,7 +115,7 @@ export const SessionMixin = {
         
         this.reconnectTimeout = setTimeout(() => {
             if (this.shouldAutoReconnect() && !this.connected) {
-                console.log(`Attempting reconnection ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+                Logger.info("Session", `Reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
                 this.attemptReconnect();
             }
         }, delay);
@@ -143,7 +145,7 @@ export const SessionMixin = {
             e.data.arrayBuffer().then((arrayBuffer) => this.handleMessage(arrayBuffer));
         };
         this.socket.onerror = (e) => {
-            console.log("Reconnection error:", e);
+            Logger.warn("Session", "Reconnection error");
         };
         this.socket.onclose = (e) => {
             if (!this.manualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -228,7 +230,7 @@ export const SessionMixin = {
      * Handle idle timeout
      */
     handleIdleTimeout() {
-        console.log('Session disconnected due to inactivity');
+        Logger.info("Session", "Disconnected due to inactivity");
         this.showUserWarning('Session disconnected due to inactivity');
         this.disconnect();
     },
@@ -237,7 +239,7 @@ export const SessionMixin = {
      * Handle session timeout
      */
     handleSessionTimeout() {
-        console.log('Session disconnected - maximum session time reached');
+        Logger.info("Session", "Maximum session time reached (8 hours)");
         this.showUserWarning('Session disconnected - maximum session time reached (8 hours)');
         this.disconnect();
     },

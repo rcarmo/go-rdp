@@ -179,7 +179,7 @@ func TestProtocolReceive(t *testing.T) {
 				payload := bytes.Repeat([]byte{0xAB}, 256)
 				totalLen := uint16(headerLen + len(payload))
 				conn.readBuf.Write([]byte{0x03, 0x00})
-				binary.Write(conn.readBuf, binary.BigEndian, totalLen)
+				_ = binary.Write(conn.readBuf, binary.BigEndian, totalLen)
 				conn.readBuf.Write(payload)
 			},
 			wantData:    bytes.Repeat([]byte{0xAB}, 256),
@@ -336,7 +336,7 @@ func BenchmarkReceive(b *testing.B) {
 	// Prepare a valid TPKT packet
 	var packetBuf bytes.Buffer
 	packetBuf.Write([]byte{0x03, 0x00, 0x04, 0x04}) // header with length 1028
-	binary.Write(&packetBuf, binary.BigEndian, uint16(1028))
+	_ = binary.Write(&packetBuf, binary.BigEndian, uint16(1028))
 	packetBuf.Write(bytes.Repeat([]byte{0x00}, 1024))
 	packetData := packetBuf.Bytes()
 

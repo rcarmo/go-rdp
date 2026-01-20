@@ -3,9 +3,9 @@ package rdp
 import (
 	"fmt"
 	"io"
-	"log"
 	"time"
 
+	"github.com/rcarmo/rdp-html5/internal/logging"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 )
 
@@ -42,7 +42,7 @@ func (c *Client) Connect() error {
 
 	// Request a full screen refresh from the server
 	if err = c.sendRefreshRect(); err != nil {
-		log.Printf("RDP: Warning - failed to send refresh rect: %v", err)
+		logging.Warn("RDP: Failed to send refresh rect: %v", err)
 		// Don't fail the connection if refresh rect fails
 	}
 
@@ -214,8 +214,10 @@ func (c *Client) licensing() error {
 	useEnhancedSecurity := c.selectedProtocol.IsSSL() || c.selectedProtocol.IsHybrid()
 
 	// Set a read deadline so we don't hang forever
-	_ = c.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-	defer func() { _ = c.conn.SetReadDeadline(time.Time{}) }() // Clear deadline
+	if c.conn != nil {
+		_ = c.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		defer func() { _ = c.conn.SetReadDeadline(time.Time{}) }() // Clear deadline
+	}
 
 	_, wire, err := c.mcsLayer.Receive()
 	if err != nil {

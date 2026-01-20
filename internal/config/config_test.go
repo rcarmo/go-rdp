@@ -104,12 +104,12 @@ func TestLoad(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear environment
 			for k := range tt.envVars {
-				os.Unsetenv(k)
+				_ = os.Unsetenv(k)
 			}
 
 			// Set test environment variables
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
+				_ = os.Setenv(k, v)
 			}
 
 			// Load configuration
@@ -131,7 +131,7 @@ func TestLoad(t *testing.T) {
 
 			// Clean up environment
 			for k := range tt.envVars {
-				os.Unsetenv(k)
+				_ = os.Unsetenv(k)
 			}
 		})
 	}
@@ -175,7 +175,7 @@ func TestLoadWithOverrides(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear environment
 			for k := range tt.envVars {
-				os.Unsetenv(k)
+				_ = os.Unsetenv(k)
 			}
 
 			cfg, err := LoadWithOverrides(tt.opts)
@@ -187,7 +187,7 @@ func TestLoadWithOverrides(t *testing.T) {
 
 			// Clean up environment
 			for k := range tt.envVars {
-				os.Unsetenv(k)
+				_ = os.Unsetenv(k)
 			}
 		})
 	}
@@ -328,17 +328,17 @@ func TestGetEnvWithDefault(t *testing.T) {
 	testValue := "test_value"
 
 	// Test when env var is not set
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 	result := getEnvWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Test when env var is set
-	os.Setenv(key, testValue)
+	_ = os.Setenv(key, testValue)
 	result = getEnvWithDefault(key, defaultValue)
 	assert.Equal(t, testValue, result)
 
 	// Clean up
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 }
 
 func TestGetIntWithDefault(t *testing.T) {
@@ -347,22 +347,22 @@ func TestGetIntWithDefault(t *testing.T) {
 	testValue := "100"
 
 	// Test when env var is not set
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 	result := getIntWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Test when env var is set with valid integer
-	os.Setenv(key, testValue)
+	_ = os.Setenv(key, testValue)
 	result = getIntWithDefault(key, defaultValue)
 	assert.Equal(t, 100, result)
 
 	// Test when env var is set with invalid integer
-	os.Setenv(key, "invalid")
+	_ = os.Setenv(key, "invalid")
 	result = getIntWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Clean up
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 }
 
 func TestGetBoolWithDefault(t *testing.T) {
@@ -370,27 +370,27 @@ func TestGetBoolWithDefault(t *testing.T) {
 	defaultValue := false
 
 	// Test when env var is not set
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 	result := getBoolWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Test when env var is set with true
-	os.Setenv(key, "true")
+	_ = os.Setenv(key, "true")
 	result = getBoolWithDefault(key, defaultValue)
 	assert.Equal(t, true, result)
 
 	// Test when env var is set with false
-	os.Setenv(key, "false")
+	_ = os.Setenv(key, "false")
 	result = getBoolWithDefault(key, defaultValue)
 	assert.Equal(t, false, result)
 
 	// Test when env var is set with invalid boolean
-	os.Setenv(key, "invalid")
+	_ = os.Setenv(key, "invalid")
 	result = getBoolWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Clean up
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 }
 
 func TestGetDurationWithDefault(t *testing.T) {
@@ -399,22 +399,22 @@ func TestGetDurationWithDefault(t *testing.T) {
 	testValue := "60s"
 
 	// Test when env var is not set
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 	result := getDurationWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Test when env var is set with valid duration
-	os.Setenv(key, testValue)
+	_ = os.Setenv(key, testValue)
 	result = getDurationWithDefault(key, defaultValue)
 	assert.Equal(t, 60*time.Second, result)
 
 	// Test when env var is set with invalid duration
-	os.Setenv(key, "invalid")
+	_ = os.Setenv(key, "invalid")
 	result = getDurationWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Clean up
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 }
 
 func TestGetStringSliceWithDefault(t *testing.T) {
@@ -423,22 +423,22 @@ func TestGetStringSliceWithDefault(t *testing.T) {
 	testValue := "value1,value2,value3"
 
 	// Test when env var is not set
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 	result := getStringSliceWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Test when env var is set with comma-separated values
-	os.Setenv(key, testValue)
+	_ = os.Setenv(key, testValue)
 	result = getStringSliceWithDefault(key, defaultValue)
 	assert.Equal(t, []string{"value1", "value2", "value3"}, result)
 
 	// Test when env var is empty
-	os.Setenv(key, "")
+	_ = os.Setenv(key, "")
 	result = getStringSliceWithDefault(key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Clean up
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 }
 
 func TestGetOverrideOrEnv(t *testing.T) {
@@ -448,22 +448,22 @@ func TestGetOverrideOrEnv(t *testing.T) {
 	defaultValue := "default_value"
 
 	// Test when override is provided
-	os.Setenv(key, envValue)
+	_ = os.Setenv(key, envValue)
 	result := getOverrideOrEnv(override, key, defaultValue)
 	assert.Equal(t, override, result)
 
 	// Test when override is empty but env var is set
-	os.Setenv(key, envValue)
+	_ = os.Setenv(key, envValue)
 	result = getOverrideOrEnv("", key, defaultValue)
 	assert.Equal(t, envValue, result)
 
 	// Test when both override and env are empty
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 	result = getOverrideOrEnv("", key, defaultValue)
 	assert.Equal(t, defaultValue, result)
 
 	// Clean up
-	os.Unsetenv(key)
+	_ = os.Unsetenv(key)
 }
 
 func TestSplitString(t *testing.T) {

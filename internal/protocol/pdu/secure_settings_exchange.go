@@ -22,14 +22,14 @@ type SystemTime struct {
 func (t *SystemTime) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, t.Year)
-	binary.Write(buf, binary.LittleEndian, t.Month)
-	binary.Write(buf, binary.LittleEndian, t.DayOfWeek)
-	binary.Write(buf, binary.LittleEndian, t.Day)
-	binary.Write(buf, binary.LittleEndian, t.Hour)
-	binary.Write(buf, binary.LittleEndian, t.Minute)
-	binary.Write(buf, binary.LittleEndian, t.Second)
-	binary.Write(buf, binary.LittleEndian, t.Milliseconds)
+	_ = binary.Write(buf, binary.LittleEndian, t.Year)
+	_ = binary.Write(buf, binary.LittleEndian, t.Month)
+	_ = binary.Write(buf, binary.LittleEndian, t.DayOfWeek)
+	_ = binary.Write(buf, binary.LittleEndian, t.Day)
+	_ = binary.Write(buf, binary.LittleEndian, t.Hour)
+	_ = binary.Write(buf, binary.LittleEndian, t.Minute)
+	_ = binary.Write(buf, binary.LittleEndian, t.Second)
+	_ = binary.Write(buf, binary.LittleEndian, t.Milliseconds)
 
 	return buf.Bytes()
 }
@@ -47,17 +47,17 @@ type TimeZoneInformation struct {
 func (i *TimeZoneInformation) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, i.Bias)
-	binary.Write(buf, binary.LittleEndian, i.StandardName)
+	_ = binary.Write(buf, binary.LittleEndian, i.Bias)
+	_ = binary.Write(buf, binary.LittleEndian, i.StandardName)
 
 	buf.Write(i.StandardDate.Serialize())
 
-	binary.Write(buf, binary.LittleEndian, i.StandardBias)
-	binary.Write(buf, binary.LittleEndian, i.DaylightName)
+	_ = binary.Write(buf, binary.LittleEndian, i.StandardBias)
+	_ = binary.Write(buf, binary.LittleEndian, i.DaylightName)
 
 	buf.Write(i.DaylightDate.Serialize())
 
-	binary.Write(buf, binary.LittleEndian, i.DaylightBias)
+	_ = binary.Write(buf, binary.LittleEndian, i.DaylightBias)
 
 	return buf.Bytes()
 }
@@ -79,14 +79,14 @@ type ExtendedInfoPacket struct {
 func (p *ExtendedInfoPacket) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, uint16(0x0002)) // ClientAddressFamily = AF_INET
-	binary.Write(buf, binary.LittleEndian, uint16(2))      // cbClientAddress
+	_ = binary.Write(buf, binary.LittleEndian, uint16(0x0002)) // ClientAddressFamily = AF_INET
+	_ = binary.Write(buf, binary.LittleEndian, uint16(2))      // cbClientAddress
 	buf.Write([]byte{0, 0})                                // ClientAddress
-	binary.Write(buf, binary.LittleEndian, uint16(2))      // cbClientDir
+	_ = binary.Write(buf, binary.LittleEndian, uint16(2))      // cbClientDir
 	buf.Write([]byte{0, 0})                                // ClientDir
 	buf.Write(make([]byte, 172))                           // ClientTimeZone
-	binary.Write(buf, binary.LittleEndian, uint32(0))      // ClientSessionId
-	binary.Write(buf, binary.LittleEndian, p.PerformanceFlags)
+	_ = binary.Write(buf, binary.LittleEndian, uint32(0))      // ClientSessionId
+	_ = binary.Write(buf, binary.LittleEndian, p.PerformanceFlags)
 
 	return buf.Bytes()
 }
@@ -142,13 +142,13 @@ func (p *ClientInfoPacket) Serialize() []byte {
 
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, p.CodePage)
-	binary.Write(buf, binary.LittleEndian, uint32(p.Flags))
-	binary.Write(buf, binary.LittleEndian, cbDomain)
-	binary.Write(buf, binary.LittleEndian, cbUserName)
-	binary.Write(buf, binary.LittleEndian, cbPassword)
-	binary.Write(buf, binary.LittleEndian, cbAlternateShell)
-	binary.Write(buf, binary.LittleEndian, cbWorkingDir)
+	_ = binary.Write(buf, binary.LittleEndian, p.CodePage)
+	_ = binary.Write(buf, binary.LittleEndian, uint32(p.Flags))
+	_ = binary.Write(buf, binary.LittleEndian, cbDomain)
+	_ = binary.Write(buf, binary.LittleEndian, cbUserName)
+	_ = binary.Write(buf, binary.LittleEndian, cbPassword)
+	_ = binary.Write(buf, binary.LittleEndian, cbAlternateShell)
+	_ = binary.Write(buf, binary.LittleEndian, cbWorkingDir)
 
 	buf.Write(domain)
 	buf.Write(username)

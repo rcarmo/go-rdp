@@ -15,9 +15,9 @@ type DrawNineGridCacheCapabilitySet struct {
 func (s *DrawNineGridCacheCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, s.drawNineGridSupportLevel)
-	binary.Write(buf, binary.LittleEndian, s.drawNineGridCacheSize)
-	binary.Write(buf, binary.LittleEndian, s.drawNineGridCacheEntries)
+	_ = binary.Write(buf, binary.LittleEndian, s.drawNineGridSupportLevel)
+	_ = binary.Write(buf, binary.LittleEndian, s.drawNineGridCacheSize)
+	_ = binary.Write(buf, binary.LittleEndian, s.drawNineGridCacheEntries)
 
 	return buf.Bytes()
 }
@@ -54,11 +54,11 @@ type GDICacheEntries struct {
 func (e *GDICacheEntries) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, e.GdipGraphicsCacheEntries)
-	binary.Write(buf, binary.LittleEndian, e.GdipBrushCacheEntries)
-	binary.Write(buf, binary.LittleEndian, e.GdipPenCacheEntries)
-	binary.Write(buf, binary.LittleEndian, e.GdipImageCacheEntries)
-	binary.Write(buf, binary.LittleEndian, e.GdipImageAttributesCacheEntries)
+	_ = binary.Write(buf, binary.LittleEndian, e.GdipGraphicsCacheEntries)
+	_ = binary.Write(buf, binary.LittleEndian, e.GdipBrushCacheEntries)
+	_ = binary.Write(buf, binary.LittleEndian, e.GdipPenCacheEntries)
+	_ = binary.Write(buf, binary.LittleEndian, e.GdipImageCacheEntries)
+	_ = binary.Write(buf, binary.LittleEndian, e.GdipImageAttributesCacheEntries)
 
 	return buf.Bytes()
 }
@@ -104,10 +104,10 @@ type GDICacheChunkSize struct {
 func (s *GDICacheChunkSize) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, s.GdipGraphicsCacheChunkSize)
-	binary.Write(buf, binary.LittleEndian, s.GdipObjectBrushCacheChunkSize)
-	binary.Write(buf, binary.LittleEndian, s.GdipObjectPenCacheChunkSize)
-	binary.Write(buf, binary.LittleEndian, s.GdipObjectImageAttributesCacheChunkSize)
+	_ = binary.Write(buf, binary.LittleEndian, s.GdipGraphicsCacheChunkSize)
+	_ = binary.Write(buf, binary.LittleEndian, s.GdipObjectBrushCacheChunkSize)
+	_ = binary.Write(buf, binary.LittleEndian, s.GdipObjectPenCacheChunkSize)
+	_ = binary.Write(buf, binary.LittleEndian, s.GdipObjectImageAttributesCacheChunkSize)
 
 	return buf.Bytes()
 }
@@ -147,9 +147,9 @@ type GDIImageCacheProperties struct {
 func (p *GDIImageCacheProperties) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, p.GdipObjectImageCacheChunkSize)
-	binary.Write(buf, binary.LittleEndian, p.GdipObjectImageCacheTotalSize)
-	binary.Write(buf, binary.LittleEndian, p.GdipObjectImageCacheMaxSize)
+	_ = binary.Write(buf, binary.LittleEndian, p.GdipObjectImageCacheChunkSize)
+	_ = binary.Write(buf, binary.LittleEndian, p.GdipObjectImageCacheTotalSize)
+	_ = binary.Write(buf, binary.LittleEndian, p.GdipObjectImageCacheMaxSize)
 
 	return buf.Bytes()
 }
@@ -187,9 +187,9 @@ type DrawGDIPlusCapabilitySet struct {
 func (s *DrawGDIPlusCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	binary.Write(buf, binary.LittleEndian, s.drawGDIPlusSupportLevel)
-	binary.Write(buf, binary.LittleEndian, s.GdipVersion)
-	binary.Write(buf, binary.LittleEndian, s.drawGdiplusCacheLevel)
+	_ = binary.Write(buf, binary.LittleEndian, s.drawGDIPlusSupportLevel)
+	_ = binary.Write(buf, binary.LittleEndian, s.GdipVersion)
+	_ = binary.Write(buf, binary.LittleEndian, s.drawGdiplusCacheLevel)
 
 	buf.Write(s.GdipCacheEntries.Serialize())
 	buf.Write(s.GdipCacheChunkSize.Serialize())

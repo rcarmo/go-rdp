@@ -121,8 +121,8 @@ func (c *Client) StartTLS() error {
 
 	// Clear any deadlines set for the handshake
 	if tcpConn, ok := c.conn.(*net.TCPConn); ok {
-		tcpConn.SetReadDeadline(time.Time{})
-		tcpConn.SetWriteDeadline(time.Time{})
+		_ = tcpConn.SetReadDeadline(time.Time{})
+		_ = tcpConn.SetWriteDeadline(time.Time{})
 	}
 
 	c.conn = tlsConn

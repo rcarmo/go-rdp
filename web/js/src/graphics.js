@@ -43,19 +43,19 @@ export const GraphicsMixin = {
         const numberColors = r.uint32(true);
         
         if (numberColors > 256 || numberColors === 0) {
-            console.warn('[Palette] Invalid number of colors:', numberColors);
+            Logger.warn("Palette", `Invalid color count: ${numberColors}`);
             return;
         }
         
-        console.log('[Palette] Received palette update with', numberColors, 'colors');
+        Logger.info("Palette", `Received ${numberColors} colors`);
         
         const paletteData = r.blob(numberColors * 3);
         
         if (typeof goRLE !== 'undefined' && goRLE.setPalette) {
             goRLE.setPalette(new Uint8Array(paletteData), numberColors);
-            console.log('[Palette] Updated', numberColors, 'colors via WASM');
+            Logger.debug("Palette", "Updated via WASM");
         } else {
-            console.warn('[Palette] Go WASM not available for palette update');
+            Logger.warn("Palette", "WASM not available");
         }
     },
     
@@ -112,9 +112,9 @@ export const GraphicsMixin = {
                 }
                 return;
             }
-            Logger.warn("[Bitmap] Go WASM processBitmap failed, bpp:", bpp, "compressed:", isCompressed);
+            Logger.debug("Bitmap", `WASM processBitmap failed, bpp=${bpp}, compressed=${isCompressed}`);
         } else {
-            Logger.error("[Bitmap] Go WASM not loaded - cannot process bitmap");
+            Logger.error("Bitmap", "WASM not loaded");
         }
     },
     
@@ -218,16 +218,16 @@ export const GraphicsMixin = {
      */
     handlePointer(header, r) {
         try {
-            Logger.debug('[Cursor] Pointer update received, type:', header.updateCode);
+            Logger.debug("Cursor", `Update type: ${header.updateCode}`);
             
             if (header.isPTRNull()) {
-                Logger.debug('[Cursor] PTRNull - hiding cursor');
+                Logger.debug("Cursor", "Hidden");
                 this.canvas.className = 'pointer-cache-null';
                 return;
             }
 
             if (header.isPTRDefault()) {
-                Logger.debug('[Cursor] PTRDefault - showing default cursor');
+                Logger.debug("Cursor", "Default");
                 this.canvas.className = 'pointer-cache-default';
                 return;
             }
@@ -237,13 +237,8 @@ export const GraphicsMixin = {
             }
 
             if (header.isPTRNew()) {
-                Logger.debug('[Cursor] PTRNew - new cursor image received');
                 const newPointerUpdate = parseNewPointerUpdate(r);
-                Logger.debug('[Cursor] Cursor details:', {
-                    cacheIndex: newPointerUpdate.cacheIndex,
-                    hotspot: { x: newPointerUpdate.x, y: newPointerUpdate.y },
-                    size: { w: newPointerUpdate.width, h: newPointerUpdate.height }
-                });
+                Logger.debug("Cursor", `New cursor: cache=${newPointerUpdate.cacheIndex}, hotspot=(${newPointerUpdate.x},${newPointerUpdate.y}), size=${newPointerUpdate.width}x${newPointerUpdate.height}`);
                 this.pointerCacheCanvasCtx.putImageData(newPointerUpdate.getImageData(this.pointerCacheCanvasCtx), 0, 0);
 
                 const url = this.pointerCacheCanvas.toDataURL('image/png');
@@ -260,28 +255,25 @@ export const GraphicsMixin = {
                 document.getElementsByTagName('head')[0].appendChild(style);
                 this.pointerCache[newPointerUpdate.cacheIndex] = style;
                 this.canvas.className = className;
-                Logger.debug('[Cursor] Applied cursor class:', className);
                 return;
             }
 
             if (header.isPTRCached()) {
                 const cacheIndex = r.uint16(true);
-                Logger.debug('[Cursor] PTRCached - using cached cursor index:', cacheIndex);
+                Logger.debug("Cursor", `Cached index: ${cacheIndex}`);
                 const className = 'pointer-cache-' + cacheIndex;
                 this.canvas.className = className;
-                Logger.debug('[Cursor] Applied cached cursor class:', className);
                 return;
             }
 
             if (header.isPTRPosition()) {
-                Logger.debug('[Cursor] PTRPosition - cursor position update (ignored)');
+                Logger.debug("Cursor", "Position update (ignored)");
                 return;
             }
             
-            Logger.debug('[Cursor] Unknown pointer update type');
+            Logger.debug("Cursor", "Unknown pointer type");
         } catch (error) {
-            console.error('[RDP] Error handling pointer:', error);
-            Logger.error('[RDP] Pointer error:', error.message, error.stack);
+            Logger.error("Cursor", `Error: ${error.message}`);
         }
     },
     
@@ -302,7 +294,7 @@ export const GraphicsMixin = {
             const newHeight = window.innerHeight;
             
             if (newWidth !== this.originalWidth || newHeight !== this.originalHeight) {
-                console.log(`[Resize] Window resized to ${newWidth}x${newHeight}, reconnecting...`);
+                Logger.info("Resize", `${newWidth}x${newHeight}, reconnecting...`);
                 this.showUserInfo('Resizing desktop...');
                 this.reconnectWithNewSize(newWidth, newHeight);
             }
@@ -313,7 +305,7 @@ export const GraphicsMixin = {
      * Show the canvas (hide login form)
      */
     showCanvas() {
-        console.log('[RDP] First bitmap received - showing canvas');
+        Logger.info("Connection", "First bitmap received - session active");
         
         const loginForm = document.getElementById('login-form');
         const canvasContainer = document.getElementById('canvas-container');
