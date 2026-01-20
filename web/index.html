@@ -26,7 +26,7 @@
     <script src="js/input/keymap.js"></script>
     <script src="js/input/keyboard.js"></script>
     <script src="js/input/mouse.js"></script>
-    <script src="js/client.js?v=18"></script>
+    <script src="js/client.bundle.min.js?v=1"></script>
     <script src="js/color.js"></script>
     <style>
         :root {
@@ -677,6 +677,182 @@
             background: #e0e0e0;
         }
         
+        /* Clipboard Modal */
+        .clipboard-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 10002;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .clipboard-modal.show {
+            display: flex;
+        }
+        
+        .clipboard-content {
+            background: var(--surface);
+            border-radius: 4px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .clipboard-textarea {
+            width: 100%;
+            height: 200px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+        
+        .clipboard-textarea:focus {
+            outline: none;
+            border-color: var(--border-dark);
+        }
+        
+        .clipboard-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .clipboard-btn {
+            padding: 10px 20px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            background: var(--surface);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .clipboard-btn:hover {
+            background: #f0f0f0;
+            border-color: var(--border-dark);
+        }
+        
+        .clipboard-btn.primary {
+            background: #1976d2;
+            color: white;
+            border-color: #1976d2;
+        }
+        
+        .clipboard-btn.primary:hover {
+            background: #1565c0;
+        }
+        
+        .clipboard-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .clipboard-info {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        
+        .clipboard-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+        
+        .clipboard-tab {
+            padding: 8px 16px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.2s;
+        }
+        
+        .clipboard-tab:hover {
+            background: #f0f0f0;
+            color: var(--text);
+        }
+        
+        .clipboard-tab.active {
+            background: #1976d2;
+            color: white;
+        }
+        
+        .clipboard-tab-content {
+            display: none;
+        }
+        
+        .clipboard-tab-content.active {
+            display: block;
+        }
+        
+        .clipboard-image-container {
+            position: relative;
+            border: 2px dashed var(--border);
+            border-radius: 4px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow: auto;
+            margin-bottom: 16px;
+            background: #fafafa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .clipboard-image-container.has-image {
+            border-style: solid;
+        }
+        
+        #clipboard-image-canvas {
+            display: none;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .clipboard-image-container.has-image #clipboard-image-canvas {
+            display: block;
+        }
+        
+        .clipboard-image-container.has-image .clipboard-image-placeholder {
+            display: none;
+        }
+        
+        .clipboard-image-placeholder {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+        
+        .clipboard-image-placeholder span {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 12px;
+        }
+        
+        .clipboard-image-placeholder p {
+            margin: 4px 0;
+        }
+        
+        .clipboard-image-placeholder .hint {
+            font-size: 11px;
+            color: #bbb;
+        }
+        
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -781,6 +957,13 @@
                     </select>
                 </div>
                 
+                <div class="form-group" style="margin-top: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="enableAudio" name="enableAudio" style="width: auto;">
+                        <span>Enable Audio</span>
+                    </label>
+                </div>
+                
                 <div class="button-group">
                     <button type="submit" id="connect-btn" class="btn btn-primary">Connect</button>
                     <button type="button" id="disconnect-btn" class="btn btn-danger" disabled>Cancel</button>
@@ -815,8 +998,13 @@
             Special Keys
             <span class="menu-shortcut">Ctrl+Alt+S</span>
         </button>
-        <button class="menu-item" id="menu-file-transfer">
-            File Transfer
+        <button class="menu-item" id="menu-clipboard">
+            Clipboard
+            <span class="menu-shortcut">Ctrl+Alt+C</span>
+        </button>
+        <button class="menu-item" id="menu-audio">
+            🔊 Audio
+            <span class="menu-shortcut">Ctrl+Alt+A</span>
         </button>
         <div class="menu-separator"></div>
         <button class="menu-item" id="menu-fullscreen">
@@ -863,6 +1051,85 @@
                 <button class="special-key-btn" data-key="F10">F10</button>
                 <button class="special-key-btn" data-key="F11">F11</button>
                 <button class="special-key-btn" data-key="F12">F12</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clipboard Modal -->
+    <div class="clipboard-modal" id="clipboard-modal">
+        <div class="clipboard-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Clipboard</h3>
+                <button class="close-btn" id="close-clipboard-modal">×</button>
+            </div>
+            
+            <!-- Tabs for Text/Image -->
+            <div class="clipboard-tabs">
+                <button class="clipboard-tab active" data-tab="text">Text</button>
+                <button class="clipboard-tab" data-tab="image">Image</button>
+            </div>
+            
+            <!-- Text Tab -->
+            <div class="clipboard-tab-content active" id="clipboard-text-tab">
+                <p class="clipboard-info">
+                    Paste text here to send to the remote desktop.
+                </p>
+                <textarea id="clipboard-buffer" class="clipboard-textarea" placeholder="Paste text here (Ctrl+V)..."></textarea>
+                <div class="clipboard-buttons">
+                    <button class="clipboard-btn" id="clipboard-clear">Clear</button>
+                    <button class="clipboard-btn" id="clipboard-copy-local">Copy to Local</button>
+                    <button class="clipboard-btn primary" id="clipboard-send">Send to Remote</button>
+                </div>
+            </div>
+            
+            <!-- Image Tab -->
+            <div class="clipboard-tab-content" id="clipboard-image-tab">
+                <p class="clipboard-info">
+                    Paste an image here (Ctrl+V) or take a screenshot to capture it.
+                </p>
+                <div class="clipboard-image-container" id="clipboard-image-container">
+                    <canvas id="clipboard-image-canvas"></canvas>
+                    <div class="clipboard-image-placeholder" id="clipboard-image-placeholder">
+                        <span>📋</span>
+                        <p>No image in clipboard</p>
+                        <p class="hint">Press Ctrl+V to paste an image</p>
+                    </div>
+                </div>
+                <div class="clipboard-buttons">
+                    <button class="clipboard-btn" id="clipboard-image-clear">Clear</button>
+                    <button class="clipboard-btn primary" id="clipboard-image-download">Download PNG</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Modal -->
+    <div class="clipboard-modal" id="audio-modal">
+        <div class="clipboard-content" style="max-width: 350px;">
+            <div class="modal-header">
+                <h3 class="modal-title">🔊 Audio Settings</h3>
+                <button class="close-btn" id="close-audio-modal">×</button>
+            </div>
+            <div style="padding: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Volume</label>
+                    <input type="range" id="audio-volume" min="0" max="100" value="100" 
+                           style="width: 100%; cursor: pointer;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-top: 4px;">
+                        <span>0%</span>
+                        <span id="audio-volume-display">100%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="audio-mute" style="width: auto;">
+                        <span>Mute</span>
+                    </label>
+                </div>
+                <div id="audio-status" style="padding: 10px; background: #f0f0f0; border-radius: 4px; font-size: 12px;">
+                    Status: <span id="audio-status-text">Not connected</span>
+                </div>
             </div>
         </div>
     </div>
@@ -1115,6 +1382,9 @@
             const hotCornerMenu = document.getElementById('hot-corner-menu');
             const specialKeysModal = document.getElementById('special-keys-modal');
             const closeModal = document.getElementById('close-modal');
+            const clipboardModal = document.getElementById('clipboard-modal');
+            const closeClipboardModal = document.getElementById('close-clipboard-modal');
+            const clipboardBuffer = document.getElementById('clipboard-buffer');
             
             let menuTimeout;
             let isMenuVisible = false;
@@ -1166,11 +1436,52 @@
                 }
             });
             
-            document.getElementById('menu-file-transfer').addEventListener('click', function() {
-                if (client && client.showFileUpload) {
-                    client.showFileUpload();
-                }
+            document.getElementById('menu-clipboard').addEventListener('click', function() {
+                clipboardModal.classList.add('show');
                 hotCornerMenu.classList.remove('show');
+                clipboardBuffer.focus();
+            });
+            
+            // Audio modal handlers
+            const audioModal = document.getElementById('audio-modal');
+            const closeAudioModal = document.getElementById('close-audio-modal');
+            const audioVolumeSlider = document.getElementById('audio-volume');
+            const audioVolumeDisplay = document.getElementById('audio-volume-display');
+            const audioMuteCheckbox = document.getElementById('audio-mute');
+            const audioStatusText = document.getElementById('audio-status-text');
+            
+            document.getElementById('menu-audio').addEventListener('click', function() {
+                audioModal.classList.add('show');
+                hotCornerMenu.classList.remove('show');
+                
+                // Update status
+                if (client && client.audioEnabled) {
+                    audioStatusText.textContent = 'Enabled - ' + (client.audioContext ? client.audioContext.state : 'unknown');
+                } else {
+                    audioStatusText.textContent = 'Not enabled';
+                }
+            });
+            
+            closeAudioModal.addEventListener('click', function() {
+                audioModal.classList.remove('show');
+            });
+            
+            audioVolumeSlider.addEventListener('input', function() {
+                const volume = parseInt(this.value);
+                audioVolumeDisplay.textContent = volume + '%';
+                if (client && client.setAudioVolume) {
+                    client.setAudioVolume(volume / 100);
+                }
+            });
+            
+            audioMuteCheckbox.addEventListener('change', function() {
+                if (client && client.setAudioVolume) {
+                    if (this.checked) {
+                        client.setAudioVolume(0);
+                    } else {
+                        client.setAudioVolume(parseInt(audioVolumeSlider.value) / 100);
+                    }
+                }
             });
             
             document.getElementById('menu-fullscreen').addEventListener('click', function() {
@@ -1207,6 +1518,169 @@
                     specialKeysModal.classList.remove('show');
                 }
             });
+            
+            // Clipboard modal handlers
+            closeClipboardModal.addEventListener('click', function() {
+                clipboardModal.classList.remove('show');
+            });
+            
+            clipboardModal.addEventListener('click', function(e) {
+                if (e.target === clipboardModal) {
+                    clipboardModal.classList.remove('show');
+                }
+            });
+            
+            // Clipboard button handlers
+            document.getElementById('clipboard-clear').addEventListener('click', function() {
+                clipboardBuffer.value = '';
+                clipboardBuffer.focus();
+            });
+            
+            document.getElementById('clipboard-copy-local').addEventListener('click', function() {
+                if (clipboardBuffer.value) {
+                    navigator.clipboard.writeText(clipboardBuffer.value).then(() => {
+                        if (window.showToast) {
+                            window.showToast('Copied to local clipboard', 'success', 'Clipboard', 2000);
+                        }
+                    }).catch(err => {
+                        if (window.showToast) {
+                            window.showToast('Failed to copy: ' + err.message, 'error', 'Clipboard', 3000);
+                        }
+                    });
+                }
+            });
+            
+            document.getElementById('clipboard-send').addEventListener('click', function() {
+                if (!client || !client.connected) {
+                    if (window.showToast) {
+                        window.showToast('Not connected to remote', 'error', 'Clipboard', 2000);
+                    }
+                    return;
+                }
+                
+                const text = clipboardBuffer.value;
+                if (!text) {
+                    if (window.showToast) {
+                        window.showToast('Nothing to send', 'info', 'Clipboard', 2000);
+                    }
+                    return;
+                }
+                
+                // Send text to remote by typing it
+                if (client.typeTextToRemote) {
+                    client.typeTextToRemote(text);
+                    if (window.showToast) {
+                        window.showToast('Sending ' + text.length + ' characters to remote...', 'info', 'Clipboard', 3000);
+                    }
+                    clipboardModal.classList.remove('show');
+                }
+            });
+            
+            // Clipboard tab switching
+            const clipboardTabs = document.querySelectorAll('.clipboard-tab');
+            const clipboardTabContents = document.querySelectorAll('.clipboard-tab-content');
+            
+            clipboardTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const targetTab = this.dataset.tab;
+                    
+                    // Update active tab
+                    clipboardTabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show corresponding content
+                    clipboardTabContents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === 'clipboard-' + targetTab + '-tab') {
+                            content.classList.add('active');
+                        }
+                    });
+                });
+            });
+            
+            // Clipboard image handling
+            const clipboardImageCanvas = document.getElementById('clipboard-image-canvas');
+            const clipboardImageCtx = clipboardImageCanvas.getContext('2d');
+            const clipboardImageContainer = document.getElementById('clipboard-image-container');
+            const clipboardImageDownload = document.getElementById('clipboard-image-download');
+            let hasClipboardImage = false;
+            
+            // Handle paste events for images
+            clipboardModal.addEventListener('paste', function(e) {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                
+                for (let i = 0; i < items.length; i++) {
+                    if (items[i].type.startsWith('image/')) {
+                        e.preventDefault();
+                        const blob = items[i].getAsFile();
+                        const img = new Image();
+                        const url = URL.createObjectURL(blob);
+                        
+                        img.onload = function() {
+                            // Resize canvas to image size
+                            clipboardImageCanvas.width = img.width;
+                            clipboardImageCanvas.height = img.height;
+                            clipboardImageCtx.drawImage(img, 0, 0);
+                            
+                            // Update UI
+                            clipboardImageContainer.classList.add('has-image');
+                            hasClipboardImage = true;
+                            clipboardImageDownload.disabled = false;
+                            
+                            // Switch to image tab
+                            clipboardTabs.forEach(t => {
+                                t.classList.toggle('active', t.dataset.tab === 'image');
+                            });
+                            clipboardTabContents.forEach(c => {
+                                c.classList.toggle('active', c.id === 'clipboard-image-tab');
+                            });
+                            
+                            URL.revokeObjectURL(url);
+                            
+                            if (window.showToast) {
+                                window.showToast('Image pasted (' + img.width + 'x' + img.height + ')', 'success', 'Clipboard', 2000);
+                            }
+                        };
+                        
+                        img.src = url;
+                        return;
+                    }
+                }
+            });
+            
+            // Clear image
+            document.getElementById('clipboard-image-clear').addEventListener('click', function() {
+                clipboardImageCtx.clearRect(0, 0, clipboardImageCanvas.width, clipboardImageCanvas.height);
+                clipboardImageCanvas.width = 0;
+                clipboardImageCanvas.height = 0;
+                clipboardImageContainer.classList.remove('has-image');
+                hasClipboardImage = false;
+                clipboardImageDownload.disabled = true;
+            });
+            
+            // Download image
+            clipboardImageDownload.addEventListener('click', function() {
+                if (!hasClipboardImage) {
+                    if (window.showToast) {
+                        window.showToast('No image to download', 'info', 'Clipboard', 2000);
+                    }
+                    return;
+                }
+                
+                const link = document.createElement('a');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                link.download = 'clipboard-' + timestamp + '.png';
+                link.href = clipboardImageCanvas.toDataURL('image/png');
+                link.click();
+                
+                if (window.showToast) {
+                    window.showToast('Image downloaded', 'success', 'Clipboard', 2000);
+                }
+            });
+            
+            // Initially disable download button
+            clipboardImageDownload.disabled = true;
             
             // Special key handlers
             document.querySelectorAll('.special-key-btn').forEach(btn => {
@@ -1341,6 +1815,16 @@
                         case 'S':
                             e.preventDefault();
                             document.getElementById('menu-special-keys').click();
+                            break;
+                        case 'c':
+                        case 'C':
+                            e.preventDefault();
+                            document.getElementById('menu-clipboard').click();
+                            break;
+                        case 'a':
+                        case 'A':
+                            e.preventDefault();
+                            document.getElementById('menu-audio').click();
                             break;
                         case 'd':
                         case 'D':

@@ -12,6 +12,7 @@ import (
 const (
 	rdpVersion5Plus             = 0x00080004
 	keyboardTypeIBM101or102Keys = 0x00000004
+	projectName                 = "rdp-html5"
 )
 
 // earlyCapabilityFlags

@@ -1,0 +1,20 @@
+{
+  "name": "rdp-web-client",
+  "version": "1.0.0",
+  "description": "RDP Web Client JavaScript modules",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "esbuild index.js --bundle --outfile=../client.bundle.js --format=iife --global-name=RDP",
+    "build:min": "esbuild index.js --bundle --minify --outfile=../client.bundle.min.js --format=iife --global-name=RDP"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  },
+  "keywords": [
+    "rdp",
+    "remote-desktop",
+    "webrtc"
+  ],
+  "license": "MIT"
+}

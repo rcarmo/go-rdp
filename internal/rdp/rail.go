@@ -254,9 +254,7 @@ func (pdu *RailPDUHandshake) Serialize() []byte {
 }
 
 func (pdu *RailPDUHandshake) Deserialize(wire io.Reader) error {
-	var err error
-
-	err = binary.Read(wire, binary.LittleEndian, &pdu.buildNumber)
+	err := binary.Read(wire, binary.LittleEndian, &pdu.buildNumber)
 	if err != nil {
 		return err
 	}

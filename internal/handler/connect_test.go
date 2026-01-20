@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,7 +13,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
+	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 	"github.com/rcarmo/rdp-html5/internal/rdp"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ import (
 
 // Mock RDP connection for testing
 type mockRDPConnection struct {
-	updateData     *fastpath.UpdatePDU
+	updateData     *rdp.Update
 	updateError    error
 	sendError      error
 	receivedInputs [][]byte
@@ -32,7 +31,7 @@ type mockRDPConnection struct {
 	maxUpdates     int
 }
 
-func (m *mockRDPConnection) GetUpdate() (*fastpath.UpdatePDU, error) {
+func (m *mockRDPConnection) GetUpdate() (*rdp.Update, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -53,52 +52,6 @@ func (m *mockRDPConnection) SendInputEvent(data []byte) error {
 
 	m.receivedInputs = append(m.receivedInputs, data)
 	return m.sendError
-}
-
-// Mock WebSocket connection for testing
-type mockWSConn struct {
-	readData      [][]byte
-	readIndex     int
-	readError     error
-	writtenData   [][]byte
-	writeError    error
-	mu            sync.Mutex
-	closed        bool
-	closeError    error
-}
-
-func (m *mockWSConn) Read(p []byte) (int, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.readError != nil {
-		return 0, m.readError
-	}
-	if m.readIndex >= len(m.readData) {
-		return 0, io.EOF
-	}
-	data := m.readData[m.readIndex]
-	m.readIndex++
-	copy(p, data)
-	return len(data), nil
-}
-
-func (m *mockWSConn) Write(p []byte) (int, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.writeError != nil {
-		return 0, m.writeError
-	}
-	m.writtenData = append(m.writtenData, append([]byte{}, p...))
-	return len(p), nil
-}
-
-func (m *mockWSConn) Close() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.closed = true
-	return m.closeError
 }
 
 // TestIsAllowedOrigin tests the origin validation logic
@@ -292,7 +245,7 @@ func TestCodecListToJSON(t *testing.T) {
 // TestRdpToWs_ContextCancellation tests that rdpToWs respects context cancellation
 func TestRdpToWs_ContextCancellation(t *testing.T) {
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: []byte{1, 2, 3}},
+		updateData: &rdp.Update{Data: []byte{1, 2, 3}},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -361,7 +314,7 @@ func TestRdpToWs_GetUpdateError(t *testing.T) {
 func TestRdpToWs_WebSocketSendSuccess(t *testing.T) {
 	updateData := []byte{0x01, 0x02, 0x03, 0x04}
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: updateData},
+		updateData: &rdp.Update{Data: updateData},
 		maxUpdates: 1,
 	}
 
@@ -387,7 +340,7 @@ func TestRdpToWs_WebSocketSendSuccess(t *testing.T) {
 // TestRdpToWs_WebSocketSendError tests handling of WebSocket send errors
 func TestRdpToWs_WebSocketSendError(t *testing.T) {
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: []byte{1, 2, 3}},
+		updateData: &rdp.Update{Data: []byte{1, 2, 3}},
 	}
 
 	// Create server that closes connection immediately
@@ -556,7 +509,7 @@ func TestWsToRdp_WebSocketEOF(t *testing.T) {
 // TestRdpToWs_ClosedConnectionError tests handling of closed connection error message
 func TestRdpToWs_ClosedConnectionError(t *testing.T) {
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: []byte{1, 2, 3}},
+		updateData: &rdp.Update{Data: []byte{1, 2, 3}},
 	}
 
 	done := make(chan struct{})
@@ -948,7 +901,7 @@ func TestWsToRdp_ReadError(t *testing.T) {
 func TestRdpToWs_SendWithUpdate(t *testing.T) {
 	testData := []byte{0x00, 0x01, 0x02, 0x03, 0x04}
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: testData},
+		updateData: &rdp.Update{Data: testData},
 		maxUpdates: 2, // Allow 2 updates before returning deactivate
 	}
 
@@ -1065,7 +1018,7 @@ func TestWsToRdp_ClosedNetworkConnectionError(t *testing.T) {
 // TestRdpToWs_ClosedNetworkConnectionSendError tests send error with closed connection message
 func TestRdpToWs_ClosedNetworkConnectionSendError(t *testing.T) {
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: []byte{1, 2, 3}},
+		updateData: &rdp.Update{Data: []byte{1, 2, 3}},
 		maxUpdates: 1, // Only try one update then return deactivate
 	}
 
@@ -1150,7 +1103,7 @@ func TestRdpToWs_LargeUpdate(t *testing.T) {
 	}
 
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: largeData},
+		updateData: &rdp.Update{Data: largeData},
 		maxUpdates: 1,
 	}
 
@@ -1245,12 +1198,12 @@ func TestIsAllowedOrigin_MoreEdgeCases(t *testing.T) {
 func TestRdpToWs_ContextCancelledDuringLoop(t *testing.T) {
 	updateChan := make(chan struct{})
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: []byte{1, 2, 3}},
+		updateData: &rdp.Update{Data: []byte{1, 2, 3}},
 	}
 
 	// Override GetUpdate to wait for a signal then return deactivate
 	customMock := &mockRDPConnection{}
-	customMock.updateData = &fastpath.UpdatePDU{Data: []byte{1, 2, 3}}
+	customMock.updateData = &rdp.Update{Data: []byte{1, 2, 3}}
 	customMock.maxUpdates = 2
 
 	done := make(chan struct{})
@@ -1425,7 +1378,7 @@ func TestWsToRdp_GenericReadError(t *testing.T) {
 // TestRdpToWs_GenericSendError tests handling of generic send errors (not closed connection)
 func TestRdpToWs_GenericSendError(t *testing.T) {
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: []byte{1, 2, 3, 4, 5}},
+		updateData: &rdp.Update{Data: []byte{1, 2, 3, 4, 5}},
 		maxUpdates: 5,
 	}
 
@@ -1509,7 +1462,7 @@ func TestConnect_VeryLargeDimensions(t *testing.T) {
 // TestRdpToWs_RapidUpdates tests handling of rapid consecutive updates
 func TestRdpToWs_RapidUpdates(t *testing.T) {
 	mockRDP := &mockRDPConnection{
-		updateData: &fastpath.UpdatePDU{Data: []byte{0xAB, 0xCD}},
+		updateData: &rdp.Update{Data: []byte{0xAB, 0xCD}},
 		maxUpdates: 100,
 	}
 
@@ -1803,4 +1756,67 @@ func TestSendCapabilitiesInfo_EmptyCodecs(t *testing.T) {
 	assert.Contains(t, jsonStr, `"codecs":[]`)
 
 	<-done
+}
+
+// Test sendAudioData function
+func TestSendAudioData(t *testing.T) {
+t.Run("sends audio with data only", func(t *testing.T) {
+server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+var msg []byte
+err := websocket.Message.Receive(ws, &msg)
+require.NoError(t, err)
+
+// Check message structure
+require.GreaterOrEqual(t, len(msg), 4, "message too short")
+assert.Equal(t, byte(0xFE), msg[0], "should have audio marker")
+assert.Equal(t, byte(AudioMsgTypeData), msg[1], "should be data message")
+assert.Equal(t, []byte{0x10, 0x00}, msg[2:4], "timestamp should be 16")
+assert.Equal(t, []byte{0x01, 0x02, 0x03, 0x04}, msg[4:], "data should match")
+}))
+defer server.Close()
+
+wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
+ws, err := websocket.Dial(wsURL, "", "http://localhost/")
+require.NoError(t, err)
+defer ws.Close()
+
+sendAudioData(ws, []byte{0x01, 0x02, 0x03, 0x04}, nil, 16)
+time.Sleep(100 * time.Millisecond)
+})
+
+t.Run("sends audio with format", func(t *testing.T) {
+server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+var msg []byte
+err := websocket.Message.Receive(ws, &msg)
+require.NoError(t, err)
+
+// Check message structure
+require.GreaterOrEqual(t, len(msg), 12, "message too short for format")
+assert.Equal(t, byte(0xFE), msg[0], "should have audio marker")
+assert.Equal(t, byte(AudioMsgTypeFormat), msg[1], "should be format message")
+// Format info starts at byte 4: channels (2), sampleRate (4), bitsPerSample (2)
+assert.Equal(t, []byte{0x02, 0x00}, msg[4:6], "channels should be 2")
+assert.Equal(t, []byte{0x44, 0xAC, 0x00, 0x00}, msg[6:10], "sample rate should be 44100")
+assert.Equal(t, []byte{0x10, 0x00}, msg[10:12], "bits per sample should be 16")
+}))
+defer server.Close()
+
+wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
+ws, err := websocket.Dial(wsURL, "", "http://localhost/")
+require.NoError(t, err)
+defer ws.Close()
+
+format := &audio.AudioFormat{
+Channels:      2,
+SamplesPerSec: 44100,
+BitsPerSample: 16,
+}
+sendAudioData(ws, []byte{0xAA, 0xBB}, format, 0)
+time.Sleep(100 * time.Millisecond)
+})
+
+t.Run("handles empty data", func(t *testing.T) {
+// Should return early without sending anything
+sendAudioData(nil, []byte{}, nil, 0)
+})
 }

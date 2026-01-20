@@ -100,6 +100,9 @@ func (c *Client) connectionInitiation() error {
 
 	selectedProto := resp.SelectedProtocol()
 
+	// Update selectedProtocol to what the server actually chose
+	c.selectedProtocol = selectedProto
+
 	// Handle Hybrid (NLA) protocol - preferred when available
 	if selectedProto.IsHybrid() {
 		return c.StartNLA()
@@ -212,10 +215,8 @@ func (c *Client) licensing() error {
 	useEnhancedSecurity := c.selectedProtocol.IsSSL() || c.selectedProtocol.IsHybrid()
 
 	// Set a read deadline so we don't hang forever
-	if netConn, ok := c.conn.(net.Conn); ok {
-		netConn.SetReadDeadline(time.Now().Add(10 * time.Second))
-		defer netConn.SetReadDeadline(time.Time{}) // Clear deadline
-	}
+	_ = c.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	defer func() { _ = c.conn.SetReadDeadline(time.Time{}) }() // Clear deadline
 
 	_, wire, err := c.mcsLayer.Receive()
 	if err != nil {

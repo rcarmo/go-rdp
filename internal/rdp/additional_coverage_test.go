@@ -3,7 +3,6 @@ package rdp
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
 	"testing"
 
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
@@ -290,13 +289,6 @@ func TestRailPDUClientExecute_Serialize_Extended(t *testing.T) {
 			assert.GreaterOrEqual(t, len(data), 8)
 		})
 	}
-}
-
-// Test error reader for edge cases
-type fullErrorReader struct{}
-
-func (r *fullErrorReader) Read(p []byte) (int, error) {
-	return 0, io.ErrUnexpectedEOF
 }
 
 func TestRailPDUSystemParameters_Deserialize_Errors(t *testing.T) {

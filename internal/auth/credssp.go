@@ -24,15 +24,15 @@ var (
 
 // ComputeClientPubKeyAuth computes the pubKeyAuth for the client
 // For version 2-4: just encrypt the public key
-// For version 5+: compute SHA256(pubKey || magic || nonce) and encrypt
+// For version 5+: compute SHA256(magic || nonce || pubKey) and encrypt
 func ComputeClientPubKeyAuth(version int, pubKey, nonce []byte) []byte {
 	if version >= 5 && len(nonce) > 0 {
 		// Version 5+: Hash-based binding
-		// Per MS-CSSP: SHA256(SubjectPublicKey || "CredSSP Client-To-Server Binding Hash\0" || clientNonce)
+		// Per FreeRDP: SHA256(ClientServerHashMagic || ClientNonce || SubjectPublicKey)
 		h := sha256.New()
-		h.Write(pubKey)
 		h.Write(ClientServerHashMagic)
 		h.Write(nonce)
+		h.Write(pubKey)
 		return h.Sum(nil)
 	}
 	// Version 2-4: Direct public key (will be encrypted by caller)
@@ -41,14 +41,14 @@ func ComputeClientPubKeyAuth(version int, pubKey, nonce []byte) []byte {
 
 // VerifyServerPubKeyAuth verifies the server's pubKeyAuth response
 // For version 2-4: server sends pubKey with first byte incremented by 1
-// For version 5+: server sends SHA256(pubKey || ServerClientHashMagic || nonce)
+// For version 5+: server sends SHA256(ServerClientHashMagic || nonce || pubKey)
 func VerifyServerPubKeyAuth(version int, serverPubKeyAuth, clientPubKey, nonce []byte) bool {
 	if version >= 5 && len(nonce) > 0 {
 		// Version 5+: Hash-based verification
 		h := sha256.New()
-		h.Write(clientPubKey)
 		h.Write(ServerClientHashMagic)
 		h.Write(nonce)
+		h.Write(clientPubKey)
 		expected := h.Sum(nil)
 		return bytes.Equal(serverPubKeyAuth, expected)
 	}
@@ -87,17 +87,17 @@ func EncodeTSRequest(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte) 
 }
 
 // EncodeTSRequestWithNonce encodes a TSRequest with optional client nonce (version 5+)
+// The version parameter should be set by the caller to match the negotiated version
 func EncodeTSRequestWithNonce(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte, clientNonce []byte) []byte {
+	return EncodeTSRequestWithVersion(6, ntlmMessages, authInfo, pubKeyAuth, clientNonce)
+}
+
+// EncodeTSRequestWithVersion encodes a TSRequest with explicit version control
+func EncodeTSRequestWithVersion(version int, ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte, clientNonce []byte) []byte {
 	buf := &bytes.Buffer{}
 
 	// Build the inner content first
 	inner := &bytes.Buffer{}
-
-	// Determine version based on whether nonce is provided
-	version := 6 // Use version 6 for modern Windows compatibility
-	if len(clientNonce) == 0 {
-		version = 2 // Fall back to version 2 if no nonce
-	}
 
 	// [0] version INTEGER
 	versionBytes := encodeContextTag(0, encodeInteger(version))

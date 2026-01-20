@@ -781,12 +781,6 @@ Client.prototype.handlePalette = function(r) {
     }
 };
 
-function buf2hex(buffer) { // buffer is an ArrayBuffer
-    return [...new Uint8Array(buffer)]
-        .map(x => x.toString(16).padStart(2, '0'))
-        .join('');
-}
-
 Client.prototype.handleBitmap = function (r) {
     const bitmap = parseBitmapUpdate(r);
     

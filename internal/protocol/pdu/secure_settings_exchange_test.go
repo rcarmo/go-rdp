@@ -6,6 +6,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSystemTime_Serialize(t *testing.T) {
+	st := SystemTime{
+		Year:         2024,
+		Month:        6,
+		DayOfWeek:    4,
+		Day:          15,
+		Hour:         10,
+		Minute:       30,
+		Second:       45,
+		Milliseconds: 500,
+	}
+
+	data := st.Serialize()
+	require.Len(t, data, 16) // 8 uint16 values
+
+	// Check Year (little-endian)
+	require.Equal(t, byte(0xE8), data[0]) // 2024 & 0xFF
+	require.Equal(t, byte(0x07), data[1]) // 2024 >> 8
+}
+
+func TestTimeZoneInformation_Serialize(t *testing.T) {
+	tzi := TimeZoneInformation{
+		Bias:         300,
+		StandardBias: 0,
+		DaylightBias: 60,
+	}
+
+	data := tzi.Serialize()
+	require.Len(t, data, 172) // 4 + 64 + 16 + 4 + 64 + 16 + 4
+
+	// Check Bias (little-endian)
+	require.Equal(t, byte(0x2C), data[0]) // 300 & 0xFF
+	require.Equal(t, byte(0x01), data[1]) // 300 >> 8
+}
+
 func TestNewClientInfoPDU_Serialize(t *testing.T) {
 	// Test with standard RDP security (includes security header)
 	req := NewClientInfo("192.168.1.2", "User", "p@$$w0rd")

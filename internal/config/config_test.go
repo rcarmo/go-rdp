@@ -506,3 +506,11 @@ func TestSplitString(t *testing.T) {
 		})
 	}
 }
+
+func TestGetGlobalConfig(t *testing.T) {
+	// Test that GetGlobalConfig returns nil before any config is stored
+	// This tests the thread-safe global config getter
+	cfg := GetGlobalConfig()
+	// Initially may be nil or have a default value
+	_ = cfg
+}

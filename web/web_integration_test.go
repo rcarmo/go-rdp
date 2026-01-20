@@ -17,7 +17,7 @@ func TestWebInterfaceFiles(t *testing.T) {
 	// Test that required JavaScript files exist
 	jsFiles := []string{
 		"js/binary.js",
-		"js/client.js",
+		"js/client.bundle.min.js",
 		"js/input/keyboard.js",
 		"js/input/keymap.js",
 		"js/input/mouse.js",
@@ -26,7 +26,7 @@ func TestWebInterfaceFiles(t *testing.T) {
 		"js/update/header.js",
 		"js/update/bitmap.js",
 		"js/update/pointer.js",
-		"js/rle/ms-rle-wasm.js",
+		"js/rle/wasm_exec.js",
 	}
 
 	for _, jsFile := range jsFiles {
@@ -37,7 +37,7 @@ func TestWebInterfaceFiles(t *testing.T) {
 
 	// Test that WASM files exist
 	wasmFiles := []string{
-		"js/rle/ms-rle-wasm.wasm",
+		"js/rle/rle.wasm",
 	}
 
 	for _, wasmFile := range wasmFiles {
@@ -79,10 +79,10 @@ func TestWebInterfaceContentStructure(t *testing.T) {
 	// Test that required scripts are included
 	requiredScripts := []string{
 		"js/binary.js",
-		"js/client.js",
+		"js/client.bundle.min.js",
 		"js/input/keyboard.js",
 		"js/input/keymap.js",
-		"js/rle/ms-rle-wasm.js",
+		"js/rle/wasm_exec.js",
 		"js/color.js",
 	}
 

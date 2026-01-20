@@ -25,7 +25,7 @@ type Client struct {
 	buffReader *bufio.Reader
 	tpktLayer  *tpkt.Protocol
 	x224Layer  *x224.Protocol
-	mcsLayer   MCSLayer
+	mcsLayer   mcs.MCSLayer
 	fastPath   *fastpath.Protocol
 
 	domain   string
@@ -53,6 +53,9 @@ type Client struct {
 
 	// NLA configuration
 	useNLA bool
+
+	// Audio handler
+	audioHandler *AudioHandler
 }
 
 const (
@@ -152,6 +155,12 @@ type ServerCapabilityInfo struct {
 	MultifragmentSize uint32
 	LargePointer      bool
 	FrameAcknowledge  bool
+}
+
+// Update represents an RDP screen update that can be sent to a client.
+// This provides a public interface without exposing internal protocol details.
+type Update struct {
+	Data []byte
 }
 
 // GetServerCapabilities returns a summary of the server's capabilities

@@ -204,3 +204,66 @@ func TestServerConnectionConfirm_DeserializeFailure(t *testing.T) {
 	require.Equal(t, NegotiationTypeFailure, confirm.Type)
 	require.Equal(t, NegotiationFailureCodeSSLRequired, confirm.FailureCode())
 }
+
+func TestCorrelationInfo_SetCorrelationID(t *testing.T) {
+	tests := []struct {
+		name    string
+		id      []byte
+		wantErr bool
+	}{
+		{
+			name:    "valid ID",
+			id:      []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F, 0x10, 0x11},
+			wantErr: false,
+		},
+		{
+			name:    "wrong length",
+			id:      []byte{0x01, 0x02, 0x03},
+			wantErr: true,
+		},
+		{
+			name:    "first byte 0x00",
+			id:      []byte{0x00, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F, 0x10, 0x11},
+			wantErr: true,
+		},
+		{
+			name:    "first byte 0xF4",
+			id:      []byte{0xF4, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F, 0x10, 0x11},
+			wantErr: true,
+		},
+		{
+			name:    "contains 0x0D",
+			id:      []byte{0x01, 0x02, 0x03, 0x04, 0x0D, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F, 0x10, 0x11},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ci := CorrelationInfo{}
+			err := ci.SetCorrelationID(tt.id)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCorrelationInfo_Serialize(t *testing.T) {
+	// Without correlation ID
+	ci := CorrelationInfo{}
+	data := ci.Serialize()
+	require.Len(t, data, 36) // Fixed size
+
+	// Check type byte
+	require.Equal(t, byte(0x06), data[0])
+	// Check flags byte
+	require.Equal(t, byte(0x00), data[1])
+
+	// With correlation ID
+	ci.correlationID = []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F, 0x10, 0x11}
+	data = ci.Serialize()
+	require.Len(t, data, 36)
+}

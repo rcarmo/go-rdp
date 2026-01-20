@@ -8,16 +8,16 @@ import (
 	"io"
 	"log"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
+	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 )
 
 var updateCounter int
 
 // pendingSlowPathUpdate stores a slow-path update converted to fastpath format
-var pendingSlowPathUpdate *fastpath.UpdatePDU
+var pendingSlowPathUpdate *Update
 
-func (c *Client) GetUpdate() (*fastpath.UpdatePDU, error) {
+func (c *Client) GetUpdate() (*Update, error) {
 	// If we have a pending slow-path update, return it first
 	if pendingSlowPathUpdate != nil {
 		update := pendingSlowPathUpdate
@@ -50,7 +50,7 @@ func (c *Client) GetUpdate() (*fastpath.UpdatePDU, error) {
 		}
 	}
 
-	update, err := c.fastPath.Receive()
+	fpUpdate, err := c.fastPath.Receive()
 	if err != nil {
 		return nil, err
 	}
@@ -58,11 +58,11 @@ func (c *Client) GetUpdate() (*fastpath.UpdatePDU, error) {
 	// For native FastPath bitmap updates, inject updateType for JS compatibility
 	// FastPath data format: [updateHeader (1 byte)] [size (2 bytes)] [data...]
 	// JS expects bitmap data to have: [updateType (2 bytes)] [numberRectangles (2 bytes)] [bitmap data...]
-	if len(update.Data) >= 3 {
-		updateCode := update.Data[0] & 0x0f
+	if len(fpUpdate.Data) >= 3 {
+		updateCode := fpUpdate.Data[0] & 0x0f
 		if updateCode == FastPathUpdateCodeBitmap {
 			// Inject updateType (0x0001 for bitmap) after header+size
-			oldData := update.Data
+			oldData := fpUpdate.Data
 			newData := make([]byte, len(oldData)+2)
 			copy(newData[0:3], oldData[0:3]) // copy header + size
 			// Update size field to include the extra 2 bytes
@@ -72,11 +72,11 @@ func (c *Client) GetUpdate() (*fastpath.UpdatePDU, error) {
 			binary.LittleEndian.PutUint16(newData[3:5], SlowPathUpdateTypeBitmap)
 			// Copy rest of data
 			copy(newData[5:], oldData[3:])
-			update.Data = newData
+			fpUpdate.Data = newData
 		}
 	}
 
-	return update, nil
+	return &Update{Data: fpUpdate.Data}, nil
 }
 
 // Slow-path update types
@@ -94,7 +94,7 @@ const (
 	FastPathUpdateCodeSynchronize uint8 = 0x03
 )
 
-func (c *Client) getX224Update() (*fastpath.UpdatePDU, error) {
+func (c *Client) getX224Update() (*Update, error) {
 	channelID, wire, err := c.mcsLayer.Receive()
 	if err != nil {
 		return nil, err
@@ -106,6 +106,22 @@ func (c *Client) getX224Update() (*fastpath.UpdatePDU, error) {
 			return nil, err
 		}
 
+		return nil, nil
+	}
+
+	// Handle rdpsnd audio channel
+	if channelID == c.channelIDMap[audio.ChannelRDPSND] {
+		if c.audioHandler != nil {
+			// Read all data from wire
+			var buf bytes.Buffer
+			if _, err := io.Copy(&buf, wire); err != nil {
+				log.Printf("Audio: Error reading channel data: %v", err)
+				return nil, nil
+			}
+			if err := c.audioHandler.HandleChannelData(buf.Bytes()); err != nil {
+				log.Printf("Audio: Error handling channel data: %v", err)
+			}
+		}
 		return nil, nil
 	}
 
@@ -152,7 +168,7 @@ func (c *Client) getX224Update() (*fastpath.UpdatePDU, error) {
 	return nil, nil
 }
 
-func (c *Client) handleSlowPathGraphicsUpdate(wire io.Reader) (*fastpath.UpdatePDU, error) {
+func (c *Client) handleSlowPathGraphicsUpdate(wire io.Reader) (*Update, error) {
 	// Read updateType (2 bytes) - [MS-RDPBCGR] 2.2.9.1.1.3 Slow-Path Graphics Update
 	var updateType uint16
 	if err := binary.Read(wire, binary.LittleEndian, &updateType); err != nil {
@@ -195,9 +211,5 @@ func (c *Client) handleSlowPathGraphicsUpdate(wire io.Reader) (*fastpath.UpdateP
 	binary.LittleEndian.PutUint16(fpData[3:5], updateType)
 	copy(fpData[5:], updateData)
 
-	return &fastpath.UpdatePDU{
-		Action: 0,
-		Flags:  0,
-		Data:   fpData,
-	}, nil
+	return &Update{Data: fpData}, nil
 }

@@ -96,8 +96,8 @@ func (c *Client) StartTLS() error {
 
 	// Set handshake timeout to prevent hanging
 	if tcpConn, ok := c.conn.(*net.TCPConn); ok {
-		tcpConn.SetReadDeadline(time.Now().Add(30 * time.Second))
-		tcpConn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+		_ = tcpConn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		_ = tcpConn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 	}
 
 	if err := tlsConn.Handshake(); err != nil {

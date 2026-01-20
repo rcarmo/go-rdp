@@ -7,6 +7,155 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestExtractCodeID(t *testing.T) {
+	tests := []struct {
+		name     string
+		header   byte
+		expected uint
+	}{
+		{"regular bg run 0x00", 0x00, RegularBgRun},
+		{"regular fg run 0x20", 0x20, RegularFgRun},
+		{"regular fg/bg image 0x40", 0x40, RegularFgBgImage},
+		{"regular color run 0x60", 0x60, RegularColorRun},
+		{"regular color image 0x80", 0x80, RegularColorImage},
+		{"lite set fg/fg run 0xC0", 0xC0, LiteSetFgFgRun},
+		{"lite set fg/fg/bg image 0xD0", 0xD0, LiteSetFgFgBgImage},
+		{"lite dithered run 0xE0", 0xE0, LiteDitheredRun},
+		{"mega mega bg run 0xF0", 0xF0, MegaMegaBgRun},
+		{"mega mega fg run 0xF1", 0xF1, MegaMegaFgRun},
+		{"mega mega fg/bg image 0xF2", 0xF2, MegaMegaFgBgImage},
+		{"mega mega color run 0xF3", 0xF3, MegaMegaColorRun},
+		{"mega mega color image 0xF4", 0xF4, MegaMegaColorImage},
+		{"mega mega set fg run 0xF6", 0xF6, MegaMegaSetFgRun},
+		{"special fg/bg 1 0xF9", 0xF9, SpecialFgBg1},
+		{"special fg/bg 2 0xFA", 0xFA, SpecialFgBg2},
+		{"white 0xFD", 0xFD, White},
+		{"black 0xFE", 0xFE, Black},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ExtractCodeID(tt.header)
+			if result != tt.expected {
+				t.Errorf("ExtractCodeID(0x%02X) = %d, want %d", tt.header, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsRegularCode(t *testing.T) {
+	regularCodes := []uint{RegularBgRun, RegularFgRun, RegularFgBgImage, RegularColorRun, RegularColorImage}
+	for _, code := range regularCodes {
+		if !IsRegularCode(code) {
+			t.Errorf("IsRegularCode(%d) should be true", code)
+		}
+	}
+
+	nonRegularCodes := []uint{LiteSetFgFgRun, LiteDitheredRun, MegaMegaBgRun, White, Black}
+	for _, code := range nonRegularCodes {
+		if IsRegularCode(code) {
+			t.Errorf("IsRegularCode(%d) should be false", code)
+		}
+	}
+}
+
+func TestIsLiteCode(t *testing.T) {
+	liteCodes := []uint{LiteSetFgFgRun, LiteDitheredRun, LiteSetFgFgBgImage}
+	for _, code := range liteCodes {
+		if !IsLiteCode(code) {
+			t.Errorf("IsLiteCode(%d) should be true", code)
+		}
+	}
+
+	nonLiteCodes := []uint{RegularBgRun, RegularFgRun, MegaMegaBgRun, White}
+	for _, code := range nonLiteCodes {
+		if IsLiteCode(code) {
+			t.Errorf("IsLiteCode(%d) should be false", code)
+		}
+	}
+}
+
+func TestIsMegaMegaCode(t *testing.T) {
+	megaCodes := []uint{MegaMegaBgRun, MegaMegaFgRun, MegaMegaSetFgRun, MegaMegaDitheredRun,
+		MegaMegaColorRun, MegaMegaFgBgImage, MegaMegaSetFgBgImage, MegaMegaColorImage}
+	for _, code := range megaCodes {
+		if !IsMegaMegaCode(code) {
+			t.Errorf("IsMegaMegaCode(%d) should be true", code)
+		}
+	}
+
+	nonMegaCodes := []uint{RegularBgRun, LiteSetFgFgRun, White, Black, SpecialFgBg1}
+	for _, code := range nonMegaCodes {
+		if IsMegaMegaCode(code) {
+			t.Errorf("IsMegaMegaCode(%d) should be false", code)
+		}
+	}
+}
+
+func TestExtractRunLength(t *testing.T) {
+	tests := []struct {
+		name           string
+		code           uint
+		src            []byte
+		idx            int
+		expectedLen    int
+		expectedNextIdx int
+	}{
+		{
+			name:           "regular run with length in header",
+			code:           RegularBgRun,
+			src:            []byte{0x05}, // length = 5
+			idx:            0,
+			expectedLen:    5,
+			expectedNextIdx: 1,
+		},
+		{
+			name:           "regular run with extended length",
+			code:           RegularBgRun,
+			src:            []byte{0x00, 0x10}, // length = 0 means extended: 16 + 32 = 48
+			idx:            0,
+			expectedLen:    48,
+			expectedNextIdx: 2,
+		},
+		{
+			name:           "mega mega code",
+			code:           MegaMegaBgRun,
+			src:            []byte{0xF0, 0x64, 0x00}, // 2-byte length = 100
+			idx:            0,
+			expectedLen:    100,
+			expectedNextIdx: 3,
+		},
+		{
+			name:           "fg/bg image with length in header",
+			code:           RegularFgBgImage,
+			src:            []byte{0x42}, // length = 2, so 2*8 = 16
+			idx:            0,
+			expectedLen:    16,
+			expectedNextIdx: 1,
+		},
+		{
+			name:           "fg/bg image with extended length",
+			code:           RegularFgBgImage,
+			src:            []byte{0x40, 0x10}, // length = 0 means extended: 16 + 1 = 17
+			idx:            0,
+			expectedLen:    17,
+			expectedNextIdx: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			length, nextIdx := ExtractRunLength(tt.code, tt.src, tt.idx)
+			if length != tt.expectedLen {
+				t.Errorf("ExtractRunLength() length = %d, want %d", length, tt.expectedLen)
+			}
+			if nextIdx != tt.expectedNextIdx {
+				t.Errorf("ExtractRunLength() nextIdx = %d, want %d", nextIdx, tt.expectedNextIdx)
+			}
+		})
+	}
+}
+
 func Test_Decompress(t *testing.T) {
 	t.Skip("not implemented")
 

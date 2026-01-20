@@ -63,11 +63,13 @@ func (header *ShareControlHeader) Serialize() []byte {
 }
 
 func (header *ShareControlHeader) Deserialize(wire io.Reader) error {
-	binary.Read(wire, binary.LittleEndian, &header.TotalLength)
-	binary.Read(wire, binary.LittleEndian, &header.PDUType)
-	binary.Read(wire, binary.LittleEndian, &header.PDUSource)
-
-	return nil
+	if err := binary.Read(wire, binary.LittleEndian, &header.TotalLength); err != nil {
+		return err
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &header.PDUType); err != nil {
+		return err
+	}
+	return binary.Read(wire, binary.LittleEndian, &header.PDUSource)
 }
 
 type Type2 uint8

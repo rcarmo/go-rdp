@@ -113,9 +113,9 @@ func TestInputEventPDU_SerializeLength(t *testing.T) {
 			expected: []byte{0x80}, // value + 1 = 0x80, since 0x7f is NOT > 0x7f
 		},
 		{
-			name:        "long length (> 0x7f) causes binary.Write error due to int type",
-			value:       0x80,
-			expectError: true, // binary.Write doesn't accept int type
+			name:     "long length (> 0x7f)",
+			value:    0x80,
+			expected: []byte{0x80, 0x82}, // 0x82 | 0x8000 = 0x8082 (big endian)
 		},
 	}
 
@@ -816,7 +816,7 @@ func TestPaletteEntry_Deserialize(t *testing.T) {
 			name:      "valid palette entry",
 			input:     []byte{0xFF, 0x80, 0x40},
 			expectedR: 0xFF,
-			expectedG: 0x40, // Note: there's a bug in the code, Blue is assigned to Green again
+			expectedG: 0x80, // Fixed: R=0xFF, G=0x80, B=0x40
 		},
 		{
 			name:        "too short",

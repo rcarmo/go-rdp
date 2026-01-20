@@ -3,7 +3,6 @@ package rdp
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -216,11 +215,4 @@ func TestRailPDUHeader_EdgeCases(t *testing.T) {
 		assert.Equal(t, tt.orderType, deserialized.OrderType)
 		assert.Equal(t, tt.orderLength, deserialized.OrderLength)
 	}
-}
-
-// errorWriter is a writer that always returns an error
-type errorWriter struct{}
-
-func (e *errorWriter) Write(p []byte) (n int, err error) {
-	return 0, io.ErrShortWrite
 }

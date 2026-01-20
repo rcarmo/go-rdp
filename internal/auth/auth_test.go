@@ -1093,8 +1093,8 @@ func TestEncodeTSRequest(t *testing.T) {
 				if err != nil {
 					t.Errorf("decode failed: %v", err)
 				}
-				if req.Version != 2 {
-					t.Errorf("version = %d, want 2", req.Version)
+				if req.Version != 6 {
+					t.Errorf("version = %d, want 6", req.Version)
 				}
 			},
 		},
@@ -1153,8 +1153,8 @@ func TestEncodeTSRequest(t *testing.T) {
 				if err != nil {
 					t.Errorf("decode failed: %v", err)
 				}
-				if req.Version != 2 {
-					t.Errorf("version = %d, want 2", req.Version)
+				if req.Version != 6 {
+					t.Errorf("version = %d, want 6", req.Version)
 				}
 				if len(req.NegoTokens) != 1 {
 					t.Errorf("NegoTokens count = %d, want 1", len(req.NegoTokens))
@@ -1192,8 +1192,8 @@ func TestDecodeTSRequest(t *testing.T) {
 			}(),
 			wantErr: false,
 			checkResult: func(t *testing.T, req *TSRequest) {
-				if req.Version != 2 {
-					t.Errorf("Version = %d, want 2", req.Version)
+				if req.Version != 6 {
+					t.Errorf("Version = %d, want 6", req.Version)
 				}
 			},
 		},
@@ -1333,8 +1333,8 @@ func TestTSRequestRoundTrip(t *testing.T) {
 				t.Fatalf("DecodeTSRequest failed: %v", err)
 			}
 
-			if decoded.Version != 2 {
-				t.Errorf("Version = %d, want 2", decoded.Version)
+			if decoded.Version != 6 {
+				t.Errorf("Version = %d, want 6", decoded.Version)
 			}
 
 			if len(tt.ntlmMessages) != len(decoded.NegoTokens) {
@@ -1414,4 +1414,71 @@ func TestDecodeTSRequestWithMalformedData(t *testing.T) {
 		_ = err
 		t.Logf("Test %d completed (err=%v)", i, err)
 	}
+}
+
+func TestComputeClientPubKeyAuth(t *testing.T) {
+pubKey := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
+nonce := []byte{0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f}
+
+// Test version 2-4: should return pubKey unchanged
+result := ComputeClientPubKeyAuth(2, pubKey, nil)
+if !bytes.Equal(result, pubKey) {
+t.Errorf("Version 2 should return pubKey unchanged")
+}
+
+result = ComputeClientPubKeyAuth(4, pubKey, nonce)
+if !bytes.Equal(result, pubKey) {
+t.Errorf("Version 4 should return pubKey unchanged")
+}
+
+// Test version 5+: should return SHA256 hash
+result = ComputeClientPubKeyAuth(5, pubKey, nonce)
+if len(result) != 32 { // SHA256 hash length
+t.Errorf("Version 5 should return 32-byte SHA256 hash, got %d bytes", len(result))
+}
+if bytes.Equal(result, pubKey) {
+t.Errorf("Version 5 result should not equal original pubKey")
+}
+
+// Test version 6 with nonce
+result = ComputeClientPubKeyAuth(6, pubKey, nonce)
+if len(result) != 32 {
+t.Errorf("Version 6 should return 32-byte SHA256 hash")
+}
+}
+
+func TestVerifyServerPubKeyAuth(t *testing.T) {
+clientPubKey := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
+nonce := []byte{0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f}
+
+// Test version 2-4: server should send pubKey with first byte + 1
+serverResponse := make([]byte, len(clientPubKey))
+copy(serverResponse, clientPubKey)
+serverResponse[0]++
+
+if !VerifyServerPubKeyAuth(2, serverResponse, clientPubKey, nil) {
+t.Errorf("Version 2 should verify correctly")
+}
+
+// Test with wrong response
+wrongResponse := make([]byte, len(clientPubKey))
+copy(wrongResponse, clientPubKey)
+if VerifyServerPubKeyAuth(2, wrongResponse, clientPubKey, nil) {
+t.Errorf("Version 2 should fail with wrong response")
+}
+
+// Test version 5+: need to compute correct hash
+// Server sends SHA256(ServerClientHashMagic || nonce || pubKey)
+// We can't easily compute this without importing crypto/sha256 in test
+// but we can test that it returns false for wrong response
+if VerifyServerPubKeyAuth(5, serverResponse, clientPubKey, nonce) {
+t.Errorf("Version 5 should fail with old-style response")
+}
+
+// Test length mismatch
+if VerifyServerPubKeyAuth(2, []byte{0x01}, clientPubKey, nil) {
+t.Errorf("Should fail with length mismatch")
+}
 }

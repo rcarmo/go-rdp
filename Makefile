@@ -22,6 +22,8 @@ help:
 	@echo "  build       - Build the binary for current platform"
 	@echo "  build-all   - Build binaries for all platforms"
 	@echo "  build-wasm  - Build WebAssembly module"
+	@echo "  build-js    - Bundle JavaScript modules"
+	@echo "  build-js-min - Bundle and minify JavaScript modules"
 	@echo "  docker      - Build Docker image"
 	@echo "  run         - Build and run the server"
 	@echo "  clean       - Clean build artifacts and dependencies"
@@ -76,7 +78,7 @@ test-int:
 
 # Building
 .PHONY: build
-build: build-wasm
+build: build-wasm build-js-min
 	@echo "Building binary..."
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME) cmd/server/main.go
@@ -123,6 +125,23 @@ build-wasm:
 	fi
 	@ls -lh web/js/rle/rle.wasm
 	@echo "WebAssembly module built: web/js/rle/rle.wasm"
+
+# JavaScript bundling
+.PHONY: build-js
+build-js:
+	@echo "Building JavaScript bundle..."
+	@cd web/js/src && npm install --silent 2>/dev/null && npm run build || \
+		npx --yes esbuild web/js/src/index.js --bundle --outfile=web/js/client.bundle.js --format=iife --global-name=RDP
+	@ls -lh web/js/client.bundle.js
+	@echo "JavaScript bundle built: web/js/client.bundle.js"
+
+.PHONY: build-js-min
+build-js-min:
+	@echo "Building minified JavaScript bundle..."
+	@cd web/js/src && npm install --silent 2>/dev/null && npm run build:min || \
+		npx --yes esbuild web/js/src/index.js --bundle --minify --outfile=web/js/client.bundle.min.js --format=iife --global-name=RDP
+	@ls -lh web/js/client.bundle.min.js
+	@echo "Minified JavaScript bundle built: web/js/client.bundle.min.js"
 
 # Docker
 .PHONY: docker

@@ -4,6 +4,10 @@ import (
 	"io"
 )
 
+const (
+	headerLen = 4
+)
+
 type Protocol struct {
 	conn io.ReadWriteCloser
 }

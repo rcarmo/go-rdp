@@ -124,7 +124,8 @@ func (c *Client) StartNLA() error {
 	}
 
 	// Step 5: Send credentials
-	domainBytes, userBytes, passBytes := ntlmCtx.GetEncodedCredentials()
+	// Per MS-CSSP, TSPasswordCreds MUST be UTF-16LE encoded
+	domainBytes, userBytes, passBytes := ntlmCtx.GetCredSSPCredentials()
 	credentials := auth.EncodeCredentials(domainBytes, userBytes, passBytes)
 	encryptedCreds := ntlmSec.GssEncrypt(credentials)
 	log.Printf("NLA: Sending encrypted credentials (%d bytes)", len(encryptedCreds))
@@ -138,7 +139,7 @@ func (c *Client) StartNLA() error {
 	// Step 6: Wait for final server response (optional - some servers send a final TSRequest)
 	// Set a short timeout for this read - if no data comes, credentials were accepted
 	if tcpConn, ok := c.conn.(*tls.Conn); ok {
-		tcpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = tcpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	}
 
 	finalResp := make([]byte, 4096)
@@ -149,7 +150,7 @@ func (c *Client) StartNLA() error {
 			log.Printf("NLA: No final response from server (timeout - expected)")
 			// Clear the deadline
 			if tcpConn, ok := c.conn.(*tls.Conn); ok {
-				tcpConn.SetReadDeadline(time.Time{})
+				_ = tcpConn.SetReadDeadline(time.Time{})
 			}
 			return nil
 		}
@@ -157,14 +158,14 @@ func (c *Client) StartNLA() error {
 		log.Printf("NLA: Error reading final response: %v", err)
 		// Try to continue anyway - some servers don't send a final response
 		if tcpConn, ok := c.conn.(*tls.Conn); ok {
-			tcpConn.SetReadDeadline(time.Time{})
+			_ = tcpConn.SetReadDeadline(time.Time{})
 		}
 		return nil
 	}
 
 	// Clear the deadline
 	if tcpConn, ok := c.conn.(*tls.Conn); ok {
-		tcpConn.SetReadDeadline(time.Time{})
+		_ = tcpConn.SetReadDeadline(time.Time{})
 	}
 
 	// If we got data, check if it's an error response
@@ -212,7 +213,7 @@ func (c *Client) startTLSForNLA() error {
 	// Windows RDP servers typically only support TLS 1.0-1.2, not TLS 1.3
 	// Use TLS 1.2 max for better compatibility
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: true, // RDP servers use self-signed certs
+		InsecureSkipVerify: insecureSkipVerify, // RDP servers use self-signed certs
 		MinVersion:         tls.VersionTLS10,
 		MaxVersion:         tls.VersionTLS12, // Windows RDP doesn't support TLS 1.3
 		ServerName:         serverName,
@@ -234,8 +235,8 @@ func (c *Client) startTLSForNLA() error {
 	tlsConn := tls.Client(c.conn, tlsConfig)
 
 	if tcpConn, ok := c.conn.(*net.TCPConn); ok {
-		tcpConn.SetReadDeadline(time.Now().Add(30 * time.Second))
-		tcpConn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+		_ = tcpConn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		_ = tcpConn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 	}
 
 	if err := tlsConn.Handshake(); err != nil {
@@ -246,8 +247,8 @@ func (c *Client) startTLSForNLA() error {
 	}
 
 	if tcpConn, ok := c.conn.(*net.TCPConn); ok {
-		tcpConn.SetReadDeadline(time.Time{})
-		tcpConn.SetWriteDeadline(time.Time{})
+		_ = tcpConn.SetReadDeadline(time.Time{})
+		_ = tcpConn.SetWriteDeadline(time.Time{})
 	}
 
 	c.conn = tlsConn

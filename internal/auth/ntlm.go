@@ -191,6 +191,53 @@ func extractTimestamp(targetInfo []byte) []byte {
 	return nil
 }
 
+// modifyTargetInfoForMIC modifies TargetInfo to add MsvAvFlags with MIC_PROVIDED flag
+// Per MS-NLMP 3.1.5.1.2: When MIC is present, MsvAvFlags MUST have MIC_PROVIDED (0x02)
+func modifyTargetInfoForMIC(targetInfo []byte) []byte {
+	if len(targetInfo) == 0 {
+		return targetInfo
+	}
+
+	// Find MsvAvFlags and MsvAvEOL positions
+	flagsOffset := -1
+	eolOffset := -1
+	offset := 0
+
+	for offset+4 <= len(targetInfo) {
+		avID := binary.LittleEndian.Uint16(targetInfo[offset:])
+		avLen := binary.LittleEndian.Uint16(targetInfo[offset+2:])
+
+		if avID == MsvAvFlags {
+			flagsOffset = offset
+		}
+		if avID == MsvAvEOL {
+			eolOffset = offset
+			break
+		}
+		offset += 4 + int(avLen)
+	}
+
+	result := make([]byte, len(targetInfo))
+	copy(result, targetInfo)
+
+	if flagsOffset >= 0 {
+		// Update existing flags to include MIC_PROVIDED (0x02)
+		existingFlags := binary.LittleEndian.Uint32(result[flagsOffset+4:])
+		existingFlags |= 0x02 // MIC_PROVIDED
+		binary.LittleEndian.PutUint32(result[flagsOffset+4:], existingFlags)
+	} else if eolOffset >= 0 {
+		// Insert MsvAvFlags before MsvAvEOL
+		newPair := make([]byte, 8)
+		binary.LittleEndian.PutUint16(newPair[0:], MsvAvFlags) // AvId
+		binary.LittleEndian.PutUint16(newPair[2:], 4)          // AvLen
+		binary.LittleEndian.PutUint32(newPair[4:], 0x02)       // MIC_PROVIDED
+
+		result = append(result[:eolOffset], append(newPair, result[eolOffset:]...)...)
+	}
+
+	return result
+}
+
 // Security handles NTLM message encryption/decryption
 type Security struct {
 	encryptRC4 *rc4.Cipher
@@ -226,9 +273,15 @@ func (n *NTLMv2) GetAuthenticateMessage(challengeData []byte) ([]byte, *Security
 	clientChallenge := make([]byte, 8)
 	rand.Read(clientChallenge)
 
+	// Modify TargetInfo to include MIC_PROVIDED flag when MIC will be computed
+	targetInfo := challenge.TargetInfo
+	if computeMIC {
+		targetInfo = modifyTargetInfoForMIC(challenge.TargetInfo)
+	}
+
 	// Compute responses
 	ntChallengeResponse, lmChallengeResponse, sessionBaseKey := n.computeResponseV2(
-		challenge.ServerChallenge[:], clientChallenge, timestamp, challenge.TargetInfo)
+		challenge.ServerChallenge[:], clientChallenge, timestamp, targetInfo)
 
 	// Key exchange
 	exportedSessionKey := make([]byte, 16)
@@ -258,10 +311,13 @@ func (n *NTLMv2) GetAuthenticateMessage(challengeData []byte) ([]byte, *Security
 	n.authMsg = authMsg
 
 	// Create security context
-	clientSigningKey := hmacMD5(exportedSessionKey, append([]byte("session key to client-to-server signing key magic constant"), 0x00))
-	serverSigningKey := hmacMD5(exportedSessionKey, append([]byte("session key to server-to-client signing key magic constant"), 0x00))
-	clientSealingKey := hmacMD5(exportedSessionKey, append([]byte("session key to client-to-server sealing key magic constant"), 0x00))
-	serverSealingKey := hmacMD5(exportedSessionKey, append([]byte("session key to server-to-client sealing key magic constant"), 0x00))
+	// Per MS-NLMP, with Extended Session Security, keys are derived using MD5
+	// SignKey = MD5(SessionBaseKey || MagicConstant)
+	// SealKey = MD5(SessionBaseKey || MagicConstant)
+	clientSigningKey := md5Hash(append(exportedSessionKey, append([]byte("session key to client-to-server signing key magic constant"), 0x00)...))
+	serverSigningKey := md5Hash(append(exportedSessionKey, append([]byte("session key to server-to-client signing key magic constant"), 0x00)...))
+	clientSealingKey := md5Hash(append(exportedSessionKey, append([]byte("session key to client-to-server sealing key magic constant"), 0x00)...))
+	serverSealingKey := md5Hash(append(exportedSessionKey, append([]byte("session key to server-to-client sealing key magic constant"), 0x00)...))
 
 	encryptRC4, _ := rc4.NewCipher(clientSealingKey)
 	decryptRC4, _ := rc4.NewCipher(serverSealingKey)
@@ -383,7 +439,7 @@ func (n *NTLMv2) computeMIC(exportedSessionKey, authMsg []byte) []byte {
 	return hmacMD5(exportedSessionKey, buf.Bytes())[:16]
 }
 
-// GetEncodedCredentials returns domain, user, password encoded appropriately
+// GetEncodedCredentials returns domain, user, password encoded appropriately for NTLM
 func (n *NTLMv2) GetEncodedCredentials() ([]byte, []byte, []byte) {
 	if n.enableUnicode {
 		return unicodeEncode(n.domain), unicodeEncode(n.user), unicodeEncode(n.password)
@@ -391,24 +447,31 @@ func (n *NTLMv2) GetEncodedCredentials() ([]byte, []byte, []byte) {
 	return []byte(n.domain), []byte(n.user), []byte(n.password)
 }
 
+// GetCredSSPCredentials returns domain, user, password as UTF-16LE for CredSSP TSCredentials
+// Per MS-CSSP, TSPasswordCreds MUST always use UTF-16LE encoding
+func (n *NTLMv2) GetCredSSPCredentials() ([]byte, []byte, []byte) {
+	return unicodeEncode(n.domain), unicodeEncode(n.user), unicodeEncode(n.password)
+}
+
 // GssEncrypt encrypts data using NTLM seal
+// Per MS-NLMP: First encrypt data, THEN compute and encrypt signature
 func (s *Security) GssEncrypt(data []byte) []byte {
-	// Compute signature first (before encrypting data, using original plaintext)
+	// Step 1: Encrypt the data FIRST
+	encrypted := make([]byte, len(data))
+	s.encryptRC4.XORKeyStream(encrypted, data)
+
+	// Step 2: Compute signature over ORIGINAL plaintext (not encrypted)
 	seqBuf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(seqBuf, s.seqNum)
 
 	signBuf := &bytes.Buffer{}
 	signBuf.Write(seqBuf)
-	signBuf.Write(data)
+	signBuf.Write(data) // Use original plaintext for signature
 	sig := hmacMD5(s.signingKey, signBuf.Bytes())[:8]
 
-	// Encrypt the signature
+	// Step 3: Encrypt the signature checksum (RC4 state continues from data encryption)
 	checksum := make([]byte, 8)
 	s.encryptRC4.XORKeyStream(checksum, sig)
-
-	// Encrypt the data
-	encrypted := make([]byte, len(data))
-	s.encryptRC4.XORKeyStream(encrypted, data)
 
 	// Build GSS token: Version(4) + Checksum(8) + SeqNum(4) + EncryptedData
 	result := &bytes.Buffer{}
@@ -419,6 +482,29 @@ func (s *Security) GssEncrypt(data []byte) []byte {
 
 	s.seqNum++
 	return result.Bytes()
+}
+
+// GssDecrypt decrypts data using NTLM unseal
+// Input format: Version(4) + Checksum(8) + SeqNum(4) + EncryptedData
+func (s *Security) GssDecrypt(data []byte) []byte {
+	if len(data) < 16 {
+		return nil
+	}
+
+	// Parse signature
+	// version := binary.LittleEndian.Uint32(data[0:4])  // Should be 1
+	// checksum := data[4:12]
+	// seqNum := binary.LittleEndian.Uint32(data[12:16])
+	encrypted := data[16:]
+
+	// Decrypt the data
+	decrypted := make([]byte, len(encrypted))
+	s.decryptRC4.XORKeyStream(decrypted, encrypted)
+
+	// Skip checksum verification for now - just return decrypted data
+	// TODO: Verify checksum using verifyKey and sequence number
+
+	return decrypted
 }
 
 // Helper functions
@@ -448,6 +534,11 @@ func hmacMD5(key, data []byte) []byte {
 	h := hmac.New(md5.New, key)
 	h.Write(data)
 	return h.Sum(nil)
+}
+
+func md5Hash(data []byte) []byte {
+	h := md5.Sum(data)
+	return h[:]
 }
 
 func makeTimestamp() []byte {

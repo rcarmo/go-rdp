@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +63,7 @@ func TestClient_handleSlowPathGraphicsUpdate_Bitmap(t *testing.T) {
 	
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.IsType(t, &fastpath.UpdatePDU{}, result)
+	assert.IsType(t, &Update{}, result)
 }
 
 func TestClient_handleSlowPathGraphicsUpdate_Palette(t *testing.T) {

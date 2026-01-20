@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -15,13 +16,13 @@ import (
 	"golang.org/x/net/websocket"
 
 	"github.com/rcarmo/rdp-html5/internal/config"
-	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
+	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 	"github.com/rcarmo/rdp-html5/internal/rdp"
 )
 
 type rdpConn interface {
-	GetUpdate() (*fastpath.UpdatePDU, error)
+	GetUpdate() (*rdp.Update, error)
 	SendInputEvent(data []byte) error
 }
 
@@ -80,6 +81,12 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 		}
 	}
 
+	// Check if NLA should be disabled for this connection
+	disableNLA := r.URL.Query().Get("disableNLA") == "true"
+	
+	// Check if audio should be enabled
+	enableAudio := r.URL.Query().Get("audio") == "true"
+
 	host := r.URL.Query().Get("host")
 	user := r.URL.Query().Get("user")
 	password := r.URL.Query().Get("password")
@@ -103,11 +110,30 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	}
 
 	rdpClient.SetTLSConfig(cfg.Security.SkipTLSValidation, cfg.Security.TLSServerName)
-	rdpClient.SetUseNLA(cfg.Security.UseNLA)
+	
+	// Use NLA unless explicitly disabled by client or server config
+	useNLA := cfg.Security.UseNLA && !disableNLA
+	rdpClient.SetUseNLA(useNLA)
+	if disableNLA {
+		log.Printf("NLA disabled for this connection")
+	}
+	
+	// Enable audio if requested
+	if enableAudio {
+		rdpClient.EnableAudio()
+		log.Printf("Audio redirection enabled")
+	}
 
 	if err = rdpClient.Connect(); err != nil {
 		log.Println(fmt.Errorf("rdp connect: %w", err))
 		return
+	}
+	
+	// Set up audio callback to forward audio data to browser
+	if enableAudio && rdpClient.GetAudioHandler() != nil {
+		rdpClient.GetAudioHandler().SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) {
+			sendAudioData(wsConn, data, format, timestamp)
+		})
 	}
 
 	// Send server capabilities info to browser
@@ -256,4 +282,53 @@ func isAllowedOrigin(origin string) bool {
 	}
 
 	return false
+}
+
+// Audio message types for WebSocket
+const (
+	AudioMsgTypeData   = 0x01 // Audio PCM data
+	AudioMsgTypeFormat = 0x02 // Audio format info
+)
+
+// sendAudioData sends audio data to the browser over WebSocket
+// Format: [0xFE][msgType][timestamp 2 bytes][format info if type=format][data]
+func sendAudioData(wsConn *websocket.Conn, data []byte, format *audio.AudioFormat, timestamp uint16) {
+	if len(data) == 0 {
+		return
+	}
+
+	// Build audio message
+	// Header: 0xFE (audio marker), msgType, timestamp (2 bytes LE)
+	headerSize := 4
+	
+	// For format messages, include format info
+	var formatInfo []byte
+	if format != nil {
+		// Format: channels (2), sampleRate (4), bitsPerSample (2)
+		formatInfo = make([]byte, 8)
+		binary.LittleEndian.PutUint16(formatInfo[0:2], format.Channels)
+		binary.LittleEndian.PutUint32(formatInfo[2:6], format.SamplesPerSec)
+		binary.LittleEndian.PutUint16(formatInfo[6:8], format.BitsPerSample)
+	}
+
+	msg := make([]byte, headerSize+len(formatInfo)+len(data))
+	msg[0] = 0xFE // Audio marker
+	msg[1] = AudioMsgTypeData
+	binary.LittleEndian.PutUint16(msg[2:4], timestamp)
+	
+	offset := headerSize
+	if len(formatInfo) > 0 {
+		msg[1] = AudioMsgTypeFormat // Include format
+		copy(msg[offset:], formatInfo)
+		offset += len(formatInfo)
+	}
+	copy(msg[offset:], data)
+
+	wsMutex.Lock()
+	err := websocket.Message.Send(wsConn, msg)
+	wsMutex.Unlock()
+
+	if err != nil {
+		log.Printf("Failed to send audio data: %v", err)
+	}
 }
