@@ -123,3 +123,4 @@ Thumbs.db
 *.dll
 *.so
 *.dylib
+*.test

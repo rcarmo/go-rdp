@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"time"
 
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
