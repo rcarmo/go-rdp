@@ -795,7 +795,7 @@ type LoggingConfig struct {
 | Host | `-host` | `SERVER_HOST` | `0.0.0.0` |
 | Port | `-port` | `SERVER_PORT` | `8080` |
 | Log Level | `-log-level` | `LOG_LEVEL` | `info` |
-| Skip TLS | `-skip-tls-verify` | `SKIP_TLS_VALIDATION` | `false` |
+| Skip TLS | `-tls-skip-verify` | `TLS_SKIP_VERIFY` | `false` (Docker default: `false`) |
 | Allow any SNI | `-tls-allow-any-server-name` | `TLS_ALLOW_ANY_SERVER_NAME` | `false` (Docker default: `true`) |
 | Use NLA | `-nla` | `USE_NLA` | `true` |
 

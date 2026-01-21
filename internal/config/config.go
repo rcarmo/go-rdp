@@ -67,7 +67,7 @@ type SecurityConfig struct {
 	TLSCertFile        string   `json:"tlsCertFile" env:"TLS_CERT_FILE" default:""`
 	TLSKeyFile         string   `json:"tlsKeyFile" env:"TLS_KEY_FILE" default:""`
 	MinTLSVersion      string   `json:"minTLSVersion" env:"MIN_TLS_VERSION" default:"1.2"`
-	SkipTLSValidation  bool     `json:"skipTLSValidation" env:"SKIP_TLS_VALIDATION" default:"false"`
+	SkipTLSValidation  bool     `json:"skipTLSValidation" env:"TLS_SKIP_VERIFY" default:"false"`
 	TLSServerName      string   `json:"tlsServerName" env:"TLS_SERVER_NAME" default:""`
 	AllowAnyTLSServer  bool     `json:"allowAnyTLSServer" env:"TLS_ALLOW_ANY_SERVER_NAME" default:"false"`
 	UseNLA             bool     `json:"useNLA" env:"USE_NLA" default:"true"`
@@ -120,7 +120,7 @@ func LoadWithOverrides(opts LoadOptions) (*Config, error) {
 	config.Security.TLSCertFile = getEnvWithDefault("TLS_CERT_FILE", "")
 	config.Security.TLSKeyFile = getEnvWithDefault("TLS_KEY_FILE", "")
 	config.Security.MinTLSVersion = getEnvWithDefault("MIN_TLS_VERSION", "1.2")
-	config.Security.SkipTLSValidation = getBoolWithDefault("SKIP_TLS_VALIDATION", false) || opts.SkipTLSValidation
+	config.Security.SkipTLSValidation = getBoolWithDefault("TLS_SKIP_VERIFY", false) || opts.SkipTLSValidation
 	config.Security.TLSServerName = getOverrideOrEnv(opts.TLSServerName, "TLS_SERVER_NAME", "")
 	config.Security.AllowAnyTLSServer = getBoolWithDefault("TLS_ALLOW_ANY_SERVER_NAME", false) || opts.AllowAnyTLSServer
 	// NLA enabled by default for security; set USE_NLA=false to disable

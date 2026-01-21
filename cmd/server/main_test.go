@@ -692,7 +692,7 @@ func TestParseFlagsWithArgs(t *testing.T) {
 		},
 		{
 			name:           "all flags",
-			args:           []string{"-host", "0.0.0.0", "-port", "8080", "-log-level", "debug", "-skip-tls-verify", "-tls-server-name", "server.local", "-nla"},
+			args:           []string{"-host", "0.0.0.0", "-port", "8080", "-log-level", "debug", "-tls-skip-verify", "-tls-server-name", "server.local", "-nla"},
 			expectedAction: "",
 			checkArgs: func(t *testing.T, args parsedArgs) {
 				assert.Equal(t, "0.0.0.0", args.host)

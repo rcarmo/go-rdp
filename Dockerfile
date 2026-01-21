@@ -84,9 +84,10 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 EXPOSE 8080
 
 # Environment variables for configuration (can be overridden at runtime with -e)
-# SKIP_TLS_VALIDATION: Set to "true" to connect to RDP servers with self-signed certificates
+# TLS_SKIP_VERIFY: Set to "true" to connect to RDP servers with self-signed certificates
+# TLS_ALLOW_ANY_SERVER_NAME: Allow connecting without enforcing SNI (lab/testing)
 # LOG_LEVEL: debug, info, warn, error
-ENV SKIP_TLS_VALIDATION=false \
+ENV TLS_SKIP_VERIFY=false \
     TLS_ALLOW_ANY_SERVER_NAME=true \
     LOG_LEVEL=info
 

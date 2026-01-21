@@ -63,7 +63,7 @@ type Config struct {
 | `TLS_CERT_FILE` | (empty) | Path to TLS certificate |
 | `TLS_KEY_FILE` | (empty) | Path to TLS private key |
 | `MIN_TLS_VERSION` | `1.2` | Minimum TLS version |
-| `SKIP_TLS_VALIDATION` | `false` | Skip RDP server TLS validation |
+| `TLS_SKIP_VERIFY` | `false` | Skip RDP server TLS validation |
 | `TLS_SERVER_NAME` | (empty) | Override RDP server TLS name |
 | `USE_NLA` | `true` | Enable Network Level Auth |
 

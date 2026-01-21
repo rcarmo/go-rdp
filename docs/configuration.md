@@ -63,7 +63,7 @@ export RDP_TIMEOUT=10s
 
 # Skip TLS certificate validation when connecting to RDP servers
 # Set to true for self-signed certificates (NOT recommended for production)
-export SKIP_TLS_VALIDATION=false
+export TLS_SKIP_VERIFY=false
 
 # Override TLS server name for certificate validation
 export TLS_SERVER_NAME=
@@ -87,7 +87,7 @@ Options:
   -host              Server listen host (default: 0.0.0.0)
   -port              Server listen port (default: 8080)
   -log-level         Log level: debug, info, warn, error
-  -skip-tls-verify           Skip TLS certificate validation
+  -tls-skip-verify           Skip TLS certificate validation
   -tls-server-name           Override TLS server name (SNI)
   -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)
   -nla               Enable Network Level Authentication
@@ -110,7 +110,7 @@ When running in Docker, pass environment variables with `-e`:
 docker run -d \
   -p 8080:8080 \
   -e LOG_LEVEL=info \
-  -e SKIP_TLS_VALIDATION=true \
+  -e TLS_SKIP_VERIFY=true \
   ghcr.io/rcarmo/rdp-html5:latest
 ```
 
@@ -124,5 +124,5 @@ services:
       - "8080:8080"
     environment:
       - LOG_LEVEL=info
-      - SKIP_TLS_VALIDATION=false
+      - TLS_SKIP_VERIFY=false
 ```

@@ -107,7 +107,7 @@ Logger.getLevel();     // Returns current level string
 ### Connection Fails Immediately
 
 1. Check server logs for TLS errors
-2. Try with `SKIP_TLS_VALIDATION=true` if using self-signed certs, or `TLS_ALLOW_ANY_SERVER_NAME=true` in lab scenarios
+2. Try with `TLS_SKIP_VERIFY=true` if using self-signed certs, or `TLS_ALLOW_ANY_SERVER_NAME=true` in lab scenarios
 3. Verify the RDP server is accessible from the backend
 
 ### NLA Authentication Fails
