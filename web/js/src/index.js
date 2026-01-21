@@ -7,7 +7,7 @@
 import { Client, Logger } from './client.js';
 import { WASMCodec, RFXDecoder, isWASMSupported } from './wasm.js';
 import { FallbackCodec } from './codec-fallback.js';
-import ConnectionHistory from '../connection-history.js';
+import ConnectionHistory from './connection-history.js';
 
 // Export to global scope for browser use
 if (typeof window !== 'undefined') {

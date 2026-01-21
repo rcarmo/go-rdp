@@ -5,31 +5,31 @@ const ConnectionHistory = {
     _maxHistory: 5,
 
     // Normalize host by removing default RDP port
-    _normalizeHost: function(host) {
+    _normalizeHost(host) {
         if (!host) return host;
         // Remove :3389 suffix if present (default RDP port)
         return host.replace(/:3389$/, '');
     },
 
     // Save a connection to history
-    save: function(host, username) {
+    save(host, username) {
         if (!host || !username) return;
 
         // Normalize host (remove default port)
         host = this._normalizeHost(host);
 
         const history = this.get();
-        
+
         // Create connection entry (timestamp for sorting)
         const entry = {
-            host: host,
-            username: username,
-            timestamp: Date.now()
+            host,
+            username,
+            timestamp: Date.now(),
         };
 
         // Remove duplicate if exists (same host + username)
-        const filtered = history.filter(item => 
-            !(this._normalizeHost(item.host) === host && item.username === username)
+        const filtered = history.filter(
+            (item) => !(this._normalizeHost(item.host) === host && item.username === username),
         );
 
         // Add to beginning
@@ -48,11 +48,11 @@ const ConnectionHistory = {
     },
 
     // Get all connection history
-    get: function() {
+    get() {
         try {
             const data = localStorage.getItem(this._storageKey);
             if (!data) return [];
-            
+
             const parsed = JSON.parse(data);
             return Array.isArray(parsed) ? parsed : [];
         } catch (e) {
@@ -62,7 +62,7 @@ const ConnectionHistory = {
     },
 
     // Clear all history
-    clear: function() {
+    clear() {
         try {
             localStorage.removeItem(this._storageKey);
             Logger.info('[ConnectionHistory] History cleared');
@@ -72,17 +72,20 @@ const ConnectionHistory = {
     },
 
     // Remove a specific entry
-    remove: function(host, username) {
+    remove(host, username) {
         const history = this.get();
-        const filtered = history.filter(item => 
-            !(this._normalizeHost(item.host) === this._normalizeHost(host) && item.username === username)
+        const filtered = history.filter(
+            (item) =>
+                !(this._normalizeHost(item.host) === this._normalizeHost(host) && item.username === username),
         );
-        
+
         try {
             localStorage.setItem(this._storageKey, JSON.stringify(filtered));
             Logger.debug('[ConnectionHistory] Removed connection:', host, username);
         } catch (e) {
             console.error('[ConnectionHistory] Failed to remove:', e);
         }
-    }
+    },
 };
+
+export default ConnectionHistory;

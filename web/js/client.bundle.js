@@ -1,13 +1,8 @@
 var RDP = (() => {
-  var __create = Object.create;
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
-  var __commonJS = (cb, mod) => function __require() {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  };
   var __export = (target, all) => {
     for (var name in all)
       __defProp(target, name, { get: all[name], enumerable: true });
@@ -20,27 +15,13 @@ var RDP = (() => {
     }
     return to;
   };
-  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-    // If the importer is in node compatibility mode or this is not an ESM
-    // file that has been converted to a CommonJS file using a Babel-
-    // compatible transform (i.e. "__esModule" has not been set), then set
-    // "default" to the CommonJS "module.exports" for node compatibility.
-    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-    mod
-  ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-  // ../connection-history.js
-  var require_connection_history = __commonJS({
-    "../connection-history.js"() {
-    }
-  });
 
   // index.js
   var src_exports = {};
   __export(src_exports, {
     Client: () => Client,
-    ConnectionHistory: () => import_connection_history.default,
+    ConnectionHistory: () => connection_history_default,
     FallbackCodec: () => FallbackCodec,
     Logger: () => Logger2,
     RFXDecoder: () => RFXDecoder,
@@ -2551,8 +2532,78 @@ var RDP = (() => {
     }, 500);
   };
 
+  // connection-history.js
+  var ConnectionHistory = {
+    _storageKey: "rdp_connection_history",
+    _maxHistory: 5,
+    // Normalize host by removing default RDP port
+    _normalizeHost(host) {
+      if (!host)
+        return host;
+      return host.replace(/:3389$/, "");
+    },
+    // Save a connection to history
+    save(host, username) {
+      if (!host || !username)
+        return;
+      host = this._normalizeHost(host);
+      const history = this.get();
+      const entry = {
+        host,
+        username,
+        timestamp: Date.now()
+      };
+      const filtered = history.filter(
+        (item) => !(this._normalizeHost(item.host) === host && item.username === username)
+      );
+      filtered.unshift(entry);
+      const trimmed = filtered.slice(0, this._maxHistory);
+      try {
+        localStorage.setItem(this._storageKey, JSON.stringify(trimmed));
+        Logger.debug("[ConnectionHistory] Saved connection:", host, username);
+      } catch (e) {
+        console.error("[ConnectionHistory] Failed to save:", e);
+      }
+    },
+    // Get all connection history
+    get() {
+      try {
+        const data = localStorage.getItem(this._storageKey);
+        if (!data)
+          return [];
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        console.error("[ConnectionHistory] Failed to load:", e);
+        return [];
+      }
+    },
+    // Clear all history
+    clear() {
+      try {
+        localStorage.removeItem(this._storageKey);
+        Logger.info("[ConnectionHistory] History cleared");
+      } catch (e) {
+        console.error("[ConnectionHistory] Failed to clear:", e);
+      }
+    },
+    // Remove a specific entry
+    remove(host, username) {
+      const history = this.get();
+      const filtered = history.filter(
+        (item) => !(this._normalizeHost(item.host) === this._normalizeHost(host) && item.username === username)
+      );
+      try {
+        localStorage.setItem(this._storageKey, JSON.stringify(filtered));
+        Logger.debug("[ConnectionHistory] Removed connection:", host, username);
+      } catch (e) {
+        console.error("[ConnectionHistory] Failed to remove:", e);
+      }
+    }
+  };
+  var connection_history_default = ConnectionHistory;
+
   // index.js
-  var import_connection_history = __toESM(require_connection_history(), 1);
   if (typeof window !== "undefined") {
     window.Client = Client;
     window.Logger = Logger2;
@@ -2560,7 +2611,7 @@ var RDP = (() => {
     window.RFXDecoder = RFXDecoder;
     window.FallbackCodec = FallbackCodec;
     window.isWASMSupported = isWASMSupported;
-    window.ConnectionHistory = import_connection_history.default;
+    window.ConnectionHistory = connection_history_default;
   }
   var src_default = Client;
   return __toCommonJS(src_exports);
