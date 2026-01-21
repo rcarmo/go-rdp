@@ -19,8 +19,9 @@ This package contains the main entry point for the RDP-to-WebSocket gateway serv
 -host            Server listen host (default: 0.0.0.0)
 -port            Server listen port (default: 8080)
 -log-level       Log level: debug, info, warn, error
--skip-tls-verify Skip TLS certificate validation for RDP connections
--tls-server-name Override TLS server name for RDP connections
+-skip-tls-verify           Skip TLS certificate validation for RDP connections
+-tls-server-name           Override TLS server name for RDP connections (SNI)
+-tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)
 -nla             Enable Network Level Authentication (CredSSP)
 -help            Show help message
 -version         Show version information

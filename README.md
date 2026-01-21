@@ -56,6 +56,7 @@ Environment variables:
 | `PORT` | `8080` | HTTP server port |
 | `LOG_LEVEL` | `info` | Logging level: debug, info, warn, error |
 | `SKIP_TLS_VALIDATION` | `false` | Skip RDP server TLS certificate validation |
+| `TLS_ALLOW_ANY_SERVER_NAME` | `false` (Docker default: `true`) | Allow connecting without enforcing SNI (lab/testing) |
 | `ENABLE_TLS` | `false` | Enable HTTPS for the web interface |
 | `TLS_CERT_FILE` | - | Path to TLS certificate |
 | `TLS_KEY_FILE` | - | Path to TLS private key |
@@ -69,7 +70,8 @@ Command-line flags:
 | `-port` | Server listen port (default: 8080) |
 | `-log-level` | Log level: debug, info, warn, error |
 | `-skip-tls-verify` | Skip TLS certificate validation |
-| `-tls-server-name` | Override TLS server name |
+| `-tls-server-name` | Override TLS server name (SNI) |
+| `-tls-allow-any-server-name` | Allow connecting without enforcing SNI (lab/testing only) |
 | `-nla` | Enable Network Level Authentication |
 | `-no-rfx` | Disable RemoteFX codec support |
 

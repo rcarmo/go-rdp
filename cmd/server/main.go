@@ -262,13 +262,14 @@ func showHelp() {
 	fmt.Println("  -host               Set server listen host (default 0.0.0.0)")
 	fmt.Println("  -port               Set server listen port (default 8080)")
 	fmt.Println("  -log-level          Set log level (debug, info, warn, error)")
-	fmt.Println("  -skip-tls-verify    Skip TLS certificate validation")
-	fmt.Println("  -tls-server-name    Override TLS server name")
+	fmt.Println("  -skip-tls-verify           Skip TLS certificate validation")
+	fmt.Println("  -tls-server-name           Override TLS server name (SNI)")
+	fmt.Println("  -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)")
 	fmt.Println("  -nla                Enable Network Level Authentication")
 	fmt.Println("  -no-rfx             Disable RemoteFX codec support")
 	fmt.Println("  -version            Show version information")
 	fmt.Println("  -help               Show this help message")
-	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, SKIP_TLS_VALIDATION, TLS_SERVER_NAME, RDP_ENABLE_RFX")
+	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, SKIP_TLS_VALIDATION, TLS_SERVER_NAME, TLS_ALLOW_ANY_SERVER_NAME, RDP_ENABLE_RFX")
 	fmt.Println("EXAMPLES: rdp-html5 -host 0.0.0.0 -port 8080")
 }
 
