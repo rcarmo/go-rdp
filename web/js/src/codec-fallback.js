@@ -28,13 +28,17 @@ export const FallbackCodec = {
     init() {
         if (this._lut5to8) return;  // Already initialized
         
-        // 5-bit to 8-bit: value * 255 / 31 ≈ value * 8 + value >> 2
+        // 5-bit to 8-bit expansion: exact formula is round(value * 255 / 31)
+        // Using (i << 3) | (i >> 2) gives exact results for all 32 values
+        // Example: 31 -> (31<<3)|(31>>2) = 248|7 = 255 ✓
         this._lut5to8 = new Uint8Array(32);
         for (let i = 0; i < 32; i++) {
             this._lut5to8[i] = (i << 3) | (i >> 2);
         }
         
-        // 6-bit to 8-bit: value * 255 / 63 ≈ value * 4 + value >> 4
+        // 6-bit to 8-bit expansion: exact formula is round(value * 255 / 63)
+        // Using (i << 2) | (i >> 4) gives exact results for all 64 values
+        // Example: 63 -> (63<<2)|(63>>4) = 252|3 = 255 ✓
         this._lut6to8 = new Uint8Array(64);
         for (let i = 0; i < 64; i++) {
             this._lut6to8[i] = (i << 2) | (i >> 4);
@@ -78,15 +82,25 @@ export const FallbackCodec = {
      * Convert RGB565 to RGBA - OPTIMIZED for performance
      * This is the primary fast path for 16-bit fallback
      * @param {Uint8Array} src - Source RGB565 data (2 bytes per pixel, little-endian)
-     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @param {Uint8Array} dst - Destination RGBA buffer (must be 4x pixel count)
+     * @returns {boolean} True if conversion succeeded
      */
     rgb565ToRGBA(src, dst) {
         // Ensure lookup tables are initialized
         if (!this._lut5to8) this.init();
         
+        const pixelCount = src.length >> 1;  // Faster than Math.floor(src.length / 2)
+        
+        // Validate buffer sizes
+        if (src.length === 0) return true;  // Empty input is valid
+        if (src.length < 2) return false;   // Need at least one pixel
+        if (dst.length < pixelCount * 4) {
+            Logger.warn('FallbackCodec', `rgb565ToRGBA: dst buffer too small (${dst.length} < ${pixelCount * 4})`);
+            return false;
+        }
+        
         const lut5 = this._lut5to8;
         const lut6 = this._lut6to8;
-        const pixelCount = src.length >> 1;  // Faster than Math.floor(src.length / 2)
         
         // Use DataView for potentially faster 16-bit reads
         const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
@@ -101,19 +115,30 @@ export const FallbackCodec = {
             dst[dstIdx + 2] = lut5[pixel & 0x1F];          // B
             dst[dstIdx + 3] = 255;                          // A
         }
+        return true;
     },
     
     /**
      * Convert RGB565 to RGBA - Ultra-fast version using 32-bit writes
      * @param {Uint8Array} src - Source RGB565 data
      * @param {Uint8Array} dst - Destination RGBA buffer (must be 4-byte aligned)
+     * @returns {boolean} True if conversion succeeded
      */
     rgb565ToRGBA_Fast(src, dst) {
         if (!this._lut5to8) this.init();
         
+        const pixelCount = src.length >> 1;
+        
+        // Validate buffer sizes
+        if (src.length === 0) return true;
+        if (src.length < 2) return false;
+        if (dst.length < pixelCount * 4) {
+            Logger.warn('FallbackCodec', `rgb565ToRGBA_Fast: dst buffer too small`);
+            return false;
+        }
+        
         const lut5 = this._lut5to8;
         const lut6 = this._lut6to8;
-        const pixelCount = src.length >> 1;
         
         const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
         const dstView = new DataView(dst.buffer, dst.byteOffset, dst.byteLength);
@@ -129,18 +154,29 @@ export const FallbackCodec = {
             // Write as 32-bit: 0xAABBGGRR (little-endian RGBA)
             dstView.setUint32(i << 2, (0xFF << 24) | (b << 16) | (g << 8) | r, true);
         }
+        return true;
     },
     
     /**
      * Convert RGB555 to RGBA - OPTIMIZED
      * @param {Uint8Array} src - Source RGB555 data (2 bytes per pixel)
      * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     rgb555ToRGBA(src, dst) {
         if (!this._lut5to8) this.init();
         
-        const lut5 = this._lut5to8;
         const pixelCount = src.length >> 1;
+        
+        // Validate buffer sizes
+        if (src.length === 0) return true;
+        if (src.length < 2) return false;
+        if (dst.length < pixelCount * 4) {
+            Logger.warn('FallbackCodec', `rgb555ToRGBA: dst buffer too small`);
+            return false;
+        }
+        
+        const lut5 = this._lut5to8;
         const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
         
         for (let i = 0; i < pixelCount; i++) {
@@ -153,12 +189,22 @@ export const FallbackCodec = {
             dst[dstIdx + 2] = lut5[pixel & 0x1F];          // B
             dst[dstIdx + 3] = 255;                          // A
         }
+        return true;
     },
     
     /**
      * Convert 8-bit paletted to RGBA
+     * @param {Uint8Array} src - Source palette indices
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     palette8ToRGBA(src, dst) {
+        if (src.length === 0) return true;
+        if (dst.length < src.length * 4) {
+            Logger.warn('FallbackCodec', `palette8ToRGBA: dst buffer too small`);
+            return false;
+        }
+        
         const palette = this.palette;
         for (let i = 0, len = src.length; i < len; i++) {
             const idx = src[i] << 2;
@@ -168,28 +214,50 @@ export const FallbackCodec = {
             dst[dstIdx + 2] = palette[idx + 2];
             dst[dstIdx + 3] = palette[idx + 3];
         }
+        return true;
     },
     
     /**
      * Convert BGR24 to RGBA
+     * @param {Uint8Array} src - Source BGR data (3 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     bgr24ToRGBA(src, dst) {
         const pixelCount = (src.length / 3) | 0;
+        if (src.length === 0) return true;
+        if (src.length < 3) return false;  // Need at least one pixel
+        if (dst.length < pixelCount * 4) {
+            Logger.warn('FallbackCodec', `bgr24ToRGBA: dst buffer too small`);
+            return false;
+        }
+        
         for (let i = 0; i < pixelCount; i++) {
             const srcIdx = i * 3;
             const dstIdx = i << 2;
-            dst[dstIdx] = src[srcIdx + 2];
-            dst[dstIdx + 1] = src[srcIdx + 1];
-            dst[dstIdx + 2] = src[srcIdx];
+            dst[dstIdx] = src[srcIdx + 2];      // R (from B position in BGR)
+            dst[dstIdx + 1] = src[srcIdx + 1];  // G
+            dst[dstIdx + 2] = src[srcIdx];      // B (from R position in BGR)
             dst[dstIdx + 3] = 255;
         }
+        return true;
     },
     
     /**
      * Convert BGRA32 to RGBA - optimized with 32-bit operations
+     * @param {Uint8Array} src - Source BGRA data (4 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     bgra32ToRGBA(src, dst) {
         const pixelCount = src.length >> 2;
+        if (src.length === 0) return true;
+        if (src.length < 4) return false;  // Need at least one pixel
+        if (dst.length < pixelCount * 4) {
+            Logger.warn('FallbackCodec', `bgra32ToRGBA: dst buffer too small`);
+            return false;
+        }
+        
         const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
         const dstView = new DataView(dst.buffer, dst.byteOffset, dst.byteLength);
         
@@ -205,13 +273,30 @@ export const FallbackCodec = {
             
             dstView.setUint32(offset, (a << 24) | (b << 16) | (g << 8) | r, true);
         }
+        return true;
     },
     
     /**
      * Flip image vertically (in-place) - optimized
+     * @param {Uint8Array} data - Image data buffer
+     * @param {number} width - Image width in pixels
+     * @param {number} height - Image height in pixels
+     * @param {number} bytesPerPixel - Bytes per pixel (typically 4 for RGBA)
+     * @returns {boolean} True if flip succeeded
      */
     flipVertical(data, width, height, bytesPerPixel) {
+        if (width <= 0 || height <= 0 || bytesPerPixel <= 0) return false;
+        
         const rowSize = width * bytesPerPixel;
+        const expectedSize = rowSize * height;
+        
+        if (data.length < expectedSize) {
+            Logger.warn('FallbackCodec', `flipVertical: data buffer too small (${data.length} < ${expectedSize})`);
+            return false;
+        }
+        
+        if (height <= 1) return true;  // Nothing to flip
+        
         const temp = new Uint8Array(rowSize);
         const halfHeight = height >> 1;
         
@@ -223,6 +308,7 @@ export const FallbackCodec = {
             data.copyWithin(topOffset, bottomOffset, bottomOffset + rowSize);
             data.set(temp, bottomOffset);
         }
+        return true;
     },
     
     /**

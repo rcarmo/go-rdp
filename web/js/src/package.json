@@ -6,7 +6,9 @@
   "main": "index.js",
   "scripts": {
     "build": "esbuild index.js --bundle --outfile=../client.bundle.js --format=iife --global-name=RDP",
-    "build:min": "esbuild index.js --bundle --minify --outfile=../client.bundle.min.js --format=iife --global-name=RDP"
+    "build:min": "esbuild index.js --bundle --minify --outfile=../client.bundle.min.js --format=iife --global-name=RDP",
+    "test": "node --test codec-fallback.test.js",
+    "test:verbose": "node --test --test-reporter=spec codec-fallback.test.js"
   },
   "devDependencies": {
     "esbuild": "^0.20.0"

@@ -35,6 +35,8 @@ help:
 	@echo "    test        - Run unit tests with coverage"
 	@echo "    test-race   - Run tests with race detection"
 	@echo "    test-int    - Run integration tests"
+	@echo "    test-rfx    - Run RemoteFX codec tests"
+	@echo "    test-js     - Run JavaScript fallback codec tests"
 	@echo ""
 	@echo "  Development:"
 	@echo "    deps        - Download and install dependencies"
@@ -107,6 +109,11 @@ test-int:
 test-rfx:
 	@echo "Running RemoteFX codec tests..."
 	go test -v -race ./internal/codec/rfx/...
+
+.PHONY: test-js
+test-js:
+	@echo "Running JavaScript tests..."
+	cd web/js/src && node --test codec-fallback.test.js
 
 # Building
 .PHONY: build
