@@ -59,6 +59,19 @@ Environment variables:
 | `ENABLE_TLS` | `false` | Enable HTTPS for the web interface |
 | `TLS_CERT_FILE` | - | Path to TLS certificate |
 | `TLS_KEY_FILE` | - | Path to TLS private key |
+| `RDP_ENABLE_RFX` | `true` | Enable RemoteFX codec support |
+
+Command-line flags:
+
+| Flag | Description |
+|------|-------------|
+| `-host` | Server listen host (default: 0.0.0.0) |
+| `-port` | Server listen port (default: 8080) |
+| `-log-level` | Log level: debug, info, warn, error |
+| `-skip-tls-verify` | Skip TLS certificate validation |
+| `-tls-server-name` | Override TLS server name |
+| `-nla` | Enable Network Level Authentication |
+| `-no-rfx` | Disable RemoteFX codec support |
 
 See [docs/configuration.md](docs/configuration.md) for full configuration options.
 

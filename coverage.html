@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/rcarmo/rdp-html5/cmd/server/main.go (91.7%)</option>
+				<option value="file0">github.com/rcarmo/rdp-html5/cmd/server/main.go (91.5%)</option>
 				
 				<option value="file1">github.com/rcarmo/rdp-html5/internal/auth/credssp.go (95.7%)</option>
 				
@@ -103,7 +103,7 @@
 				
 				<option value="file23">github.com/rcarmo/rdp-html5/internal/codec/security.go (100.0%)</option>
 				
-				<option value="file24">github.com/rcarmo/rdp-html5/internal/config/config.go (91.6%)</option>
+				<option value="file24">github.com/rcarmo/rdp-html5/internal/config/config.go (90.8%)</option>
 				
 				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (69.5%)</option>
 				
@@ -311,6 +311,7 @@ type parsedArgs struct {
         skipTLS       bool
         tlsServerName string
         useNLA        bool
+        enableRFX     *bool // nil = use default, non-nil = override
 }
 
 // parseFlags parses command line flags and returns the parsed args.
@@ -320,7 +321,7 @@ func parseFlags() (parsedArgs, string) <span class="cov0" title="0">{
 }</span>
 
 // parseFlagsWithArgs parses the given arguments and returns the parsed args.
-func parseFlagsWithArgs(args []string) (parsedArgs, string) <span class="cov6" title="5">{
+func parseFlagsWithArgs(args []string) (parsedArgs, string) <span class="cov6" title="6">{
         fs := flag.NewFlagSet("server", flag.ContinueOnError)
         hostFlag := fs.String("host", "", "RDP HTML5 server host")
         portFlag := fs.String("port", "", "RDP HTML5 server port")
@@ -328,6 +329,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) <span class="cov6" t
         skipTLS := fs.Bool("skip-tls-verify", false, "skip TLS certificate validation")
         tlsServerName := fs.String("tls-server-name", "", "override TLS server name")
         useNLA := fs.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
+        noRFX := fs.Bool("no-rfx", false, "disable RemoteFX codec support")
         helpFlag := fs.Bool("help", false, "show help")
         versionFlag := fs.Bool("version", false, "show version")
 
@@ -338,18 +340,26 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) <span class="cov6" t
                 return parsedArgs{}, "help"
         }</span>
 
-        <span class="cov5" title="4">if *versionFlag </span><span class="cov1" title="1">{
+        <span class="cov6" title="5">if *versionFlag </span><span class="cov1" title="1">{
                 showVersion()
                 return parsedArgs{}, "version"
         }</span>
 
-        <span class="cov4" title="3">return parsedArgs{
+        // Handle RFX flag - only set if explicitly disabled
+        <span class="cov5" title="4">var enableRFX *bool
+        if *noRFX </span><span class="cov1" title="1">{
+                rfxValue := false
+                enableRFX = &amp;rfxValue
+        }</span>
+
+        <span class="cov5" title="4">return parsedArgs{
                 host:          strings.TrimSpace(*hostFlag),
                 port:          strings.TrimSpace(*portFlag),
                 logLevel:      strings.TrimSpace(*logLevelFlag),
                 skipTLS:       *skipTLS,
                 tlsServerName: strings.TrimSpace(*tlsServerName),
                 useNLA:        *useNLA,
+                enableRFX:     enableRFX,
         }, ""</span>
 }
 
@@ -362,6 +372,7 @@ func run(args parsedArgs) error <span class="cov3" title="2">{
                 SkipTLSValidation: args.skipTLS,
                 TLSServerName:     args.tlsServerName,
                 UseNLA:            args.useNLA,
+                EnableRFX:         args.enableRFX,
         }
 
         cfg, err := config.LoadWithOverrides(opts)
@@ -372,7 +383,11 @@ func run(args parsedArgs) error <span class="cov3" title="2">{
         <span class="cov3" title="2">setupLogging(cfg.Logging)
 
         server := createServer(cfg)
-        logging.Info("Starting server on %s:%s (TLS=%t)", cfg.Server.Host, cfg.Server.Port, cfg.Security.EnableTLS)
+        rfxStatus := "enabled"
+        if !cfg.RDP.EnableRFX </span><span class="cov0" title="0">{
+                rfxStatus = "disabled"
+        }</span>
+        <span class="cov3" title="2">logging.Info("Starting server on %s:%s (TLS=%t, RFX=%s)", cfg.Server.Host, cfg.Server.Port, cfg.Security.EnableTLS, rfxStatus)
 
         if err := startServer(server, cfg); err != nil &amp;&amp; !errors.Is(err, http.ErrServerClosed) </span><span class="cov1" title="1">{
                 return err
@@ -517,9 +532,11 @@ func showHelp() <span class="cov3" title="2">{
         fmt.Println("  -log-level          Set log level (debug, info, warn, error)")
         fmt.Println("  -skip-tls-verify    Skip TLS certificate validation")
         fmt.Println("  -tls-server-name    Override TLS server name")
+        fmt.Println("  -nla                Enable Network Level Authentication")
+        fmt.Println("  -no-rfx             Disable RemoteFX codec support")
         fmt.Println("  -version            Show version information")
         fmt.Println("  -help               Show this help message")
-        fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, SKIP_TLS_VALIDATION, TLS_SERVER_NAME")
+        fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, SKIP_TLS_VALIDATION, TLS_SERVER_NAME, RDP_ENABLE_RFX")
         fmt.Println("EXAMPLES: rdp-html5 -host 0.0.0.0 -port 8080")
 }</span>
 
@@ -5300,6 +5317,7 @@ type LoadOptions struct {
         SkipTLSValidation bool
         TLSServerName     string
         UseNLA            bool
+        EnableRFX         *bool // nil = use env/default, non-nil = override
 }
 
 // ServerConfig holds server-specific configuration
@@ -5319,6 +5337,7 @@ type RDPConfig struct {
         MaxHeight     int           `json:"maxHeight" env:"RDP_MAX_HEIGHT" default:"2160"`
         BufferSize    int           `json:"bufferSize" env:"RDP_BUFFER_SIZE" default:"65536"`
         Timeout       time.Duration `json:"timeout" env:"RDP_TIMEOUT" default:"10s"`
+        EnableRFX     bool          `json:"enableRFX" env:"RDP_ENABLE_RFX" default:"true"`
 }
 
 // SecurityConfig holds security-related configuration
@@ -5367,9 +5386,15 @@ func LoadWithOverrides(opts LoadOptions) (*Config, error) <span class="cov3" tit
         config.RDP.MaxHeight = getIntWithDefault("RDP_MAX_HEIGHT", 2160)
         config.RDP.BufferSize = getIntWithDefault("RDP_BUFFER_SIZE", 65536)
         config.RDP.Timeout = getDurationWithDefault("RDP_TIMEOUT", 10*time.Second)
+        // RFX enabled by default; use --no-rfx or RDP_ENABLE_RFX=false to disable
+        if opts.EnableRFX != nil </span><span class="cov0" title="0">{
+                config.RDP.EnableRFX = *opts.EnableRFX
+        }</span> else<span class="cov3" title="3"> {
+                config.RDP.EnableRFX = getBoolWithDefault("RDP_ENABLE_RFX", true)
+        }</span>
 
         // Security config
-        config.Security.AllowedOrigins = getStringSliceWithDefault("ALLOWED_ORIGINS", []string{})
+        <span class="cov3" title="3">config.Security.AllowedOrigins = getStringSliceWithDefault("ALLOWED_ORIGINS", []string{})
         config.Security.MaxConnections = getIntWithDefault("MAX_CONNECTIONS", 100)
         config.Security.EnableRateLimit = getBoolWithDefault("ENABLE_RATE_LIMIT", true)
         config.Security.RateLimitPerMinute = getIntWithDefault("RATE_LIMIT_PER_MINUTE", 60)
@@ -5501,13 +5526,13 @@ func getIntWithDefault(key string, defaultValue int) int <span class="cov9" titl
         <span class="cov9" title="20">return defaultValue</span>
 }
 
-func getBoolWithDefault(key string, defaultValue bool) bool <span class="cov8" title="19">{
+func getBoolWithDefault(key string, defaultValue bool) bool <span class="cov9" title="22">{
         if value := os.Getenv(key); value != "" </span><span class="cov3" title="3">{
                 if boolValue, err := strconv.ParseBool(value); err == nil </span><span class="cov2" title="2">{
                         return boolValue
                 }</span>
         }
-        <span class="cov8" title="17">return defaultValue</span>
+        <span class="cov9" title="20">return defaultValue</span>
 }
 
 func getDurationWithDefault(key string, defaultValue time.Duration) time.Duration <span class="cov8" title="15">{

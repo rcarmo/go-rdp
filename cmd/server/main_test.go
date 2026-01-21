@@ -590,6 +590,7 @@ func TestStartServerAlreadyInUse(t *testing.T) {
 
 func TestParsedArgsStruct(t *testing.T) {
 	// Test parsedArgs struct fields are accessible
+	rfxEnabled := true
 	args := parsedArgs{
 		host:          "localhost",
 		port:          "8080",
@@ -597,6 +598,7 @@ func TestParsedArgsStruct(t *testing.T) {
 		skipTLS:       true,
 		tlsServerName: "example.com",
 		useNLA:        true,
+		enableRFX:     &rfxEnabled,
 	}
 
 	assert.Equal(t, "localhost", args.host)
@@ -605,6 +607,8 @@ func TestParsedArgsStruct(t *testing.T) {
 	assert.True(t, args.skipTLS)
 	assert.Equal(t, "example.com", args.tlsServerName)
 	assert.True(t, args.useNLA)
+	require.NotNil(t, args.enableRFX)
+	assert.True(t, *args.enableRFX)
 }
 
 func TestRunWithValidConfig(t *testing.T) {
@@ -674,6 +678,7 @@ func TestParseFlagsWithArgs(t *testing.T) {
 			checkArgs: func(t *testing.T, args parsedArgs) {
 				assert.Empty(t, args.host)
 				assert.Empty(t, args.port)
+				assert.Nil(t, args.enableRFX)
 			},
 		},
 		{
@@ -696,6 +701,15 @@ func TestParseFlagsWithArgs(t *testing.T) {
 				assert.True(t, args.skipTLS)
 				assert.Equal(t, "server.local", args.tlsServerName)
 				assert.True(t, args.useNLA)
+			},
+		},
+		{
+			name:           "no-rfx flag disables RFX",
+			args:           []string{"-no-rfx"},
+			expectedAction: "",
+			checkArgs: func(t *testing.T, args parsedArgs) {
+				require.NotNil(t, args.enableRFX)
+				assert.False(t, *args.enableRFX)
 			},
 		},
 		{

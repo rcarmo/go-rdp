@@ -39,6 +39,7 @@ type parsedArgs struct {
 	skipTLS       bool
 	tlsServerName string
 	useNLA        bool
+	enableRFX     *bool // nil = use default, non-nil = override
 }
 
 // parseFlags parses command line flags and returns the parsed args.
@@ -56,6 +57,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 	skipTLS := fs.Bool("skip-tls-verify", false, "skip TLS certificate validation")
 	tlsServerName := fs.String("tls-server-name", "", "override TLS server name")
 	useNLA := fs.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
+	noRFX := fs.Bool("no-rfx", false, "disable RemoteFX codec support")
 	helpFlag := fs.Bool("help", false, "show help")
 	versionFlag := fs.Bool("version", false, "show version")
 
@@ -71,6 +73,13 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 		return parsedArgs{}, "version"
 	}
 
+	// Handle RFX flag - only set if explicitly disabled
+	var enableRFX *bool
+	if *noRFX {
+		rfxValue := false
+		enableRFX = &rfxValue
+	}
+
 	return parsedArgs{
 		host:          strings.TrimSpace(*hostFlag),
 		port:          strings.TrimSpace(*portFlag),
@@ -78,6 +87,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 		skipTLS:       *skipTLS,
 		tlsServerName: strings.TrimSpace(*tlsServerName),
 		useNLA:        *useNLA,
+		enableRFX:     enableRFX,
 	}, ""
 }
 
@@ -90,6 +100,7 @@ func run(args parsedArgs) error {
 		SkipTLSValidation: args.skipTLS,
 		TLSServerName:     args.tlsServerName,
 		UseNLA:            args.useNLA,
+		EnableRFX:         args.enableRFX,
 	}
 
 	cfg, err := config.LoadWithOverrides(opts)
@@ -100,7 +111,11 @@ func run(args parsedArgs) error {
 	setupLogging(cfg.Logging)
 
 	server := createServer(cfg)
-	logging.Info("Starting server on %s:%s (TLS=%t)", cfg.Server.Host, cfg.Server.Port, cfg.Security.EnableTLS)
+	rfxStatus := "enabled"
+	if !cfg.RDP.EnableRFX {
+		rfxStatus = "disabled"
+	}
+	logging.Info("Starting server on %s:%s (TLS=%t, RFX=%s)", cfg.Server.Host, cfg.Server.Port, cfg.Security.EnableTLS, rfxStatus)
 
 	if err := startServer(server, cfg); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
@@ -245,9 +260,11 @@ func showHelp() {
 	fmt.Println("  -log-level          Set log level (debug, info, warn, error)")
 	fmt.Println("  -skip-tls-verify    Skip TLS certificate validation")
 	fmt.Println("  -tls-server-name    Override TLS server name")
+	fmt.Println("  -nla                Enable Network Level Authentication")
+	fmt.Println("  -no-rfx             Disable RemoteFX codec support")
 	fmt.Println("  -version            Show version information")
 	fmt.Println("  -help               Show this help message")
-	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, SKIP_TLS_VALIDATION, TLS_SERVER_NAME")
+	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, SKIP_TLS_VALIDATION, TLS_SERVER_NAME, RDP_ENABLE_RFX")
 	fmt.Println("EXAMPLES: rdp-html5 -host 0.0.0.0 -port 8080")
 }
 
