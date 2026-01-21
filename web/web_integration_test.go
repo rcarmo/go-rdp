@@ -78,12 +78,7 @@ func TestWebInterfaceContentStructure(t *testing.T) {
 
 	// Test that required scripts are included
 	requiredScripts := []string{
-		"js/binary.js",
 		"js/client.bundle.min.js",
-		"js/input/keyboard.js",
-		"js/input/keymap.js",
-		"js/rle/wasm_exec.js",
-		"js/color.js",
 	}
 
 	for _, script := range requiredScripts {
