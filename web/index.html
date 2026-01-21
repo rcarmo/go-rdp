@@ -10,11 +10,12 @@
     <script src="js/binary.js?v=2"></script>
     <script src="js/rle/wasm_exec.js"></script>
     <script>
-        // Initialize Go WASM
+        // Initialize Go WASM (RLE + RFX codec)
+        // This will be replaced by WASMCodec.init() when using bundled client
         const go = new Go();
         WebAssembly.instantiateStreaming(fetch("js/rle/rle.wasm"), go.importObject).then((result) => {
             go.run(result.instance);
-            console.log("Go WASM RLE module initialized");
+            console.log("Go WASM codec initialized (RLE + RFX)");
         }).catch(err => {
             console.warn("Go WASM failed to load:", err);
         });
@@ -26,7 +27,7 @@
     <script src="js/input/keymap.js"></script>
     <script src="js/input/keyboard.js"></script>
     <script src="js/input/mouse.js"></script>
-    <script src="js/client.bundle.min.js?v=1"></script>
+    <script src="js/client.bundle.min.js?v=2"></script>
     <script src="js/color.js"></script>
     <style>
         :root {

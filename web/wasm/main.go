@@ -9,6 +9,7 @@ import (
 	"syscall/js"
 
 	"github.com/rcarmo/rdp-html5/internal/codec"
+	"github.com/rcarmo/rdp-html5/internal/codec/rfx"
 )
 
 // jsDecompressRLE16 is the JS wrapper for RLEDecompress16
@@ -192,6 +193,91 @@ func jsSetPalette(this js.Value, args []js.Value) interface{} {
 	return true
 }
 
+// RFX buffers (reused to avoid allocations)
+var (
+	rfxInputBuffer  = make([]byte, 65536)          // Max compressed tile size
+	rfxOutputBuffer = make([]byte, rfx.TileRGBASize) // 16384 bytes
+	rfxQuantBuffer  = make([]byte, 15)             // 3 quant tables × 5 bytes
+
+	// Coefficient buffers
+	rfxYCoeff  = make([]int16, rfx.TilePixels)
+	rfxCbCoeff = make([]int16, rfx.TilePixels)
+	rfxCrCoeff = make([]int16, rfx.TilePixels)
+)
+
+// jsDecodeRFXTile decodes a single RemoteFX tile
+// Returns: { x: pixelX, y: pixelY, width: 64, height: 64 } on success
+// Returns: null on error
+func jsDecodeRFXTile(this js.Value, args []js.Value) interface{} {
+	if len(args) < 2 {
+		return nil
+	}
+
+	srcArray := args[0]
+	dstArray := args[1]
+
+	srcLen := srcArray.Get("length").Int()
+	if srcLen > len(rfxInputBuffer) {
+		return nil
+	}
+
+	js.CopyBytesToGo(rfxInputBuffer[:srcLen], srcArray)
+
+	// Parse quant values from buffer (set separately via setRFXQuant)
+	quantY, _ := rfx.ParseQuantValues(rfxQuantBuffer[0:5])
+	quantCb, _ := rfx.ParseQuantValues(rfxQuantBuffer[5:10])
+	quantCr, _ := rfx.ParseQuantValues(rfxQuantBuffer[10:15])
+
+	if quantY == nil {
+		quantY = rfx.DefaultQuant()
+	}
+	if quantCb == nil {
+		quantCb = rfx.DefaultQuant()
+	}
+	if quantCr == nil {
+		quantCr = rfx.DefaultQuant()
+	}
+
+	// Decode using pre-allocated buffers
+	xIdx, yIdx, err := rfx.DecodeTileWithBuffers(
+		rfxInputBuffer[:srcLen],
+		quantY, quantCb, quantCr,
+		rfxYCoeff, rfxCbCoeff, rfxCrCoeff,
+		rfxOutputBuffer,
+	)
+
+	if err != nil {
+		return nil
+	}
+
+	js.CopyBytesToJS(dstArray, rfxOutputBuffer)
+
+	// Return result as array [x, y, width, height] - more efficient than map
+	return []interface{}{
+		int(xIdx) * rfx.TileSize,
+		int(yIdx) * rfx.TileSize,
+		rfx.TileSize,
+		rfx.TileSize,
+	}
+}
+
+// jsSetRFXQuant sets quantization values for subsequent decodes
+func jsSetRFXQuant(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		return false
+	}
+
+	quantArray := args[0]
+	quantLen := quantArray.Get("length").Int()
+
+	if quantLen > len(rfxQuantBuffer) {
+		quantLen = len(rfxQuantBuffer)
+	}
+
+	js.CopyBytesToGo(rfxQuantBuffer[:quantLen], quantArray)
+	return true
+}
+
 func main() {
 	c := make(chan struct{}, 0)
 
@@ -205,9 +291,11 @@ func main() {
 		"processBitmap":   js.FuncOf(jsProcessBitmap),
 		"decodeNSCodec":   js.FuncOf(jsDecodeNSCodec),
 		"setPalette":      js.FuncOf(jsSetPalette),
+		"decodeRFXTile":   js.FuncOf(jsDecodeRFXTile),
+		"setRFXQuant":     js.FuncOf(jsSetRFXQuant),
 	}))
 
-	println("Go WASM RLE module loaded")
+	println("Go WASM RLE module loaded (with RFX support)")
 
 	<-c
 }

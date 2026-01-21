@@ -5,6 +5,7 @@
  */
 
 import { Logger } from './logger.js';
+import { WASMCodec, RFXDecoder } from './wasm.js';
 
 /**
  * Graphics handling mixin - adds graphics functionality to Client
@@ -29,6 +30,9 @@ export const GraphicsMixin = {
         this.originalHeight = 0;
         this.resizeTimeout = null;
         
+        // RFX decoder instance
+        this.rfxDecoder = new RFXDecoder();
+        
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
     },
@@ -51,8 +55,8 @@ export const GraphicsMixin = {
         
         const paletteData = r.blob(numberColors * 3);
         
-        if (typeof goRLE !== 'undefined' && goRLE.setPalette) {
-            goRLE.setPalette(new Uint8Array(paletteData), numberColors);
+        if (WASMCodec.isReady()) {
+            WASMCodec.setPalette(new Uint8Array(paletteData), numberColors);
             Logger.debug("Palette", "Updated via WASM");
         } else {
             Logger.warn("Palette", "WASM not available");
@@ -96,9 +100,9 @@ export const GraphicsMixin = {
         
         let rgba = new Uint8ClampedArray(size * 4);
         
-        if (typeof goRLE !== 'undefined' && goRLE.processBitmap) {
+        if (WASMCodec.isReady()) {
             const srcData = new Uint8Array(bitmapData.bitmapDataStream);
-            const result = goRLE.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
+            const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
             
             if (result) {
                 this.ctx.putImageData(
@@ -342,6 +346,67 @@ export const GraphicsMixin = {
     clearCanvas() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.canvas.className = '';
+    },
+    
+    // ========================================
+    // RemoteFX (RFX) Support
+    // ========================================
+    
+    /**
+     * Handle RemoteFX surface command
+     * @param {Uint8Array} data - Surface command data
+     */
+    handleRFXSurface(data) {
+        if (!WASMCodec.isReady()) {
+            Logger.error("RFX", "WASM not loaded");
+            return;
+        }
+        
+        // TODO: Parse surface command header and extract tiles
+        // For now, this is a placeholder for future integration
+        Logger.debug("RFX", `Surface command received, ${data.length} bytes`);
+    },
+    
+    /**
+     * Set RFX quantization values
+     * @param {Uint8Array} quantY - 5 bytes
+     * @param {Uint8Array} quantCb - 5 bytes
+     * @param {Uint8Array} quantCr - 5 bytes
+     */
+    setRFXQuant(quantY, quantCb, quantCr) {
+        this.rfxDecoder.setQuant(quantY, quantCb, quantCr);
+    },
+    
+    /**
+     * Decode and render an RFX tile
+     * @param {Uint8Array} tileData - CBT_TILE block data
+     * @returns {boolean}
+     */
+    decodeRFXTile(tileData) {
+        return this.rfxDecoder.decodeTileToCanvas(tileData, this.ctx);
+    },
+    
+    /**
+     * Process multiple RFX tiles
+     * @param {Array<Uint8Array>} tiles - Array of tile data
+     */
+    processRFXTiles(tiles) {
+        let decoded = 0;
+        let failed = 0;
+        
+        for (const tileData of tiles) {
+            if (this.rfxDecoder.decodeTileToCanvas(tileData, this.ctx)) {
+                decoded++;
+            } else {
+                failed++;
+            }
+        }
+        
+        if (failed > 0) {
+            Logger.warn("RFX", `Decoded ${decoded} tiles, ${failed} failed`);
+        } else {
+            Logger.debug("RFX", `Decoded ${decoded} tiles`);
+        }
     }
 };
 

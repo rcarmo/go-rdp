@@ -103,6 +103,11 @@ test-int:
 	@echo "Running integration tests..."
 	go test -v -tags=integration ./...
 
+.PHONY: test-rfx
+test-rfx:
+	@echo "Running RemoteFX codec tests..."
+	go test -v -race ./internal/codec/rfx/...
+
 # Building
 .PHONY: build
 build: build-frontend build-backend

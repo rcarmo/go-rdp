@@ -22,6 +22,8 @@ var RDP = (() => {
   __export(src_exports, {
     Client: () => Client,
     Logger: () => Logger2,
+    RFXDecoder: () => RFXDecoder,
+    WASMCodec: () => WASMCodec,
     default: () => src_default
   });
 
@@ -646,6 +648,268 @@ var RDP = (() => {
     }
   };
 
+  // wasm.js
+  var WASMCodec = {
+    ready: false,
+    goInstance: null,
+    wasmInstance: null,
+    /**
+     * Initialize WASM module
+     * @param {string} wasmPath - Path to the WASM file
+     * @returns {Promise<boolean>}
+     */
+    async init(wasmPath = "js/rle/rle.wasm") {
+      if (this.ready) {
+        return true;
+      }
+      try {
+        if (typeof Go === "undefined") {
+          Logger2.error("WASM", "Go class not found. Include wasm_exec.js before initializing.");
+          return false;
+        }
+        this.goInstance = new Go();
+        let result;
+        if (typeof WebAssembly.instantiateStreaming === "function") {
+          try {
+            result = await WebAssembly.instantiateStreaming(
+              fetch(wasmPath),
+              this.goInstance.importObject
+            );
+          } catch (e) {
+            Logger2.warn("WASM", "Streaming failed, using array buffer fallback");
+            const response = await fetch(wasmPath);
+            const bytes = await response.arrayBuffer();
+            result = await WebAssembly.instantiate(bytes, this.goInstance.importObject);
+          }
+        } else {
+          const response = await fetch(wasmPath);
+          const bytes = await response.arrayBuffer();
+          result = await WebAssembly.instantiate(bytes, this.goInstance.importObject);
+        }
+        this.wasmInstance = result.instance;
+        this.goInstance.run(this.wasmInstance);
+        if (typeof goRLE === "undefined") {
+          Logger2.error("WASM", "goRLE not initialized after running WASM");
+          return false;
+        }
+        this.ready = true;
+        Logger2.info("WASM", "Codec module initialized (RLE + RFX)");
+        return true;
+      } catch (error) {
+        Logger2.error("WASM", `Failed to initialize: ${error.message}`);
+        return false;
+      }
+    },
+    /**
+     * Check if WASM is ready
+     * @returns {boolean}
+     */
+    isReady() {
+      return this.ready && typeof goRLE !== "undefined";
+    },
+    // ========================================
+    // RLE and Bitmap functions
+    // ========================================
+    /**
+     * Decompress RLE16 data
+     * @param {Uint8Array} src - Compressed data
+     * @param {Uint8Array} dst - Output buffer
+     * @param {number} width - Image width
+     * @param {number} rowDelta - Row stride in bytes
+     * @returns {boolean}
+     */
+    decompressRLE16(src, dst, width, rowDelta) {
+      if (!this.isReady())
+        return false;
+      return goRLE.decompressRLE16(src, dst, width, rowDelta);
+    },
+    /**
+     * Flip image vertically
+     * @param {Uint8Array} data - Image data (modified in place)
+     * @param {number} width
+     * @param {number} height
+     * @param {number} bytesPerPixel
+     */
+    flipVertical(data, width, height, bytesPerPixel) {
+      if (!this.isReady())
+        return;
+      goRLE.flipVertical(data, width, height, bytesPerPixel);
+    },
+    /**
+     * Convert RGB565 to RGBA
+     * @param {Uint8Array} src
+     * @param {Uint8Array} dst
+     */
+    rgb565toRGBA(src, dst) {
+      if (!this.isReady())
+        return;
+      goRLE.rgb565toRGBA(src, dst);
+    },
+    /**
+     * Convert BGR24 to RGBA
+     * @param {Uint8Array} src
+     * @param {Uint8Array} dst
+     */
+    bgr24toRGBA(src, dst) {
+      if (!this.isReady())
+        return;
+      goRLE.bgr24toRGBA(src, dst);
+    },
+    /**
+     * Convert BGRA32 to RGBA
+     * @param {Uint8Array} src
+     * @param {Uint8Array} dst
+     */
+    bgra32toRGBA(src, dst) {
+      if (!this.isReady())
+        return;
+      goRLE.bgra32toRGBA(src, dst);
+    },
+    /**
+     * Process a complete bitmap (decompress + convert)
+     * @param {Uint8Array} src - Source bitmap data
+     * @param {number} width
+     * @param {number} height
+     * @param {number} bpp - Bits per pixel
+     * @param {boolean} isCompressed
+     * @param {Uint8Array} dst - Output RGBA buffer
+     * @param {number} rowDelta
+     * @returns {boolean}
+     */
+    processBitmap(src, width, height, bpp, isCompressed, dst, rowDelta) {
+      if (!this.isReady())
+        return false;
+      return goRLE.processBitmap(src, width, height, bpp, isCompressed, dst, rowDelta);
+    },
+    /**
+     * Decode NSCodec data to RGBA
+     * @param {Uint8Array} src
+     * @param {number} width
+     * @param {number} height
+     * @param {Uint8Array} dst
+     * @returns {boolean}
+     */
+    decodeNSCodec(src, width, height, dst) {
+      if (!this.isReady())
+        return false;
+      return goRLE.decodeNSCodec(src, width, height, dst);
+    },
+    /**
+     * Set palette colors
+     * @param {Uint8Array} data - Palette data (RGB triples)
+     * @param {number} numColors
+     * @returns {boolean}
+     */
+    setPalette(data, numColors) {
+      if (!this.isReady())
+        return false;
+      return goRLE.setPalette(data, numColors);
+    },
+    // ========================================
+    // RemoteFX (RFX) functions
+    // ========================================
+    /**
+     * Set RFX quantization values
+     * @param {Uint8Array} quantData - 15 bytes (3 tables × 5 bytes)
+     * @returns {boolean}
+     */
+    setRFXQuant(quantData) {
+      if (!this.isReady())
+        return false;
+      return goRLE.setRFXQuant(quantData);
+    },
+    /**
+     * Decode a single RFX tile
+     * @param {Uint8Array} tileData - Compressed tile data (CBT_TILE block)
+     * @param {Uint8Array} outputBuffer - Output buffer (16384 bytes for 64x64 RGBA)
+     * @returns {Object|null} { x, y, width, height } or null on error
+     */
+    decodeRFXTile(tileData, outputBuffer) {
+      if (!this.isReady())
+        return null;
+      const result = goRLE.decodeRFXTile(tileData, outputBuffer);
+      if (result === null || result === void 0) {
+        return null;
+      }
+      return {
+        x: result[0],
+        y: result[1],
+        width: result[2],
+        height: result[3]
+      };
+    },
+    /**
+     * RFX tile constants
+     */
+    RFX_TILE_SIZE: 64,
+    RFX_TILE_PIXELS: 4096,
+    RFX_TILE_RGBA_SIZE: 16384
+  };
+  var RFXDecoder = class {
+    constructor() {
+      this.tileBuffer = new Uint8Array(WASMCodec.RFX_TILE_RGBA_SIZE);
+      this.quantBuffer = new Uint8Array(15);
+      this.quantSet = false;
+    }
+    /**
+     * Set quantization values for subsequent decodes
+     * @param {Uint8Array} quantY - 5 bytes for Y component
+     * @param {Uint8Array} quantCb - 5 bytes for Cb component  
+     * @param {Uint8Array} quantCr - 5 bytes for Cr component
+     */
+    setQuant(quantY, quantCb, quantCr) {
+      this.quantBuffer.set(quantY, 0);
+      this.quantBuffer.set(quantCb, 5);
+      this.quantBuffer.set(quantCr, 10);
+      this.quantSet = WASMCodec.setRFXQuant(this.quantBuffer);
+    }
+    /**
+     * Set quantization from raw buffer (15 bytes)
+     * @param {Uint8Array} quantData
+     */
+    setQuantRaw(quantData) {
+      this.quantBuffer.set(quantData.subarray(0, 15));
+      this.quantSet = WASMCodec.setRFXQuant(this.quantBuffer);
+    }
+    /**
+     * Decode a tile and return result
+     * @param {Uint8Array} tileData - CBT_TILE block data
+     * @returns {Object|null} { x, y, width, height, rgba }
+     */
+    decodeTile(tileData) {
+      const result = WASMCodec.decodeRFXTile(tileData, this.tileBuffer);
+      if (!result) {
+        return null;
+      }
+      return {
+        x: result.x,
+        y: result.y,
+        width: result.width,
+        height: result.height,
+        rgba: this.tileBuffer
+      };
+    }
+    /**
+     * Decode a tile and render directly to canvas context
+     * @param {Uint8Array} tileData - CBT_TILE block data
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @returns {boolean}
+     */
+    decodeTileToCanvas(tileData, ctx) {
+      const result = WASMCodec.decodeRFXTile(tileData, this.tileBuffer);
+      if (!result) {
+        return false;
+      }
+      const imageData = new ImageData(
+        new Uint8ClampedArray(this.tileBuffer.buffer),
+        result.width,
+        result.height
+      );
+      ctx.putImageData(imageData, result.x, result.y);
+      return true;
+    }
+  };
+
   // graphics.js
   var GraphicsMixin = {
     /**
@@ -662,6 +926,7 @@ var RDP = (() => {
       this.originalWidth = 0;
       this.originalHeight = 0;
       this.resizeTimeout = null;
+      this.rfxDecoder = new RFXDecoder();
       this.handleResize = this.handleResize.bind(this);
     },
     /**
@@ -678,8 +943,8 @@ var RDP = (() => {
       }
       Logger2.info("Palette", `Received ${numberColors} colors`);
       const paletteData = r.blob(numberColors * 3);
-      if (typeof goRLE !== "undefined" && goRLE.setPalette) {
-        goRLE.setPalette(new Uint8Array(paletteData), numberColors);
+      if (WASMCodec.isReady()) {
+        WASMCodec.setPalette(new Uint8Array(paletteData), numberColors);
         Logger2.debug("Palette", "Updated via WASM");
       } else {
         Logger2.warn("Palette", "WASM not available");
@@ -716,9 +981,9 @@ var RDP = (() => {
       const rowDelta = width * bytesPerPixel;
       const isCompressed = bitmapData.isCompressed();
       let rgba = new Uint8ClampedArray(size * 4);
-      if (typeof goRLE !== "undefined" && goRLE.processBitmap) {
+      if (WASMCodec.isReady()) {
         const srcData = new Uint8Array(bitmapData.bitmapDataStream);
-        const result = goRLE.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
+        const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
         if (result) {
           this.ctx.putImageData(
             new ImageData(rgba, width, height),
@@ -925,6 +1190,57 @@ var RDP = (() => {
     clearCanvas() {
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       this.canvas.className = "";
+    },
+    // ========================================
+    // RemoteFX (RFX) Support
+    // ========================================
+    /**
+     * Handle RemoteFX surface command
+     * @param {Uint8Array} data - Surface command data
+     */
+    handleRFXSurface(data) {
+      if (!WASMCodec.isReady()) {
+        Logger2.error("RFX", "WASM not loaded");
+        return;
+      }
+      Logger2.debug("RFX", `Surface command received, ${data.length} bytes`);
+    },
+    /**
+     * Set RFX quantization values
+     * @param {Uint8Array} quantY - 5 bytes
+     * @param {Uint8Array} quantCb - 5 bytes
+     * @param {Uint8Array} quantCr - 5 bytes
+     */
+    setRFXQuant(quantY, quantCb, quantCr) {
+      this.rfxDecoder.setQuant(quantY, quantCb, quantCr);
+    },
+    /**
+     * Decode and render an RFX tile
+     * @param {Uint8Array} tileData - CBT_TILE block data
+     * @returns {boolean}
+     */
+    decodeRFXTile(tileData) {
+      return this.rfxDecoder.decodeTileToCanvas(tileData, this.ctx);
+    },
+    /**
+     * Process multiple RFX tiles
+     * @param {Array<Uint8Array>} tiles - Array of tile data
+     */
+    processRFXTiles(tiles) {
+      let decoded = 0;
+      let failed = 0;
+      for (const tileData of tiles) {
+        if (this.rfxDecoder.decodeTileToCanvas(tileData, this.ctx)) {
+          decoded++;
+        } else {
+          failed++;
+        }
+      }
+      if (failed > 0) {
+        Logger2.warn("RFX", `Decoded ${decoded} tiles, ${failed} failed`);
+      } else {
+        Logger2.debug("RFX", `Decoded ${decoded} tiles`);
+      }
     }
   };
 
@@ -1429,9 +1745,6 @@ var RDP = (() => {
     const enableAudio = enableAudioEl ? enableAudioEl.checked : false;
     Logger2.info("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
     const url = new URL(this.websocketURL);
-    url.searchParams.set("host", host);
-    url.searchParams.set("user", user);
-    url.searchParams.set("password", password);
     url.searchParams.set("width", screenWidth);
     url.searchParams.set("height", screenHeight);
     url.searchParams.set("colorDepth", colorDepth);
@@ -1444,9 +1757,20 @@ var RDP = (() => {
       this.enableAudio();
       Logger2.info("Audio", "Audio redirection enabled");
     }
+    this._pendingCredentials = { host, user, password };
     this.socket = new WebSocket(url.toString());
     this.socket.onopen = () => {
-      Logger2.info("Connection", "WebSocket opened");
+      Logger2.info("Connection", "WebSocket opened, sending credentials");
+      if (this._pendingCredentials) {
+        const credMsg = JSON.stringify({
+          type: "credentials",
+          host: this._pendingCredentials.host,
+          user: this._pendingCredentials.user,
+          password: this._pendingCredentials.password
+        });
+        this.socket.send(credMsg);
+        this._pendingCredentials = null;
+      }
       this.initialize();
     };
     this.socket.onmessage = (e) => {
@@ -1622,7 +1946,12 @@ var RDP = (() => {
         return;
       }
       if (message.type === "capabilities") {
+        if (message.logLevel) {
+          Logger2.setLevel(message.logLevel);
+          Logger2.info("Config", `Log level synced: ${message.logLevel}`);
+        }
         Logger2.info("Capabilities", `Server: codecs=${message.codecs?.join(",") || "none"}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
+        this.serverCapabilities = message;
         return;
       }
     } catch (e) {
@@ -1685,6 +2014,8 @@ var RDP = (() => {
   if (typeof window !== "undefined") {
     window.Client = Client;
     window.Logger = Logger2;
+    window.WASMCodec = WASMCodec;
+    window.RFXDecoder = RFXDecoder;
   }
   var src_default = Client;
   return __toCommonJS(src_exports);
