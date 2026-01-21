@@ -32,6 +32,7 @@ type LoadOptions struct {
 	ConfigFile        string
 	SkipTLSValidation bool
 	TLSServerName     string
+	AllowAnyTLSServer bool
 	UseNLA            bool
 	EnableRFX         *bool // nil = use env/default, non-nil = override
 }
@@ -68,6 +69,7 @@ type SecurityConfig struct {
 	MinTLSVersion      string   `json:"minTLSVersion" env:"MIN_TLS_VERSION" default:"1.2"`
 	SkipTLSValidation  bool     `json:"skipTLSValidation" env:"SKIP_TLS_VALIDATION" default:"false"`
 	TLSServerName      string   `json:"tlsServerName" env:"TLS_SERVER_NAME" default:""`
+	AllowAnyTLSServer  bool     `json:"allowAnyTLSServer" env:"TLS_ALLOW_ANY_SERVER_NAME" default:"false"`
 	UseNLA             bool     `json:"useNLA" env:"USE_NLA" default:"true"`
 }
 
@@ -120,6 +122,7 @@ func LoadWithOverrides(opts LoadOptions) (*Config, error) {
 	config.Security.MinTLSVersion = getEnvWithDefault("MIN_TLS_VERSION", "1.2")
 	config.Security.SkipTLSValidation = getBoolWithDefault("SKIP_TLS_VALIDATION", false) || opts.SkipTLSValidation
 	config.Security.TLSServerName = getOverrideOrEnv(opts.TLSServerName, "TLS_SERVER_NAME", "")
+	config.Security.AllowAnyTLSServer = getBoolWithDefault("TLS_ALLOW_ANY_SERVER_NAME", false) || opts.AllowAnyTLSServer
 	// NLA enabled by default for security; set USE_NLA=false to disable
 	config.Security.UseNLA = getBoolWithDefault("USE_NLA", true)
 	if opts.UseNLA {

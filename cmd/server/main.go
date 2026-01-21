@@ -37,6 +37,7 @@ type parsedArgs struct {
 	port          string
 	logLevel      string
 	skipTLS       bool
+	allowAnyTLS   bool
 	tlsServerName string
 	useNLA        bool
 	enableRFX     *bool // nil = use default, non-nil = override
@@ -55,6 +56,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 	portFlag := fs.String("port", "", "RDP HTML5 server port")
 	logLevelFlag := fs.String("log-level", "", "log level (debug, info, warn, error)")
 	skipTLS := fs.Bool("skip-tls-verify", false, "skip TLS certificate validation")
+	allowAnyTLS := fs.Bool("tls-allow-any-server-name", false, "allow overriding server name to any host (disables SNI enforcement)")
 	tlsServerName := fs.String("tls-server-name", "", "override TLS server name")
 	useNLA := fs.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
 	noRFX := fs.Bool("no-rfx", false, "disable RemoteFX codec support")
@@ -85,6 +87,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 		port:          strings.TrimSpace(*portFlag),
 		logLevel:      strings.TrimSpace(*logLevelFlag),
 		skipTLS:       *skipTLS,
+		allowAnyTLS:   *allowAnyTLS,
 		tlsServerName: strings.TrimSpace(*tlsServerName),
 		useNLA:        *useNLA,
 		enableRFX:     enableRFX,
@@ -98,6 +101,7 @@ func run(args parsedArgs) error {
 		Port:              args.port,
 		LogLevel:          args.logLevel,
 		SkipTLSValidation: args.skipTLS,
+		AllowAnyTLSServer: args.allowAnyTLS,
 		TLSServerName:     args.tlsServerName,
 		UseNLA:            args.useNLA,
 		EnableRFX:         args.enableRFX,

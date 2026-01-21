@@ -15,6 +15,7 @@ func (c *Client) StartTLS() error {
 	// Use client-specific TLS configuration if set, otherwise fall back to global config
 	insecureSkipVerify := c.skipTLSValidation
 	serverName := c.tlsServerName
+	allowAnyServer := false
 	minTLSVersion := "1.2" // default
 
 	// Pull server-wide config when available so flag/env overrides are honored
@@ -34,12 +35,14 @@ func (c *Client) StartTLS() error {
 		if serverName == "" {
 			serverName = cfg.Security.TLSServerName
 		}
+		allowAnyServer = cfg.Security.AllowAnyTLSServer
 		if cfg.Security.MinTLSVersion != "" {
 			minTLSVersion = cfg.Security.MinTLSVersion
 		}
 	}
 
-	if serverName == "" {
+	// If not explicitly allowed, derive ServerName from target host
+	if serverName == "" && !allowAnyServer {
 		serverName = c.getServerName()
 	}
 
@@ -56,9 +59,8 @@ func (c *Client) StartTLS() error {
 		ServerName:         serverName,
 	}
 
-	// When skipping TLS validation, ensure we have a ServerName
-	// If no ServerName is provided and we're skipping validation, use a fallback
-	if tlsConfig.InsecureSkipVerify && tlsConfig.ServerName == "" {
+	// When skipping validation or allowing any server, ensure we still set an SNI value
+	if (tlsConfig.InsecureSkipVerify || allowAnyServer) && tlsConfig.ServerName == "" {
 		// Try to extract hostname from the connection address
 		if c.conn != nil {
 			remoteAddr := c.conn.RemoteAddr().String()

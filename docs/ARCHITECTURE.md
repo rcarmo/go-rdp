@@ -796,6 +796,7 @@ type LoggingConfig struct {
 | Port | `-port` | `SERVER_PORT` | `8080` |
 | Log Level | `-log-level` | `LOG_LEVEL` | `info` |
 | Skip TLS | `-skip-tls-verify` | `SKIP_TLS_VALIDATION` | `false` |
+| Allow any SNI | `-tls-allow-any-server-name` | `TLS_ALLOW_ANY_SERVER_NAME` | `false` |
 | Use NLA | `-nla` | `USE_NLA` | `true` |
 
 ---

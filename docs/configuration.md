@@ -87,8 +87,9 @@ Options:
   -host              Server listen host (default: 0.0.0.0)
   -port              Server listen port (default: 8080)
   -log-level         Log level: debug, info, warn, error
-  -skip-tls-verify   Skip TLS certificate validation
-  -tls-server-name   Override TLS server name
+  -skip-tls-verify           Skip TLS certificate validation
+  -tls-server-name           Override TLS server name (SNI)
+  -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)
   -nla               Enable Network Level Authentication
   -no-rfx            Disable RemoteFX codec support
   -help              Show help message
