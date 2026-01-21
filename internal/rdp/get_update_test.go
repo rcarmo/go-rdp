@@ -30,9 +30,9 @@ func TestUpdateCounter(t *testing.T) {
 
 func TestPendingSlowPathUpdate_InitiallyNil(t *testing.T) {
 	// The pendingSlowPathUpdate should be nil initially (or after consumed)
-	// We can't really test this without running GetUpdate, but we can at least
-	// verify the variable type is correct
-	assert.Nil(t, pendingSlowPathUpdate)
+	// Create a client and verify its pendingSlowPathUpdate is nil
+	client := &Client{}
+	assert.Nil(t, client.pendingSlowPathUpdate)
 }
 
 func TestClient_handleSlowPathGraphicsUpdate_Bitmap(t *testing.T) {

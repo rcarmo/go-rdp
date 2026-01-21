@@ -73,14 +73,16 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	defer cancel()
 
 	width, err := strconv.Atoi(r.URL.Query().Get("width"))
-	if err != nil {
-		logging.Error("Get width: %v", err)
+	if err != nil || width <= 0 || width > 8192 {
+		logging.Error("Invalid width: %v (must be 1-8192)", r.URL.Query().Get("width"))
+		sendError(wsConn, "Invalid width parameter")
 		return
 	}
 
 	height, err := strconv.Atoi(r.URL.Query().Get("height"))
-	if err != nil {
-		logging.Error("Get height: %v", err)
+	if err != nil || height <= 0 || height > 8192 {
+		logging.Error("Invalid height: %v (must be 1-8192)", r.URL.Query().Get("height"))
+		sendError(wsConn, "Invalid height parameter")
 		return
 	}
 
@@ -190,6 +192,11 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) {
 	defer cancel()
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Error("Panic in wsToRdp: %v", r)
+		}
+	}()
 
 	for {
 		select {
@@ -217,6 +224,12 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
 var wsMutex sync.Mutex
 
 func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Error("Panic in rdpToWs: %v", r)
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():

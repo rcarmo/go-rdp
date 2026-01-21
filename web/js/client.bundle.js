@@ -161,7 +161,7 @@ var RDP = (() => {
      */
     saveSession() {
       try {
-        const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toUTCString();
+        const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3).toUTCString();
         document.cookie = `rdp_host=${encodeURIComponent(this.hostEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
         document.cookie = `rdp_user=${encodeURIComponent(this.userEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
       } catch (e) {
@@ -234,23 +234,16 @@ var RDP = (() => {
       url.searchParams.set("width", this.canvas.width);
       url.searchParams.set("height", this.canvas.height);
       url.searchParams.set("sessionId", this.sessionId);
-      this._pendingReconnectCredentials = {
-        host: this.hostEl.value,
-        user: this.userEl.value,
-        password: this.passwordEl.value || ""
-      };
+      const password = this.passwordEl ? this.passwordEl.value : "";
       this.socket = new WebSocket(url.toString());
       this.socket.onopen = () => {
-        if (this._pendingReconnectCredentials) {
-          const credMsg = JSON.stringify({
-            type: "credentials",
-            host: this._pendingReconnectCredentials.host,
-            user: this._pendingReconnectCredentials.user,
-            password: this._pendingReconnectCredentials.password
-          });
-          this.socket.send(credMsg);
-          this._pendingReconnectCredentials = null;
-        }
+        const credMsg = JSON.stringify({
+          type: "credentials",
+          host: this.hostEl.value,
+          user: this.userEl.value,
+          password
+        });
+        this.socket.send(credMsg);
         this.initialize();
       };
       this.socket.onmessage = (e) => {

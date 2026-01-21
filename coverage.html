@@ -105,7 +105,7 @@
 				
 				<option value="file24">github.com/rcarmo/rdp-html5/internal/config/config.go (90.8%)</option>
 				
-				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (69.5%)</option>
+				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (69.7%)</option>
 				
 				<option value="file26">github.com/rcarmo/rdp-html5/internal/logging/logging.go (88.6%)</option>
 				
@@ -5649,18 +5649,20 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
         defer cancel()
 
         width, err := strconv.Atoi(r.URL.Query().Get("width"))
-        if err != nil </span><span class="cov2" title="2">{
-                logging.Error("Get width: %v", err)
+        if err != nil || width &lt;= 0 || width &gt; 8192 </span><span class="cov4" title="5">{
+                logging.Error("Invalid width: %v (must be 1-8192)", r.URL.Query().Get("width"))
+                sendError(wsConn, "Invalid width parameter")
                 return
         }</span>
 
-        <span class="cov6" title="17">height, err := strconv.Atoi(r.URL.Query().Get("height"))
-        if err != nil </span><span class="cov2" title="2">{
-                logging.Error("Get height: %v", err)
+        <span class="cov5" title="14">height, err := strconv.Atoi(r.URL.Query().Get("height"))
+        if err != nil || height &lt;= 0 || height &gt; 8192 </span><span class="cov2" title="2">{
+                logging.Error("Invalid height: %v (must be 1-8192)", r.URL.Query().Get("height"))
+                sendError(wsConn, "Invalid height parameter")
                 return
         }</span>
 
-        <span class="cov6" title="15">colorDepth := 16 // default to 16-bit
+        <span class="cov5" title="12">colorDepth := 16 // default to 16-bit
         if cdStr := r.URL.Query().Get("colorDepth"); cdStr != "" </span><span class="cov4" title="7">{
                 if cd, err := strconv.Atoi(cdStr); err == nil &amp;&amp; (cd == 8 || cd == 15 || cd == 16 || cd == 24 || cd == 32) </span><span class="cov4" title="6">{
                         colorDepth = cd
@@ -5668,7 +5670,7 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
         }
 
         // Check if NLA should be disabled for this connection
-        <span class="cov6" title="15">disableNLA := r.URL.Query().Get("disableNLA") == "true"
+        <span class="cov5" title="12">disableNLA := r.URL.Query().Get("disableNLA") == "true"
 
         // Check if audio should be enabled
         enableAudio := r.URL.Query().Get("audio") == "true"
@@ -5682,8 +5684,8 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
                 return
         }</span>
         
-        <span class="cov6" title="15">var credMsg []byte
-        if err := websocket.Message.Receive(wsConn, &amp;credMsg); err != nil </span><span class="cov6" title="15">{
+        <span class="cov5" title="12">var credMsg []byte
+        if err := websocket.Message.Receive(wsConn, &amp;credMsg); err != nil </span><span class="cov5" title="12">{
                 logging.Error("Receive credentials: %v", err)
                 sendError(wsConn, "Failed to receive credentials")
                 return
@@ -5766,8 +5768,13 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) <span class="cov5" title="11">{
         defer cancel()
+        defer func() </span><span class="cov5" title="11">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        logging.Error("Panic in wsToRdp: %v", r)
+                }</span>
+        }()
 
-        for </span><span class="cov8" title="67">{
+        <span class="cov5" title="11">for </span><span class="cov8" title="67">{
                 select </span>{
                 case &lt;-ctx.Done():<span class="cov1" title="1">
                         return</span>
@@ -5793,7 +5800,13 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
 var wsMutex sync.Mutex
 
 func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) <span class="cov5" title="13">{
-        for </span><span class="cov10" title="125">{
+        defer func() </span><span class="cov5" title="13">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        logging.Error("Panic in rdpToWs: %v", r)
+                }</span>
+        }()
+
+        <span class="cov5" title="13">for </span><span class="cov10" title="125">{
                 select </span>{
                 case &lt;-ctx.Done():<span class="cov1" title="1">
                         return</span>
@@ -5876,7 +5889,7 @@ func codecListToJSON(codecs []string) string <span class="cov5" title="11">{
 }
 
 // sendError sends an error message to the client via WebSocket
-func sendError(wsConn *websocket.Conn, message string) <span class="cov6" title="15">{
+func sendError(wsConn *websocket.Conn, message string) <span class="cov6" title="19">{
         errMsg := fmt.Sprintf(`{"type":"error","message":"%s"}`, message)
         if err := websocket.Message.Send(wsConn, errMsg); err != nil </span><span class="cov0" title="0">{
                 logging.Error("Failed to send error message: %v", err)
@@ -14115,6 +14128,9 @@ type Client struct {
 
         // Audio handler
         audioHandler *AudioHandler
+
+        // Pending slow-path update (per-client, not global)
+        pendingSlowPathUpdate *Update
 }
 
 const (
@@ -14649,14 +14665,11 @@ import (
 
 var updateCounter int
 
-// pendingSlowPathUpdate stores a slow-path update converted to fastpath format
-var pendingSlowPathUpdate *Update
-
 func (c *Client) GetUpdate() (*Update, error) <span class="cov0" title="0">{
         // If we have a pending slow-path update, return it first
-        if pendingSlowPathUpdate != nil </span><span class="cov0" title="0">{
-                update := pendingSlowPathUpdate
-                pendingSlowPathUpdate = nil
+        if c.pendingSlowPathUpdate != nil </span><span class="cov0" title="0">{
+                update := c.pendingSlowPathUpdate
+                c.pendingSlowPathUpdate = nil
                 return update, nil
         }</span>
 

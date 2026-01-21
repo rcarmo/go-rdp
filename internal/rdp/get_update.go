@@ -14,14 +14,11 @@ import (
 
 var updateCounter int
 
-// pendingSlowPathUpdate stores a slow-path update converted to fastpath format
-var pendingSlowPathUpdate *Update
-
 func (c *Client) GetUpdate() (*Update, error) {
 	// If we have a pending slow-path update, return it first
-	if pendingSlowPathUpdate != nil {
-		update := pendingSlowPathUpdate
-		pendingSlowPathUpdate = nil
+	if c.pendingSlowPathUpdate != nil {
+		update := c.pendingSlowPathUpdate
+		c.pendingSlowPathUpdate = nil
 		return update, nil
 	}
 

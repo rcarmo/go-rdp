@@ -58,7 +58,8 @@ export const SessionMixin = {
      */
     saveSession() {
         try {
-            const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+            // 7-day expiry for session cookies (not password - just host/user)
+            const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
             document.cookie = `rdp_host=${encodeURIComponent(this.hostEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
             document.cookie = `rdp_user=${encodeURIComponent(this.userEl.value)}; expires=${expires}; path=/; SameSite=Strict`;
         } catch (e) {
@@ -140,26 +141,19 @@ export const SessionMixin = {
         url.searchParams.set('height', this.canvas.height);
         url.searchParams.set('sessionId', this.sessionId);
         
-        // Store credentials to send after connection opens
-        this._pendingReconnectCredentials = {
-            host: this.hostEl.value,
-            user: this.userEl.value,
-            password: this.passwordEl.value || ''
-        };
+        // Get password from input (don't persist it)
+        const password = this.passwordEl ? this.passwordEl.value : '';
 
         this.socket = new WebSocket(url.toString());
         this.socket.onopen = () => {
             // Send credentials securely via WebSocket message (not URL)
-            if (this._pendingReconnectCredentials) {
-                const credMsg = JSON.stringify({
-                    type: 'credentials',
-                    host: this._pendingReconnectCredentials.host,
-                    user: this._pendingReconnectCredentials.user,
-                    password: this._pendingReconnectCredentials.password
-                });
-                this.socket.send(credMsg);
-                this._pendingReconnectCredentials = null;
-            }
+            const credMsg = JSON.stringify({
+                type: 'credentials',
+                host: this.hostEl.value,
+                user: this.userEl.value,
+                password: password
+            });
+            this.socket.send(credMsg);
             this.initialize();
         };
         this.socket.onmessage = (e) => {

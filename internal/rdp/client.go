@@ -56,6 +56,9 @@ type Client struct {
 
 	// Audio handler
 	audioHandler *AudioHandler
+
+	// Pending slow-path update (per-client, not global)
+	pendingSlowPathUpdate *Update
 }
 
 const (
