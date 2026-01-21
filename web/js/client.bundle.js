@@ -1035,14 +1035,23 @@ var RDP = (() => {
      * Convert RGB565 to RGBA - OPTIMIZED for performance
      * This is the primary fast path for 16-bit fallback
      * @param {Uint8Array} src - Source RGB565 data (2 bytes per pixel, little-endian)
-     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @param {Uint8Array} dst - Destination RGBA buffer (must be 4x pixel count)
+     * @returns {boolean} True if conversion succeeded
      */
     rgb565ToRGBA(src, dst) {
       if (!this._lut5to8)
         this.init();
+      const pixelCount = src.length >> 1;
+      if (src.length === 0)
+        return true;
+      if (src.length < 2)
+        return false;
+      if (dst.length < pixelCount * 4) {
+        Logger2.warn("FallbackCodec", `rgb565ToRGBA: dst buffer too small (${dst.length} < ${pixelCount * 4})`);
+        return false;
+      }
       const lut5 = this._lut5to8;
       const lut6 = this._lut6to8;
-      const pixelCount = src.length >> 1;
       const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
       for (let i = 0; i < pixelCount; i++) {
         const pixel = srcView.getUint16(i << 1, true);
@@ -1052,18 +1061,28 @@ var RDP = (() => {
         dst[dstIdx + 2] = lut5[pixel & 31];
         dst[dstIdx + 3] = 255;
       }
+      return true;
     },
     /**
      * Convert RGB565 to RGBA - Ultra-fast version using 32-bit writes
      * @param {Uint8Array} src - Source RGB565 data
      * @param {Uint8Array} dst - Destination RGBA buffer (must be 4-byte aligned)
+     * @returns {boolean} True if conversion succeeded
      */
     rgb565ToRGBA_Fast(src, dst) {
       if (!this._lut5to8)
         this.init();
+      const pixelCount = src.length >> 1;
+      if (src.length === 0)
+        return true;
+      if (src.length < 2)
+        return false;
+      if (dst.length < pixelCount * 4) {
+        Logger2.warn("FallbackCodec", `rgb565ToRGBA_Fast: dst buffer too small`);
+        return false;
+      }
       const lut5 = this._lut5to8;
       const lut6 = this._lut6to8;
-      const pixelCount = src.length >> 1;
       const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
       const dstView = new DataView(dst.buffer, dst.byteOffset, dst.byteLength);
       for (let i = 0; i < pixelCount; i++) {
@@ -1073,17 +1092,27 @@ var RDP = (() => {
         const b = lut5[pixel & 31];
         dstView.setUint32(i << 2, 255 << 24 | b << 16 | g << 8 | r, true);
       }
+      return true;
     },
     /**
      * Convert RGB555 to RGBA - OPTIMIZED
      * @param {Uint8Array} src - Source RGB555 data (2 bytes per pixel)
      * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     rgb555ToRGBA(src, dst) {
       if (!this._lut5to8)
         this.init();
-      const lut5 = this._lut5to8;
       const pixelCount = src.length >> 1;
+      if (src.length === 0)
+        return true;
+      if (src.length < 2)
+        return false;
+      if (dst.length < pixelCount * 4) {
+        Logger2.warn("FallbackCodec", `rgb555ToRGBA: dst buffer too small`);
+        return false;
+      }
+      const lut5 = this._lut5to8;
       const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
       for (let i = 0; i < pixelCount; i++) {
         const pixel = srcView.getUint16(i << 1, true);
@@ -1093,11 +1122,21 @@ var RDP = (() => {
         dst[dstIdx + 2] = lut5[pixel & 31];
         dst[dstIdx + 3] = 255;
       }
+      return true;
     },
     /**
      * Convert 8-bit paletted to RGBA
+     * @param {Uint8Array} src - Source palette indices
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     palette8ToRGBA(src, dst) {
+      if (src.length === 0)
+        return true;
+      if (dst.length < src.length * 4) {
+        Logger2.warn("FallbackCodec", `palette8ToRGBA: dst buffer too small`);
+        return false;
+      }
       const palette = this.palette;
       for (let i = 0, len = src.length; i < len; i++) {
         const idx = src[i] << 2;
@@ -1107,12 +1146,24 @@ var RDP = (() => {
         dst[dstIdx + 2] = palette[idx + 2];
         dst[dstIdx + 3] = palette[idx + 3];
       }
+      return true;
     },
     /**
      * Convert BGR24 to RGBA
+     * @param {Uint8Array} src - Source BGR data (3 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     bgr24ToRGBA(src, dst) {
       const pixelCount = src.length / 3 | 0;
+      if (src.length === 0)
+        return true;
+      if (src.length < 3)
+        return false;
+      if (dst.length < pixelCount * 4) {
+        Logger2.warn("FallbackCodec", `bgr24ToRGBA: dst buffer too small`);
+        return false;
+      }
       for (let i = 0; i < pixelCount; i++) {
         const srcIdx = i * 3;
         const dstIdx = i << 2;
@@ -1121,12 +1172,24 @@ var RDP = (() => {
         dst[dstIdx + 2] = src[srcIdx];
         dst[dstIdx + 3] = 255;
       }
+      return true;
     },
     /**
      * Convert BGRA32 to RGBA - optimized with 32-bit operations
+     * @param {Uint8Array} src - Source BGRA data (4 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean} True if conversion succeeded
      */
     bgra32ToRGBA(src, dst) {
       const pixelCount = src.length >> 2;
+      if (src.length === 0)
+        return true;
+      if (src.length < 4)
+        return false;
+      if (dst.length < pixelCount * 4) {
+        Logger2.warn("FallbackCodec", `bgra32ToRGBA: dst buffer too small`);
+        return false;
+      }
       const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
       const dstView = new DataView(dst.buffer, dst.byteOffset, dst.byteLength);
       for (let i = 0; i < pixelCount; i++) {
@@ -1138,12 +1201,27 @@ var RDP = (() => {
         const a = bgra >> 24 & 255;
         dstView.setUint32(offset, a << 24 | b << 16 | g << 8 | r, true);
       }
+      return true;
     },
     /**
      * Flip image vertically (in-place) - optimized
+     * @param {Uint8Array} data - Image data buffer
+     * @param {number} width - Image width in pixels
+     * @param {number} height - Image height in pixels
+     * @param {number} bytesPerPixel - Bytes per pixel (typically 4 for RGBA)
+     * @returns {boolean} True if flip succeeded
      */
     flipVertical(data, width, height, bytesPerPixel) {
+      if (width <= 0 || height <= 0 || bytesPerPixel <= 0)
+        return false;
       const rowSize = width * bytesPerPixel;
+      const expectedSize = rowSize * height;
+      if (data.length < expectedSize) {
+        Logger2.warn("FallbackCodec", `flipVertical: data buffer too small (${data.length} < ${expectedSize})`);
+        return false;
+      }
+      if (height <= 1)
+        return true;
       const temp = new Uint8Array(rowSize);
       const halfHeight = height >> 1;
       for (let y = 0; y < halfHeight; y++) {
@@ -1153,6 +1231,7 @@ var RDP = (() => {
         data.copyWithin(topOffset, bottomOffset, bottomOffset + rowSize);
         data.set(temp, bottomOffset);
       }
+      return true;
     },
     /**
      * Process a bitmap with fallback codecs
@@ -1225,10 +1304,73 @@ var RDP = (() => {
       this._wasmErrorShown = false;
       this._usingFallback = false;
       this._fallbackWarningShown = false;
+      this._capabilitiesLogged = false;
       this.handleResize = this.handleResize.bind(this);
       if (!WASMCodec.isSupported()) {
         Logger2.debug("Graphics", "WebAssembly not available - using JS fallback");
       }
+    },
+    /**
+     * Log client capabilities to the console
+     * Called once upon connection
+     */
+    logCapabilities() {
+      if (this._capabilitiesLogged)
+        return;
+      this._capabilitiesLogged = true;
+      const wasmSupported = WASMCodec.isSupported();
+      const wasmReady = WASMCodec.isReady();
+      const wasmError = WASMCodec.getInitError();
+      const caps = {
+        wasm: {
+          supported: wasmSupported,
+          loaded: wasmReady,
+          error: wasmError
+        },
+        codecs: {
+          rfx: wasmReady,
+          rle: wasmReady,
+          nscodec: wasmReady,
+          fallback: !wasmReady
+        },
+        display: {
+          width: this.originalWidth || window.innerWidth,
+          height: this.originalHeight || window.innerHeight,
+          colorDepth: this.getRecommendedColorDepth(),
+          devicePixelRatio: window.devicePixelRatio || 1
+        },
+        browser: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform
+        }
+      };
+      const codecList = [];
+      if (caps.codecs.rfx)
+        codecList.push("RemoteFX");
+      if (caps.codecs.rle)
+        codecList.push("RLE");
+      if (caps.codecs.nscodec)
+        codecList.push("NSCodec");
+      if (caps.codecs.fallback)
+        codecList.push("JS-Fallback");
+      console.info(
+        "%c[RDP Client] Capabilities",
+        "color: #4CAF50; font-weight: bold",
+        "\n  WASM:",
+        wasmReady ? "\u2713 loaded" : wasmSupported ? "\u2717 failed" : "\u2717 unsupported",
+        "\n  Codecs:",
+        codecList.join(", "),
+        "\n  Display:",
+        `${caps.display.width}\xD7${caps.display.height}`,
+        "\n  Color:",
+        `${caps.display.colorDepth}bpp`,
+        wasmError ? `
+  Error: ${wasmError}` : ""
+      );
+      if (this.emitEvent) {
+        this.emitEvent("capabilities", caps);
+      }
+      return caps;
     },
     /**
      * Get recommended color depth based on codec availability
@@ -2227,6 +2369,7 @@ var RDP = (() => {
     this.canvas.addEventListener("touchend", this.handleTouchEnd, { passive: false });
     window.addEventListener("resize", this.handleResize);
     this.connected = true;
+    this.logCapabilities();
   };
   Client.prototype.showCanvas = function() {
     const canvasContainer = document.getElementById("canvas-container");

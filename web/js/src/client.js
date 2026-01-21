@@ -281,6 +281,9 @@ Client.prototype.initialize = function() {
     window.addEventListener('resize', this.handleResize);
 
     this.connected = true;
+    
+    // Log capabilities on connection
+    this.logCapabilities();
 };
 
 /**

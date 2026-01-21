@@ -38,6 +38,7 @@ export const GraphicsMixin = {
         this._wasmErrorShown = false;
         this._usingFallback = false;
         this._fallbackWarningShown = false;
+        this._capabilitiesLogged = false;
         
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
@@ -46,6 +47,67 @@ export const GraphicsMixin = {
         if (!WASMCodec.isSupported()) {
             Logger.debug('Graphics', 'WebAssembly not available - using JS fallback');
         }
+    },
+    
+    /**
+     * Log client capabilities to the console
+     * Called once upon connection
+     */
+    logCapabilities() {
+        if (this._capabilitiesLogged) return;
+        this._capabilitiesLogged = true;
+        
+        const wasmSupported = WASMCodec.isSupported();
+        const wasmReady = WASMCodec.isReady();
+        const wasmError = WASMCodec.getInitError();
+        
+        const caps = {
+            wasm: {
+                supported: wasmSupported,
+                loaded: wasmReady,
+                error: wasmError
+            },
+            codecs: {
+                rfx: wasmReady,
+                rle: wasmReady,
+                nscodec: wasmReady,
+                fallback: !wasmReady
+            },
+            display: {
+                width: this.originalWidth || window.innerWidth,
+                height: this.originalHeight || window.innerHeight,
+                colorDepth: this.getRecommendedColorDepth(),
+                devicePixelRatio: window.devicePixelRatio || 1
+            },
+            browser: {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform
+            }
+        };
+        
+        // Log summary to console (always visible)
+        const codecList = [];
+        if (caps.codecs.rfx) codecList.push('RemoteFX');
+        if (caps.codecs.rle) codecList.push('RLE');
+        if (caps.codecs.nscodec) codecList.push('NSCodec');
+        if (caps.codecs.fallback) codecList.push('JS-Fallback');
+        
+        console.info(
+            '%c[RDP Client] Capabilities',
+            'color: #4CAF50; font-weight: bold',
+            '\n  WASM:', wasmReady ? '✓ loaded' : (wasmSupported ? '✗ failed' : '✗ unsupported'),
+            '\n  Codecs:', codecList.join(', '),
+            '\n  Display:', `${caps.display.width}×${caps.display.height}`,
+            '\n  Color:', `${caps.display.colorDepth}bpp`,
+            wasmError ? `\n  Error: ${wasmError}` : ''
+        );
+        
+        // Emit event for programmatic access
+        if (this.emitEvent) {
+            this.emitEvent('capabilities', caps);
+        }
+        
+        return caps;
     },
     
     /**
