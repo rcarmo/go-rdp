@@ -971,6 +971,40 @@ var RDP = (() => {
   var FallbackCodec = {
     palette: new Uint8Array(256 * 4),
     // RGBA palette
+    // Pre-computed lookup tables for fast 5/6-bit to 8-bit expansion
+    _lut5to8: null,
+    _lut6to8: null,
+    /**
+     * Initialize lookup tables for fast color conversion
+     * Call once at startup for best performance
+     */
+    init() {
+      if (this._lut5to8)
+        return;
+      this._lut5to8 = new Uint8Array(32);
+      for (let i = 0; i < 32; i++) {
+        this._lut5to8[i] = i << 3 | i >> 2;
+      }
+      this._lut6to8 = new Uint8Array(64);
+      for (let i = 0; i < 64; i++) {
+        this._lut6to8[i] = i << 2 | i >> 4;
+      }
+      Logger2.debug("FallbackCodec", "Initialized color lookup tables");
+    },
+    /**
+     * Check if WASM-free operation is recommended
+     * @returns {boolean}
+     */
+    shouldUse16BitColor() {
+      return true;
+    },
+    /**
+     * Get recommended color depth for fallback mode
+     * @returns {number}
+     */
+    getRecommendedColorDepth() {
+      return 16;
+    },
     /**
      * Set color palette for 8-bit mode
      * @param {Uint8Array} data - RGB palette data (3 bytes per color)
@@ -986,62 +1020,90 @@ var RDP = (() => {
       }
     },
     /**
-     * Convert 8-bit paletted to RGBA
-     * @param {Uint8Array} src - Source paletted data
+     * Convert RGB565 to RGBA - OPTIMIZED for performance
+     * This is the primary fast path for 16-bit fallback
+     * @param {Uint8Array} src - Source RGB565 data (2 bytes per pixel, little-endian)
      * @param {Uint8Array} dst - Destination RGBA buffer
      */
-    palette8ToRGBA(src, dst) {
-      for (let i = 0; i < src.length; i++) {
-        const idx = src[i] * 4;
-        const dstIdx = i * 4;
-        dst[dstIdx] = this.palette[idx];
-        dst[dstIdx + 1] = this.palette[idx + 1];
-        dst[dstIdx + 2] = this.palette[idx + 2];
-        dst[dstIdx + 3] = this.palette[idx + 3];
+    rgb565ToRGBA(src, dst) {
+      if (!this._lut5to8)
+        this.init();
+      const lut5 = this._lut5to8;
+      const lut6 = this._lut6to8;
+      const pixelCount = src.length >> 1;
+      const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
+      for (let i = 0; i < pixelCount; i++) {
+        const pixel = srcView.getUint16(i << 1, true);
+        const dstIdx = i << 2;
+        dst[dstIdx] = lut5[pixel >> 11 & 31];
+        dst[dstIdx + 1] = lut6[pixel >> 5 & 63];
+        dst[dstIdx + 2] = lut5[pixel & 31];
+        dst[dstIdx + 3] = 255;
       }
     },
     /**
-     * Convert RGB555 to RGBA
+     * Convert RGB565 to RGBA - Ultra-fast version using 32-bit writes
+     * @param {Uint8Array} src - Source RGB565 data
+     * @param {Uint8Array} dst - Destination RGBA buffer (must be 4-byte aligned)
+     */
+    rgb565ToRGBA_Fast(src, dst) {
+      if (!this._lut5to8)
+        this.init();
+      const lut5 = this._lut5to8;
+      const lut6 = this._lut6to8;
+      const pixelCount = src.length >> 1;
+      const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
+      const dstView = new DataView(dst.buffer, dst.byteOffset, dst.byteLength);
+      for (let i = 0; i < pixelCount; i++) {
+        const pixel = srcView.getUint16(i << 1, true);
+        const r = lut5[pixel >> 11 & 31];
+        const g = lut6[pixel >> 5 & 63];
+        const b = lut5[pixel & 31];
+        dstView.setUint32(i << 2, 255 << 24 | b << 16 | g << 8 | r, true);
+      }
+    },
+    /**
+     * Convert RGB555 to RGBA - OPTIMIZED
      * @param {Uint8Array} src - Source RGB555 data (2 bytes per pixel)
      * @param {Uint8Array} dst - Destination RGBA buffer
      */
     rgb555ToRGBA(src, dst) {
-      const pixelCount = Math.floor(src.length / 2);
+      if (!this._lut5to8)
+        this.init();
+      const lut5 = this._lut5to8;
+      const pixelCount = src.length >> 1;
+      const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
       for (let i = 0; i < pixelCount; i++) {
-        const pixel = src[i * 2] | src[i * 2 + 1] << 8;
-        const dstIdx = i * 4;
-        dst[dstIdx] = (pixel >> 10 & 31) << 3;
-        dst[dstIdx + 1] = (pixel >> 5 & 31) << 3;
-        dst[dstIdx + 2] = (pixel & 31) << 3;
+        const pixel = srcView.getUint16(i << 1, true);
+        const dstIdx = i << 2;
+        dst[dstIdx] = lut5[pixel >> 10 & 31];
+        dst[dstIdx + 1] = lut5[pixel >> 5 & 31];
+        dst[dstIdx + 2] = lut5[pixel & 31];
         dst[dstIdx + 3] = 255;
       }
     },
     /**
-     * Convert RGB565 to RGBA
-     * @param {Uint8Array} src - Source RGB565 data (2 bytes per pixel)
-     * @param {Uint8Array} dst - Destination RGBA buffer
+     * Convert 8-bit paletted to RGBA
      */
-    rgb565ToRGBA(src, dst) {
-      const pixelCount = Math.floor(src.length / 2);
-      for (let i = 0; i < pixelCount; i++) {
-        const pixel = src[i * 2] | src[i * 2 + 1] << 8;
-        const dstIdx = i * 4;
-        dst[dstIdx] = (pixel >> 11 & 31) << 3;
-        dst[dstIdx + 1] = (pixel >> 5 & 63) << 2;
-        dst[dstIdx + 2] = (pixel & 31) << 3;
-        dst[dstIdx + 3] = 255;
+    palette8ToRGBA(src, dst) {
+      const palette = this.palette;
+      for (let i = 0, len = src.length; i < len; i++) {
+        const idx = src[i] << 2;
+        const dstIdx = i << 2;
+        dst[dstIdx] = palette[idx];
+        dst[dstIdx + 1] = palette[idx + 1];
+        dst[dstIdx + 2] = palette[idx + 2];
+        dst[dstIdx + 3] = palette[idx + 3];
       }
     },
     /**
      * Convert BGR24 to RGBA
-     * @param {Uint8Array} src - Source BGR24 data (3 bytes per pixel)
-     * @param {Uint8Array} dst - Destination RGBA buffer
      */
     bgr24ToRGBA(src, dst) {
-      const pixelCount = Math.floor(src.length / 3);
+      const pixelCount = src.length / 3 | 0;
       for (let i = 0; i < pixelCount; i++) {
         const srcIdx = i * 3;
-        const dstIdx = i * 4;
+        const dstIdx = i << 2;
         dst[dstIdx] = src[srcIdx + 2];
         dst[dstIdx + 1] = src[srcIdx + 1];
         dst[dstIdx + 2] = src[srcIdx];
@@ -1049,92 +1111,41 @@ var RDP = (() => {
       }
     },
     /**
-     * Convert BGRA32 to RGBA
-     * @param {Uint8Array} src - Source BGRA32 data (4 bytes per pixel)
-     * @param {Uint8Array} dst - Destination RGBA buffer
+     * Convert BGRA32 to RGBA - optimized with 32-bit operations
      */
     bgra32ToRGBA(src, dst) {
-      const pixelCount = Math.floor(src.length / 4);
+      const pixelCount = src.length >> 2;
+      const srcView = new DataView(src.buffer, src.byteOffset, src.byteLength);
+      const dstView = new DataView(dst.buffer, dst.byteOffset, dst.byteLength);
       for (let i = 0; i < pixelCount; i++) {
-        const srcIdx = i * 4;
-        const dstIdx = i * 4;
-        dst[dstIdx] = src[srcIdx + 2];
-        dst[dstIdx + 1] = src[srcIdx + 1];
-        dst[dstIdx + 2] = src[srcIdx];
-        dst[dstIdx + 3] = src[srcIdx + 3];
+        const offset = i << 2;
+        const bgra = srcView.getUint32(offset, true);
+        const b = bgra & 255;
+        const g = bgra >> 8 & 255;
+        const r = bgra >> 16 & 255;
+        const a = bgra >> 24 & 255;
+        dstView.setUint32(offset, a << 24 | b << 16 | g << 8 | r, true);
       }
     },
     /**
-     * Flip image vertically (in-place)
-     * @param {Uint8Array} data - Image data
-     * @param {number} width - Image width
-     * @param {number} height - Image height
-     * @param {number} bytesPerPixel - Bytes per pixel
+     * Flip image vertically (in-place) - optimized
      */
     flipVertical(data, width, height, bytesPerPixel) {
       const rowSize = width * bytesPerPixel;
       const temp = new Uint8Array(rowSize);
-      const halfHeight = Math.floor(height / 2);
+      const halfHeight = height >> 1;
       for (let y = 0; y < halfHeight; y++) {
         const topOffset = y * rowSize;
         const bottomOffset = (height - 1 - y) * rowSize;
         temp.set(data.subarray(topOffset, topOffset + rowSize));
-        data.set(data.subarray(bottomOffset, bottomOffset + rowSize), topOffset);
+        data.copyWithin(topOffset, bottomOffset, bottomOffset + rowSize);
         data.set(temp, bottomOffset);
       }
     },
     /**
-     * Decompress RLE8 data (basic implementation)
-     * @param {Uint8Array} src - Compressed data
-     * @param {Uint8Array} dst - Output buffer
-     * @param {number} width - Image width
-     * @param {number} height - Image height
-     * @returns {boolean}
-     */
-    decompressRLE8(src, dst, width, height) {
-      let srcIdx = 0;
-      let dstIdx = 0;
-      const dstSize = width * height;
-      while (srcIdx < src.length && dstIdx < dstSize) {
-        const code = src[srcIdx++];
-        if (code === 0) {
-          if (srcIdx >= src.length)
-            break;
-          const escape = src[srcIdx++];
-          if (escape === 0) {
-            const rowPos = dstIdx % width;
-            if (rowPos > 0) {
-              dstIdx += width - rowPos;
-            }
-          } else if (escape === 1) {
-            break;
-          } else if (escape === 2) {
-            if (srcIdx + 1 >= src.length)
-              break;
-            const dx = src[srcIdx++];
-            const dy = src[srcIdx++];
-            dstIdx += dx + dy * width;
-          } else {
-            const count = escape;
-            for (let i = 0; i < count && srcIdx < src.length && dstIdx < dstSize; i++) {
-              dst[dstIdx++] = src[srcIdx++];
-            }
-            if (count & 1)
-              srcIdx++;
-          }
-        } else {
-          if (srcIdx >= src.length)
-            break;
-          const pixel = src[srcIdx++];
-          for (let i = 0; i < code && dstIdx < dstSize; i++) {
-            dst[dstIdx++] = pixel;
-          }
-        }
-      }
-      return true;
-    },
-    /**
      * Process a bitmap with fallback codecs
+     * Optimized for 16-bit uncompressed (fastest path)
+     * 
      * @param {Uint8Array} src - Source data
      * @param {number} width - Image width
      * @param {number} height - Image height
@@ -1144,48 +1155,43 @@ var RDP = (() => {
      * @returns {boolean}
      */
     processBitmap(src, width, height, bpp, isCompressed, dst) {
-      const pixelCount = width * height;
       try {
-        if (isCompressed) {
-          if (bpp === 8) {
-            const temp = new Uint8Array(pixelCount);
-            if (this.decompressRLE8(src, temp, width, height)) {
-              this.palette8ToRGBA(temp, dst);
-              this.flipVertical(dst, width, height, 4);
-              return true;
-            }
-          }
-          Logger2.warn("FallbackCodec", `Compressed ${bpp}bpp not supported in JS fallback`);
-          return false;
-        }
-        switch (bpp) {
-          case 8:
-            this.palette8ToRGBA(src, dst);
-            break;
-          case 15:
-            this.rgb555ToRGBA(src, dst);
-            break;
-          case 16:
+        if (!isCompressed && (bpp === 16 || bpp === 15)) {
+          if (bpp === 16) {
             this.rgb565ToRGBA(src, dst);
-            break;
-          case 24:
-            this.bgr24ToRGBA(src, dst);
-            break;
-          case 32:
-            this.bgra32ToRGBA(src, dst);
-            break;
-          default:
-            Logger2.warn("FallbackCodec", `Unsupported bpp: ${bpp}`);
-            return false;
+          } else {
+            this.rgb555ToRGBA(src, dst);
+          }
+          this.flipVertical(dst, width, height, 4);
+          return true;
         }
-        this.flipVertical(dst, width, height, 4);
-        return true;
+        if (!isCompressed) {
+          switch (bpp) {
+            case 8:
+              this.palette8ToRGBA(src, dst);
+              break;
+            case 24:
+              this.bgr24ToRGBA(src, dst);
+              break;
+            case 32:
+              this.bgra32ToRGBA(src, dst);
+              break;
+            default:
+              Logger2.warn("FallbackCodec", `Unsupported uncompressed bpp: ${bpp}`);
+              return false;
+          }
+          this.flipVertical(dst, width, height, 4);
+          return true;
+        }
+        Logger2.debug("FallbackCodec", `Compressed ${bpp}bpp not optimized in JS fallback`);
+        return false;
       } catch (e) {
         Logger2.error("FallbackCodec", `Processing failed: ${e.message}`);
         return false;
       }
     }
   };
+  FallbackCodec.init();
 
   // graphics.js
   var GraphicsMixin = {
@@ -1206,7 +1212,29 @@ var RDP = (() => {
       this.rfxDecoder = new RFXDecoder();
       this._wasmErrorShown = false;
       this._usingFallback = false;
+      this._fallbackWarningShown = false;
       this.handleResize = this.handleResize.bind(this);
+      if (!WASMCodec.isSupported()) {
+        Logger2.warn("Graphics", "WebAssembly not available - using JS fallback");
+        Logger2.info("Graphics", "For best performance, select 16-bit color depth");
+      }
+    },
+    /**
+     * Get recommended color depth based on codec availability
+     * @returns {number} Recommended bits per pixel (16 or 32)
+     */
+    getRecommendedColorDepth() {
+      if (WASMCodec.isReady()) {
+        return 32;
+      }
+      return FallbackCodec.getRecommendedColorDepth();
+    },
+    /**
+     * Check if using fallback codecs
+     * @returns {boolean}
+     */
+    isUsingFallback() {
+      return this._usingFallback || !WASMCodec.isReady();
     },
     /**
      * Handle palette update

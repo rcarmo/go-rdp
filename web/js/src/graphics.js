@@ -37,9 +37,37 @@ export const GraphicsMixin = {
         // WASM status tracking
         this._wasmErrorShown = false;
         this._usingFallback = false;
+        this._fallbackWarningShown = false;
         
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
+        
+        // Check WASM availability and recommend 16-bit if not available
+        if (!WASMCodec.isSupported()) {
+            Logger.warn('Graphics', 'WebAssembly not available - using JS fallback');
+            Logger.info('Graphics', 'For best performance, select 16-bit color depth');
+        }
+    },
+    
+    /**
+     * Get recommended color depth based on codec availability
+     * @returns {number} Recommended bits per pixel (16 or 32)
+     */
+    getRecommendedColorDepth() {
+        // If WASM is available and working, 32-bit is fine
+        if (WASMCodec.isReady()) {
+            return 32;
+        }
+        // Without WASM, recommend 16-bit for best JS performance
+        return FallbackCodec.getRecommendedColorDepth();
+    },
+    
+    /**
+     * Check if using fallback codecs
+     * @returns {boolean}
+     */
+    isUsingFallback() {
+        return this._usingFallback || !WASMCodec.isReady();
     },
     
     /**
