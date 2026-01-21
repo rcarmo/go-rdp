@@ -24,7 +24,8 @@ var RDP = (() => {
     Logger: () => Logger2,
     RFXDecoder: () => RFXDecoder,
     WASMCodec: () => WASMCodec,
-    default: () => src_default
+    default: () => src_default,
+    isWASMSupported: () => isWASMSupported
   });
 
   // logger.js
@@ -214,14 +215,28 @@ var RDP = (() => {
       }
       this.reconnectAttempts++;
       const url = new URL(this.websocketURL);
-      url.searchParams.set("host", this.hostEl.value);
-      url.searchParams.set("user", this.userEl.value);
-      url.searchParams.set("password", this.passwordEl.value || "");
       url.searchParams.set("width", this.canvas.width);
       url.searchParams.set("height", this.canvas.height);
       url.searchParams.set("sessionId", this.sessionId);
+      this._pendingReconnectCredentials = {
+        host: this.hostEl.value,
+        user: this.userEl.value,
+        password: this.passwordEl.value || ""
+      };
       this.socket = new WebSocket(url.toString());
-      this.socket.onopen = this.initialize;
+      this.socket.onopen = () => {
+        if (this._pendingReconnectCredentials) {
+          const credMsg = JSON.stringify({
+            type: "credentials",
+            host: this._pendingReconnectCredentials.host,
+            user: this._pendingReconnectCredentials.user,
+            password: this._pendingReconnectCredentials.password
+          });
+          this.socket.send(credMsg);
+          this._pendingReconnectCredentials = null;
+        }
+        this.initialize();
+      };
       this.socket.onmessage = (e) => {
         e.data.arrayBuffer().then((arrayBuffer) => this.handleMessage(arrayBuffer));
       };
@@ -649,10 +664,24 @@ var RDP = (() => {
   };
 
   // wasm.js
+  function isWASMSupported() {
+    try {
+      if (typeof WebAssembly === "object" && typeof WebAssembly.instantiate === "function") {
+        const module = new WebAssembly.Module(
+          new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])
+        );
+        return module instanceof WebAssembly.Module;
+      }
+    } catch (e) {
+    }
+    return false;
+  }
   var WASMCodec = {
     ready: false,
     goInstance: null,
     wasmInstance: null,
+    supported: isWASMSupported(),
+    initError: null,
     /**
      * Initialize WASM module
      * @param {string} wasmPath - Path to the WASM file
@@ -662,9 +691,15 @@ var RDP = (() => {
       if (this.ready) {
         return true;
       }
+      if (!this.supported) {
+        this.initError = "WebAssembly not supported in this browser";
+        Logger2.error("WASM", this.initError);
+        return false;
+      }
       try {
         if (typeof Go === "undefined") {
-          Logger2.error("WASM", "Go class not found. Include wasm_exec.js before initializing.");
+          this.initError = "Go class not found. Include wasm_exec.js before initializing.";
+          Logger2.error("WASM", this.initError);
           return false;
         }
         this.goInstance = new Go();
@@ -689,16 +724,33 @@ var RDP = (() => {
         this.wasmInstance = result.instance;
         this.goInstance.run(this.wasmInstance);
         if (typeof goRLE === "undefined") {
-          Logger2.error("WASM", "goRLE not initialized after running WASM");
+          this.initError = "goRLE not initialized after running WASM";
+          Logger2.error("WASM", this.initError);
           return false;
         }
         this.ready = true;
+        this.initError = null;
         Logger2.info("WASM", "Codec module initialized (RLE + RFX)");
         return true;
       } catch (error) {
+        this.initError = error.message;
         Logger2.error("WASM", `Failed to initialize: ${error.message}`);
         return false;
       }
+    },
+    /**
+     * Check if WASM is supported (before init)
+     * @returns {boolean}
+     */
+    isSupported() {
+      return this.supported;
+    },
+    /**
+     * Get initialization error message
+     * @returns {string|null}
+     */
+    getInitError() {
+      return this.initError;
     },
     /**
      * Check if WASM is ready
@@ -901,7 +953,8 @@ var RDP = (() => {
         return false;
       }
       const imageData = new ImageData(
-        new Uint8ClampedArray(this.tileBuffer.buffer),
+        new Uint8ClampedArray(this.tileBuffer),
+        // Creates a copy
         result.width,
         result.height
       );
@@ -997,7 +1050,30 @@ var RDP = (() => {
         }
         Logger2.debug("Bitmap", `WASM processBitmap failed, bpp=${bpp}, compressed=${isCompressed}`);
       } else {
-        Logger2.error("Bitmap", "WASM not loaded");
+        if (!this._wasmErrorShown) {
+          this._wasmErrorShown = true;
+          const errorMsg = WASMCodec.getInitError() || "WASM not loaded";
+          Logger2.error("Bitmap", `WASM unavailable: ${errorMsg}`);
+          this.showUserError("Graphics decoder not available. Some images may not display correctly.");
+        }
+        if (!isCompressed && bpp === 32) {
+          const src = new Uint8Array(bitmapData.bitmapDataStream);
+          for (let i = 0; i < size; i++) {
+            const srcIdx = i * 4;
+            const dstIdx = i * 4;
+            rgba[dstIdx] = src[srcIdx + 2];
+            rgba[dstIdx + 1] = src[srcIdx + 1];
+            rgba[dstIdx + 2] = src[srcIdx];
+            rgba[dstIdx + 3] = src[srcIdx + 3];
+          }
+          this.ctx.putImageData(
+            new ImageData(rgba, width, height),
+            bitmapData.destLeft,
+            bitmapData.destTop
+          );
+          return;
+        }
+        Logger2.warn("Bitmap", `Cannot decode: bpp=${bpp}, compressed=${isCompressed} (no WASM fallback)`);
       }
     },
     /**
@@ -1586,9 +1662,24 @@ var RDP = (() => {
       const timestamp = view.getUint16(2, true);
       let offset = 4;
       if (msgType === 2 && data.length >= 12) {
-        this.audioChannels = view.getUint16(4, true);
-        this.audioSampleRate = view.getUint32(6, true);
-        this.audioBitsPerSample = view.getUint16(10, true);
+        const channels = view.getUint16(4, true);
+        const sampleRate = view.getUint32(6, true);
+        const bitsPerSample = view.getUint16(10, true);
+        if (channels < 1 || channels > 8) {
+          Logger.warn("Audio", `Invalid channel count: ${channels}`);
+          return;
+        }
+        if (sampleRate < 8e3 || sampleRate > 192e3) {
+          Logger.warn("Audio", `Invalid sample rate: ${sampleRate}`);
+          return;
+        }
+        if (bitsPerSample !== 8 && bitsPerSample !== 16) {
+          Logger.warn("Audio", `Unsupported bit depth: ${bitsPerSample}`);
+          return;
+        }
+        this.audioChannels = channels;
+        this.audioSampleRate = sampleRate;
+        this.audioBitsPerSample = bitsPerSample;
         offset = 12;
         Logger.info("Audio", `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);
       }
@@ -2016,6 +2107,7 @@ var RDP = (() => {
     window.Logger = Logger2;
     window.WASMCodec = WASMCodec;
     window.RFXDecoder = RFXDecoder;
+    window.isWASMSupported = isWASMSupported;
   }
   var src_default = Client;
   return __toCommonJS(src_exports);

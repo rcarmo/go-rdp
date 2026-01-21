@@ -5,7 +5,7 @@
  */
 
 import { Client, Logger } from './client.js';
-import { WASMCodec, RFXDecoder } from './wasm.js';
+import { WASMCodec, RFXDecoder, isWASMSupported } from './wasm.js';
 
 // Export to global scope for browser use
 if (typeof window !== 'undefined') {
@@ -13,7 +13,8 @@ if (typeof window !== 'undefined') {
     window.Logger = Logger;
     window.WASMCodec = WASMCodec;
     window.RFXDecoder = RFXDecoder;
+    window.isWASMSupported = isWASMSupported;
 }
 
-export { Client, Logger, WASMCodec, RFXDecoder };
+export { Client, Logger, WASMCodec, RFXDecoder, isWASMSupported };
 export default Client;

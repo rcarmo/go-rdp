@@ -118,7 +118,35 @@ export const GraphicsMixin = {
             }
             Logger.debug("Bitmap", `WASM processBitmap failed, bpp=${bpp}, compressed=${isCompressed}`);
         } else {
-            Logger.error("Bitmap", "WASM not loaded");
+            // WASM not available - show error once and provide fallback for uncompressed data
+            if (!this._wasmErrorShown) {
+                this._wasmErrorShown = true;
+                const errorMsg = WASMCodec.getInitError() || 'WASM not loaded';
+                Logger.error("Bitmap", `WASM unavailable: ${errorMsg}`);
+                this.showUserError('Graphics decoder not available. Some images may not display correctly.');
+            }
+            
+            // Fallback for uncompressed 32-bit data only
+            if (!isCompressed && bpp === 32) {
+                const src = new Uint8Array(bitmapData.bitmapDataStream);
+                // Convert BGRA to RGBA (simple swap)
+                for (let i = 0; i < size; i++) {
+                    const srcIdx = i * 4;
+                    const dstIdx = i * 4;
+                    rgba[dstIdx] = src[srcIdx + 2];     // R <- B
+                    rgba[dstIdx + 1] = src[srcIdx + 1]; // G <- G
+                    rgba[dstIdx + 2] = src[srcIdx];     // B <- R
+                    rgba[dstIdx + 3] = src[srcIdx + 3]; // A <- A
+                }
+                this.ctx.putImageData(
+                    new ImageData(rgba, width, height),
+                    bitmapData.destLeft,
+                    bitmapData.destTop
+                );
+                return;
+            }
+            
+            Logger.warn("Bitmap", `Cannot decode: bpp=${bpp}, compressed=${isCompressed} (no WASM fallback)`);
         }
     },
     

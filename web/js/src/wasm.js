@@ -7,6 +7,26 @@
 import { Logger } from './logger.js';
 
 /**
+ * Check if WebAssembly is supported in this environment
+ * @returns {boolean}
+ */
+export function isWASMSupported() {
+    try {
+        if (typeof WebAssembly === 'object' &&
+            typeof WebAssembly.instantiate === 'function') {
+            // Test with minimal valid WASM module
+            const module = new WebAssembly.Module(
+                new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00])
+            );
+            return module instanceof WebAssembly.Module;
+        }
+    } catch (e) {
+        // WebAssembly not available
+    }
+    return false;
+}
+
+/**
  * WASM Codec interface
  * Provides access to Go-implemented codec functions
  */
@@ -14,6 +34,8 @@ export const WASMCodec = {
     ready: false,
     goInstance: null,
     wasmInstance: null,
+    supported: isWASMSupported(),
+    initError: null,
     
     /**
      * Initialize WASM module
@@ -25,10 +47,18 @@ export const WASMCodec = {
             return true;
         }
         
+        // Check WebAssembly support first
+        if (!this.supported) {
+            this.initError = 'WebAssembly not supported in this browser';
+            Logger.error('WASM', this.initError);
+            return false;
+        }
+        
         try {
             // Check if Go class is available (from wasm_exec.js)
             if (typeof Go === 'undefined') {
-                Logger.error('WASM', 'Go class not found. Include wasm_exec.js before initializing.');
+                this.initError = 'Go class not found. Include wasm_exec.js before initializing.';
+                Logger.error('WASM', this.initError);
                 return false;
             }
             
@@ -61,18 +91,37 @@ export const WASMCodec = {
             
             // Verify goRLE is available
             if (typeof goRLE === 'undefined') {
-                Logger.error('WASM', 'goRLE not initialized after running WASM');
+                this.initError = 'goRLE not initialized after running WASM';
+                Logger.error('WASM', this.initError);
                 return false;
             }
             
             this.ready = true;
+            this.initError = null;
             Logger.info('WASM', 'Codec module initialized (RLE + RFX)');
             return true;
             
         } catch (error) {
+            this.initError = error.message;
             Logger.error('WASM', `Failed to initialize: ${error.message}`);
             return false;
         }
+    },
+    
+    /**
+     * Check if WASM is supported (before init)
+     * @returns {boolean}
+     */
+    isSupported() {
+        return this.supported;
+    },
+    
+    /**
+     * Get initialization error message
+     * @returns {string|null}
+     */
+    getInitError() {
+        return this.initError;
     },
     
     /**
@@ -294,8 +343,9 @@ export class RFXDecoder {
             return false;
         }
         
+        // Copy buffer to avoid data corruption if called again before render
         const imageData = new ImageData(
-            new Uint8ClampedArray(this.tileBuffer.buffer),
+            new Uint8ClampedArray(this.tileBuffer),  // Creates a copy
             result.width,
             result.height
         );

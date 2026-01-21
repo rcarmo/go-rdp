@@ -72,9 +72,27 @@ const AudioMixin = {
 
         // Check for format info (msgType = 2)
         if (msgType === 0x02 && data.length >= 12) {
-            this.audioChannels = view.getUint16(4, true);
-            this.audioSampleRate = view.getUint32(6, true);
-            this.audioBitsPerSample = view.getUint16(10, true);
+            const channels = view.getUint16(4, true);
+            const sampleRate = view.getUint32(6, true);
+            const bitsPerSample = view.getUint16(10, true);
+            
+            // Validate audio format parameters
+            if (channels < 1 || channels > 8) {
+                Logger.warn('Audio', `Invalid channel count: ${channels}`);
+                return;
+            }
+            if (sampleRate < 8000 || sampleRate > 192000) {
+                Logger.warn('Audio', `Invalid sample rate: ${sampleRate}`);
+                return;
+            }
+            if (bitsPerSample !== 8 && bitsPerSample !== 16) {
+                Logger.warn('Audio', `Unsupported bit depth: ${bitsPerSample}`);
+                return;
+            }
+            
+            this.audioChannels = channels;
+            this.audioSampleRate = sampleRate;
+            this.audioBitsPerSample = bitsPerSample;
             offset = 12;
             
             Logger.info('Audio', `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);

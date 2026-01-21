@@ -131,16 +131,34 @@ export const SessionMixin = {
         
         this.reconnectAttempts++;
         
+        // Build URL with non-sensitive parameters only (NO password in URL!)
         const url = new URL(this.websocketURL);
-        url.searchParams.set('host', this.hostEl.value);
-        url.searchParams.set('user', this.userEl.value);
-        url.searchParams.set('password', this.passwordEl.value || '');
         url.searchParams.set('width', this.canvas.width);
         url.searchParams.set('height', this.canvas.height);
         url.searchParams.set('sessionId', this.sessionId);
+        
+        // Store credentials to send after connection opens
+        this._pendingReconnectCredentials = {
+            host: this.hostEl.value,
+            user: this.userEl.value,
+            password: this.passwordEl.value || ''
+        };
 
         this.socket = new WebSocket(url.toString());
-        this.socket.onopen = this.initialize;
+        this.socket.onopen = () => {
+            // Send credentials securely via WebSocket message (not URL)
+            if (this._pendingReconnectCredentials) {
+                const credMsg = JSON.stringify({
+                    type: 'credentials',
+                    host: this._pendingReconnectCredentials.host,
+                    user: this._pendingReconnectCredentials.user,
+                    password: this._pendingReconnectCredentials.password
+                });
+                this.socket.send(credMsg);
+                this._pendingReconnectCredentials = null;
+            }
+            this.initialize();
+        };
         this.socket.onmessage = (e) => {
             e.data.arrayBuffer().then((arrayBuffer) => this.handleMessage(arrayBuffer));
         };
