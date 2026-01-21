@@ -199,18 +199,22 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 
 	if err = rdpClient.Connect(); err != nil {
 		logging.Error("RDP connect: %v", err)
+		sendError(wsConn, "Connection failed")
 		return
 	}
+	
+	// Per-connection mutex for WebSocket writes
+	var wsMu sync.Mutex
 	
 	// Set up audio callback to forward audio data to browser
 	if enableAudio && rdpClient.GetAudioHandler() != nil {
 		rdpClient.GetAudioHandler().SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) {
-			sendAudioData(wsConn, data, format, timestamp)
+			sendAudioDataWithMutex(wsConn, &wsMu, data, format, timestamp)
 		})
 	}
 
 	// Send server capabilities info to browser
-	sendCapabilitiesInfo(wsConn, rdpClient)
+	sendCapabilitiesInfoWithMutex(wsConn, &wsMu, rdpClient)
 
 	// Use WaitGroup to ensure clean goroutine shutdown
 	var wg sync.WaitGroup
@@ -219,10 +223,22 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 		defer wg.Done()
 		wsToRdp(ctx, wsConn, rdpClient, cancel)
 	}()
-	rdpToWs(ctx, rdpClient, wsConn)
+	rdpToWsWithMutex(ctx, rdpClient, wsConn, &wsMu)
 	
-	// Wait for wsToRdp goroutine to finish
-	wg.Wait()
+	// Cancel context to signal wsToRdp to exit
+	cancel()
+	
+	// Wait for wsToRdp goroutine to finish (with timeout)
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		logging.Warn("Timeout waiting for wsToRdp goroutine to exit")
+	}
 }
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) {
@@ -256,9 +272,7 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
 	}
 }
 
-var wsMutex sync.Mutex
-
-func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
+func rdpToWsWithMutex(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn, wsMu *sync.Mutex) {
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Error("Panic in rdpToWs: %v", r)
@@ -282,9 +296,9 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
 			return
 		}
 
-		wsMutex.Lock()
+		wsMu.Lock()
 		err = websocket.Message.Send(wsConn, update.Data)
-		wsMutex.Unlock()
+		wsMu.Unlock()
 
 		if err != nil {
 			if strings.Contains(err.Error(), "use of closed network connection") {
@@ -296,8 +310,8 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
 	}
 }
 
-// sendCapabilitiesInfo sends server capabilities to the browser
-func sendCapabilitiesInfo(wsConn *websocket.Conn, rdpClient capabilitiesGetter) {
+// sendCapabilitiesInfoWithMutex sends server capabilities to the browser
+func sendCapabilitiesInfoWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, rdpClient capabilitiesGetter) {
 	caps := rdpClient.GetServerCapabilities()
 	if caps == nil {
 		return
@@ -309,8 +323,8 @@ func sendCapabilitiesInfo(wsConn *websocket.Conn, rdpClient capabilitiesGetter) 
 
 	msg := buildCapabilitiesMessage(caps)
 
-	wsMutex.Lock()
-	defer wsMutex.Unlock()
+	wsMu.Lock()
+	defer wsMu.Unlock()
 	if err := websocket.Message.Send(wsConn, msg); err != nil {
 		logging.Error("Failed to send capabilities info: %v", err)
 	}
@@ -394,9 +408,9 @@ const (
 	AudioMsgTypeFormat = 0x02 // Audio format info
 )
 
-// sendAudioData sends audio data to the browser over WebSocket
+// sendAudioDataWithMutex sends audio data to the browser over WebSocket with per-connection mutex
 // Format: [0xFE][msgType][timestamp 2 bytes][format info if type=format][data]
-func sendAudioData(wsConn *websocket.Conn, data []byte, format *audio.AudioFormat, timestamp uint16) {
+func sendAudioDataWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, data []byte, format *audio.AudioFormat, timestamp uint16) {
 	if len(data) == 0 {
 		return
 	}
@@ -428,9 +442,9 @@ func sendAudioData(wsConn *websocket.Conn, data []byte, format *audio.AudioForma
 	}
 	copy(msg[offset:], data)
 
-	wsMutex.Lock()
+	wsMu.Lock()
 	err := websocket.Message.Send(wsConn, msg)
-	wsMutex.Unlock()
+	wsMu.Unlock()
 
 	if err != nil {
 		logging.Debug("Failed to send audio data: %v", err)

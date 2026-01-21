@@ -345,8 +345,15 @@ Client.prototype.deinitialize = function() {
     this.clearBitmapCache();
     this.disableAudio();
 
+    // Clean up pointer cache CSS styles with error handling
     Object.entries(this.pointerCache).forEach(([index, style]) => {
-        document.getElementsByTagName('head')[0].removeChild(style);
+        try {
+            if (style && style.parentNode) {
+                style.parentNode.removeChild(style);
+            }
+        } catch (e) {
+            // Ignore removal errors - element may already be removed
+        }
     });
     this.pointerCache = {};
     this.canvas.classList = [];

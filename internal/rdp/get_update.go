@@ -62,9 +62,13 @@ func (c *Client) GetUpdate() (*Update, error) {
 			oldData := fpUpdate.Data
 			newData := make([]byte, len(oldData)+2)
 			copy(newData[0:3], oldData[0:3]) // copy header + size
-			// Update size field to include the extra 2 bytes
+			// Update size field to include the extra 2 bytes (with overflow check)
 			origSize := binary.LittleEndian.Uint16(oldData[1:3])
-			binary.LittleEndian.PutUint16(newData[1:3], origSize+2)
+			if origSize > 0xFFFD { // Check for overflow before adding 2
+				logging.Warn("FastPath size overflow: %d", origSize)
+			} else {
+				binary.LittleEndian.PutUint16(newData[1:3], origSize+2)
+			}
 			// Insert updateType
 			binary.LittleEndian.PutUint16(newData[3:5], SlowPathUpdateTypeBitmap)
 			// Copy rest of data

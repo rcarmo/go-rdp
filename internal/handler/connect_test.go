@@ -31,6 +31,27 @@ type mockRDPConnection struct {
 	maxUpdates     int
 }
 
+// testMutex is used by tests that test concurrent access patterns
+var testMutex sync.Mutex
+
+// rdpToWs is a test helper that wraps rdpToWsWithMutex for backward compatibility
+func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) {
+	var mu sync.Mutex
+	rdpToWsWithMutex(ctx, rdpConn, wsConn, &mu)
+}
+
+// sendCapabilitiesInfo is a test helper that wraps sendCapabilitiesInfoWithMutex for backward compatibility
+func sendCapabilitiesInfo(wsConn *websocket.Conn, rdpClient capabilitiesGetter) {
+	var mu sync.Mutex
+	sendCapabilitiesInfoWithMutex(wsConn, &mu, rdpClient)
+}
+
+// sendAudioData is a test helper that wraps sendAudioDataWithMutex for backward compatibility
+func sendAudioData(wsConn *websocket.Conn, data []byte, format *audio.AudioFormat, timestamp uint16) {
+	var mu sync.Mutex
+	sendAudioDataWithMutex(wsConn, &mu, data, format, timestamp)
+}
+
 func (m *mockRDPConnection) GetUpdate() (*rdp.Update, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -580,9 +601,9 @@ func TestRdpToWs_MultipleUpdates(t *testing.T) {
 			cm.count++
 			cm.mu.Unlock()
 
-			wsMutex.Lock()
+			testMutex.Lock()
 			err := websocket.Message.Send(ws, data)
-			wsMutex.Unlock()
+			testMutex.Unlock()
 			if err != nil {
 				return
 			}
@@ -706,9 +727,9 @@ func TestRdpToWs_ConcurrentSends(t *testing.T) {
 			wg.Add(1)
 			go func(idx int) {
 				defer wg.Done()
-				wsMutex.Lock()
+				testMutex.Lock()
 				_ = websocket.Message.Send(ws, []byte{byte(idx)}) //nolint:errcheck // test helper
-				wsMutex.Unlock()
+				testMutex.Unlock()
 			}(i)
 		}
 		wg.Wait()

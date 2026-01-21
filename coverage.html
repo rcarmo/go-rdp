@@ -105,7 +105,7 @@
 				
 				<option value="file24">github.com/rcarmo/rdp-html5/internal/config/config.go (90.8%)</option>
 				
-				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (63.5%)</option>
+				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (61.1%)</option>
 				
 				<option value="file26">github.com/rcarmo/rdp-html5/internal/logging/logging.go (88.6%)</option>
 				
@@ -227,7 +227,7 @@
 				
 				<option value="file85">github.com/rcarmo/rdp-html5/internal/rdp/frame_ack.go (0.0%)</option>
 				
-				<option value="file86">github.com/rcarmo/rdp-html5/internal/rdp/get_update.go (20.0%)</option>
+				<option value="file86">github.com/rcarmo/rdp-html5/internal/rdp/get_update.go (19.6%)</option>
 				
 				<option value="file87">github.com/rcarmo/rdp-html5/internal/rdp/nla.go (8.8%)</option>
 				
@@ -5775,18 +5775,22 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
 
         <span class="cov0" title="0">if err = rdpClient.Connect(); err != nil </span><span class="cov0" title="0">{
                 logging.Error("RDP connect: %v", err)
+                sendError(wsConn, "Connection failed")
                 return
         }</span>
         
+        // Per-connection mutex for WebSocket writes
+        <span class="cov0" title="0">var wsMu sync.Mutex
+        
         // Set up audio callback to forward audio data to browser
-        <span class="cov0" title="0">if enableAudio &amp;&amp; rdpClient.GetAudioHandler() != nil </span><span class="cov0" title="0">{
+        if enableAudio &amp;&amp; rdpClient.GetAudioHandler() != nil </span><span class="cov0" title="0">{
                 rdpClient.GetAudioHandler().SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) </span><span class="cov0" title="0">{
-                        sendAudioData(wsConn, data, format, timestamp)
+                        sendAudioDataWithMutex(wsConn, &amp;wsMu, data, format, timestamp)
                 }</span>)
         }
 
         // Send server capabilities info to browser
-        <span class="cov0" title="0">sendCapabilitiesInfo(wsConn, rdpClient)
+        <span class="cov0" title="0">sendCapabilitiesInfoWithMutex(wsConn, &amp;wsMu, rdpClient)
 
         // Use WaitGroup to ensure clean goroutine shutdown
         var wg sync.WaitGroup
@@ -5795,10 +5799,22 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
                 defer wg.Done()
                 wsToRdp(ctx, wsConn, rdpClient, cancel)
         }</span>()
-        <span class="cov0" title="0">rdpToWs(ctx, rdpClient, wsConn)
+        <span class="cov0" title="0">rdpToWsWithMutex(ctx, rdpClient, wsConn, &amp;wsMu)
         
-        // Wait for wsToRdp goroutine to finish
-        wg.Wait()</span>
+        // Cancel context to signal wsToRdp to exit
+        cancel()
+        
+        // Wait for wsToRdp goroutine to finish (with timeout)
+        done := make(chan struct{})
+        go func() </span><span class="cov0" title="0">{
+                wg.Wait()
+                close(done)
+        }</span>()
+        <span class="cov0" title="0">select </span>{
+        case &lt;-done:<span class="cov0" title="0"></span>
+        case &lt;-time.After(5 * time.Second):<span class="cov0" title="0">
+                logging.Warn("Timeout waiting for wsToRdp goroutine to exit")</span>
+        }
 }
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) <span class="cov5" title="11">{
@@ -5832,9 +5848,7 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
         }
 }
 
-var wsMutex sync.Mutex
-
-func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) <span class="cov5" title="13">{
+func rdpToWsWithMutex(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn, wsMu *sync.Mutex) <span class="cov5" title="13">{
         defer func() </span><span class="cov5" title="13">{
                 if r := recover(); r != nil </span><span class="cov0" title="0">{
                         logging.Error("Panic in rdpToWs: %v", r)
@@ -5858,9 +5872,9 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) <span
                         return</span>
                 }
 
-                <span class="cov9" title="114">wsMutex.Lock()
+                <span class="cov9" title="114">wsMu.Lock()
                 err = websocket.Message.Send(wsConn, update.Data)
-                wsMutex.Unlock()
+                wsMu.Unlock()
 
                 if err != nil </span><span class="cov2" title="2">{
                         if strings.Contains(err.Error(), "use of closed network connection") </span><span class="cov2" title="2">{
@@ -5872,8 +5886,8 @@ func rdpToWs(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Conn) <span
         }
 }
 
-// sendCapabilitiesInfo sends server capabilities to the browser
-func sendCapabilitiesInfo(wsConn *websocket.Conn, rdpClient capabilitiesGetter) <span class="cov3" title="4">{
+// sendCapabilitiesInfoWithMutex sends server capabilities to the browser
+func sendCapabilitiesInfoWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, rdpClient capabilitiesGetter) <span class="cov3" title="4">{
         caps := rdpClient.GetServerCapabilities()
         if caps == nil </span><span class="cov1" title="1">{
                 return
@@ -5885,8 +5899,8 @@ func sendCapabilitiesInfo(wsConn *websocket.Conn, rdpClient capabilitiesGetter) 
 
         msg := buildCapabilitiesMessage(caps)
 
-        wsMutex.Lock()
-        defer wsMutex.Unlock()
+        wsMu.Lock()
+        defer wsMu.Unlock()
         if err := websocket.Message.Send(wsConn, msg); err != nil </span><span class="cov1" title="1">{
                 logging.Error("Failed to send capabilities info: %v", err)
         }</span>
@@ -5970,9 +5984,9 @@ const (
         AudioMsgTypeFormat = 0x02 // Audio format info
 )
 
-// sendAudioData sends audio data to the browser over WebSocket
+// sendAudioDataWithMutex sends audio data to the browser over WebSocket with per-connection mutex
 // Format: [0xFE][msgType][timestamp 2 bytes][format info if type=format][data]
-func sendAudioData(wsConn *websocket.Conn, data []byte, format *audio.AudioFormat, timestamp uint16) <span class="cov3" title="3">{
+func sendAudioDataWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, data []byte, format *audio.AudioFormat, timestamp uint16) <span class="cov3" title="3">{
         if len(data) == 0 </span><span class="cov1" title="1">{
                 return
         }</span>
@@ -6004,9 +6018,9 @@ func sendAudioData(wsConn *websocket.Conn, data []byte, format *audio.AudioForma
         }</span>
         <span class="cov2" title="2">copy(msg[offset:], data)
 
-        wsMutex.Lock()
+        wsMu.Lock()
         err := websocket.Message.Send(wsConn, msg)
-        wsMutex.Unlock()
+        wsMu.Unlock()
 
         if err != nil </span><span class="cov0" title="0">{
                 logging.Debug("Failed to send audio data: %v", err)
@@ -14751,15 +14765,19 @@ func (c *Client) GetUpdate() (*Update, error) <span class="cov0" title="0">{
                         oldData := fpUpdate.Data
                         newData := make([]byte, len(oldData)+2)
                         copy(newData[0:3], oldData[0:3]) // copy header + size
-                        // Update size field to include the extra 2 bytes
+                        // Update size field to include the extra 2 bytes (with overflow check)
                         origSize := binary.LittleEndian.Uint16(oldData[1:3])
-                        binary.LittleEndian.PutUint16(newData[1:3], origSize+2)
+                        if origSize &gt; 0xFFFD </span><span class="cov0" title="0">{ // Check for overflow before adding 2
+                                logging.Warn("FastPath size overflow: %d", origSize)
+                        }</span> else<span class="cov0" title="0"> {
+                                binary.LittleEndian.PutUint16(newData[1:3], origSize+2)
+                        }</span>
                         // Insert updateType
-                        binary.LittleEndian.PutUint16(newData[3:5], SlowPathUpdateTypeBitmap)
+                        <span class="cov0" title="0">binary.LittleEndian.PutUint16(newData[3:5], SlowPathUpdateTypeBitmap)
                         // Copy rest of data
                         copy(newData[5:], oldData[3:])
-                        fpUpdate.Data = newData
-                }</span>
+                        fpUpdate.Data = newData</span>
+                }
         }
 
         <span class="cov0" title="0">return &amp;Update{Data: fpUpdate.Data}, nil</span>

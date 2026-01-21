@@ -2411,7 +2411,12 @@ var RDP = (() => {
     this.clearBitmapCache();
     this.disableAudio();
     Object.entries(this.pointerCache).forEach(([index, style]) => {
-      document.getElementsByTagName("head")[0].removeChild(style);
+      try {
+        if (style && style.parentNode) {
+          style.parentNode.removeChild(style);
+        }
+      } catch (e) {
+      }
     });
     this.pointerCache = {};
     this.canvas.classList = [];
