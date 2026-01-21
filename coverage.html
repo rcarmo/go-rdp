@@ -105,7 +105,7 @@
 				
 				<option value="file24">github.com/rcarmo/rdp-html5/internal/config/config.go (90.8%)</option>
 				
-				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (67.9%)</option>
+				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (63.5%)</option>
 				
 				<option value="file26">github.com/rcarmo/rdp-html5/internal/logging/logging.go (88.6%)</option>
 				
@@ -229,7 +229,7 @@
 				
 				<option value="file86">github.com/rcarmo/rdp-html5/internal/rdp/get_update.go (20.0%)</option>
 				
-				<option value="file87">github.com/rcarmo/rdp-html5/internal/rdp/nla.go (9.5%)</option>
+				<option value="file87">github.com/rcarmo/rdp-html5/internal/rdp/nla.go (8.8%)</option>
 				
 				<option value="file88">github.com/rcarmo/rdp-html5/internal/rdp/rail.go (85.6%)</option>
 				
@@ -5691,6 +5691,13 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
                 return
         }</span>
         
+        // Limit credential message size to prevent DoS (1MB max)
+        <span class="cov0" title="0">if len(credMsg) &gt; 1024*1024 </span><span class="cov0" title="0">{
+                logging.Error("Credentials message too large: %d bytes", len(credMsg))
+                sendError(wsConn, "Credentials message too large")
+                return
+        }</span>
+        
         // Clear read deadline
         <span class="cov0" title="0">if err := wsConn.SetReadDeadline(time.Time{}); err != nil </span><span class="cov0" title="0">{
                 logging.Error("Clear read deadline: %v", err)
@@ -5712,11 +5719,30 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
         <span class="cov0" title="0">host := credentials.Host
         user := credentials.User
         password := credentials.Password
+        
+        // Validate hostname length (max 253 per DNS spec)
+        if len(host) == 0 || len(host) &gt; 253 </span><span class="cov0" title="0">{
+                sendError(wsConn, "Invalid hostname")
+                return
+        }</span>
+        
+        // Validate username length (Windows max is 256)
+        <span class="cov0" title="0">if len(user) == 0 || len(user) &gt; 256 </span><span class="cov0" title="0">{
+                sendError(wsConn, "Invalid username")
+                return
+        }</span>
+        
+        // Validate password length (reasonable max, prevent memory exhaustion)
+        <span class="cov0" title="0">if len(password) &gt; 1024 </span><span class="cov0" title="0">{
+                sendError(wsConn, "Password too long")
+                return
+        }</span>
 
-        rdpClient, err := rdp.NewClient(host, user, password, width, height, colorDepth)
+        <span class="cov0" title="0">rdpClient, err := rdp.NewClient(host, user, password, width, height, colorDepth)
         if err != nil </span><span class="cov0" title="0">{
                 logging.Error("RDP init: %v", err)
-                sendError(wsConn, fmt.Sprintf("RDP initialization failed: %v", err))
+                // Generic error message to avoid information leakage
+                sendError(wsConn, "Connection failed")
                 return
         }</span>
         <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{ _ = rdpClient.Close() }</span>()
@@ -14882,6 +14908,7 @@ import (
         "crypto/rand"
         "crypto/tls"
         "fmt"
+        "io"
         "net"
         "strings"
         "time"
@@ -14890,6 +14917,40 @@ import (
         "github.com/rcarmo/rdp-html5/internal/config"
         "github.com/rcarmo/rdp-html5/internal/logging"
 )
+
+// maxNLAMessageSize is the maximum size for NLA/CredSSP messages (64KB)
+const maxNLAMessageSize = 64 * 1024
+
+// readNLAMessage reads a complete NLA message with size limit
+func readNLAMessage(r io.Reader, maxSize int) ([]byte, error) <span class="cov0" title="0">{
+        // Read into a limited reader to prevent memory exhaustion
+        buf := make([]byte, 0, 4096)
+        tmp := make([]byte, 4096)
+        total := 0
+        
+        for </span><span class="cov0" title="0">{
+                n, err := r.Read(tmp)
+                if n &gt; 0 </span><span class="cov0" title="0">{
+                        total += n
+                        if total &gt; maxSize </span><span class="cov0" title="0">{
+                                return nil, fmt.Errorf("NLA message exceeds max size (%d bytes)", maxSize)
+                        }</span>
+                        <span class="cov0" title="0">buf = append(buf, tmp[:n]...)</span>
+                }
+                <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                        if err == io.EOF </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov0" title="0">return buf, err</span>
+                }
+                // NLA messages are self-delimiting ASN.1 - if we got data, try to parse
+                // Most NLA messages fit in first read
+                <span class="cov0" title="0">if n &gt; 0 &amp;&amp; len(buf) &gt; 0 </span><span class="cov0" title="0">{
+                        break</span>
+                }
+        }
+        <span class="cov0" title="0">return buf, nil</span>
+}
 
 // StartNLA performs Network Level Authentication using CredSSP/NTLMv2
 func (c *Client) StartNLA() error <span class="cov0" title="0">{
@@ -14900,7 +14961,7 @@ func (c *Client) StartNLA() error <span class="cov0" title="0">{
 
         // Parse domain from username if present (DOMAIN\user or user@domain)
         <span class="cov0" title="0">domain, user := c.parseDomainUser()
-        logging.Info("NLA: Authenticating as domain=%q user=%q", domain, user)
+        logging.Debug("NLA: Authenticating user")
 
         // Create NTLMv2 context
         ntlmCtx := auth.NewNTLMv2(domain, user, c.password)
@@ -14920,15 +14981,14 @@ func (c *Client) StartNLA() error <span class="cov0" title="0">{
         }</span>
         <span class="cov0" title="0">logging.Debug("NLA: Sent negotiate message (%d bytes)", len(tsReq))
 
-        // Step 2: Receive server challenge
-        resp := make([]byte, 4096)
-        n, err := c.conn.Read(resp)
+        // Step 2: Receive server challenge (with size limit)
+        resp, err := readNLAMessage(c.conn, maxNLAMessageSize)
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("NLA: failed to read challenge: %w", err)
         }</span>
-        <span class="cov0" title="0">logging.Debug("NLA: Received challenge (%d bytes)", n)
+        <span class="cov0" title="0">logging.Debug("NLA: Received challenge (%d bytes)", len(resp))
 
-        tsResp, err := auth.DecodeTSRequest(resp[:n])
+        tsResp, err := auth.DecodeTSRequest(resp)
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("NLA: failed to decode challenge: %w", err)
         }</span>
@@ -14972,15 +15032,14 @@ func (c *Client) StartNLA() error <span class="cov0" title="0">{
         }</span>
         <span class="cov0" title="0">logging.Debug("NLA: Sent authenticate message (%d bytes)", len(tsReq))
 
-        // Step 4: Receive public key verification from server
-        resp = make([]byte, 4096)
-        n, err = c.conn.Read(resp)
+        // Step 4: Receive public key verification from server (with size limit)
+        resp, err = readNLAMessage(c.conn, maxNLAMessageSize)
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("NLA: failed to read public key response: %w", err)
         }</span>
-        <span class="cov0" title="0">logging.Debug("NLA: Received public key response (%d bytes)", n)
+        <span class="cov0" title="0">logging.Debug("NLA: Received public key response (%d bytes)", len(resp))
 
-        tsResp, err = auth.DecodeTSRequest(resp[:n])
+        tsResp, err = auth.DecodeTSRequest(resp)
         if err != nil </span><span class="cov0" title="0">{
                 return fmt.Errorf("NLA: failed to decode public key response: %w", err)
         }</span>
@@ -15020,7 +15079,7 @@ func (c *Client) StartNLA() error <span class="cov0" title="0">{
         }</span>
 
         <span class="cov0" title="0">finalResp := make([]byte, 4096)
-        n, err = c.conn.Read(finalResp)
+        finalN, err := c.conn.Read(finalResp)
         if err != nil </span><span class="cov0" title="0">{
                 // Timeout is expected and OK - means server accepted credentials silently
                 if ne, ok := err.(net.Error); ok &amp;&amp; ne.Timeout() </span><span class="cov0" title="0">{
@@ -15046,9 +15105,9 @@ func (c *Client) StartNLA() error <span class="cov0" title="0">{
         }</span>
 
         // If we got data, check if it's an error response
-        <span class="cov0" title="0">if n &gt; 0 </span><span class="cov0" title="0">{
-                logging.Debug("NLA: Received final response (%d bytes)", n)
-                finalTsResp, err := auth.DecodeTSRequest(finalResp[:n])
+        <span class="cov0" title="0">if finalN &gt; 0 </span><span class="cov0" title="0">{
+                logging.Debug("NLA: Received final response (%d bytes)", finalN)
+                finalTsResp, err := auth.DecodeTSRequest(finalResp[:finalN])
                 if err == nil </span><span class="cov0" title="0">{
                         if finalTsResp.ErrorCode != 0 </span><span class="cov0" title="0">{
                                 return fmt.Errorf("NLA: server returned error code: 0x%08X", finalTsResp.ErrorCode)

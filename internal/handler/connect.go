@@ -115,6 +115,13 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 		return
 	}
 	
+	// Limit credential message size to prevent DoS (1MB max)
+	if len(credMsg) > 1024*1024 {
+		logging.Error("Credentials message too large: %d bytes", len(credMsg))
+		sendError(wsConn, "Credentials message too large")
+		return
+	}
+	
 	// Clear read deadline
 	if err := wsConn.SetReadDeadline(time.Time{}); err != nil {
 		logging.Error("Clear read deadline: %v", err)
@@ -136,11 +143,30 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	host := credentials.Host
 	user := credentials.User
 	password := credentials.Password
+	
+	// Validate hostname length (max 253 per DNS spec)
+	if len(host) == 0 || len(host) > 253 {
+		sendError(wsConn, "Invalid hostname")
+		return
+	}
+	
+	// Validate username length (Windows max is 256)
+	if len(user) == 0 || len(user) > 256 {
+		sendError(wsConn, "Invalid username")
+		return
+	}
+	
+	// Validate password length (reasonable max, prevent memory exhaustion)
+	if len(password) > 1024 {
+		sendError(wsConn, "Password too long")
+		return
+	}
 
 	rdpClient, err := rdp.NewClient(host, user, password, width, height, colorDepth)
 	if err != nil {
 		logging.Error("RDP init: %v", err)
-		sendError(wsConn, fmt.Sprintf("RDP initialization failed: %v", err))
+		// Generic error message to avoid information leakage
+		sendError(wsConn, "Connection failed")
 		return
 	}
 	defer func() { _ = rdpClient.Close() }()

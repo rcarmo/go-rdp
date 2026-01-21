@@ -135,6 +135,15 @@ export const SessionMixin = {
         
         this.reconnectAttempts++;
         
+        // Close any existing socket before creating a new one
+        if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+            try {
+                this.socket.close();
+            } catch (e) {
+                // Ignore close errors
+            }
+        }
+        
         // Build URL with non-sensitive parameters only (NO password in URL!)
         const url = new URL(this.websocketURL);
         url.searchParams.set('width', this.canvas.width);

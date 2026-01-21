@@ -230,6 +230,12 @@ var RDP = (() => {
         return;
       }
       this.reconnectAttempts++;
+      if (this.socket && this.socket.readyState !== WebSocket.CLOSED) {
+        try {
+          this.socket.close();
+        } catch (e) {
+        }
+      }
       const url = new URL(this.websocketURL);
       url.searchParams.set("width", this.canvas.width);
       url.searchParams.set("height", this.canvas.height);

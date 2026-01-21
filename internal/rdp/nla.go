@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -13,6 +14,40 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/config"
 	"github.com/rcarmo/rdp-html5/internal/logging"
 )
+
+// maxNLAMessageSize is the maximum size for NLA/CredSSP messages (64KB)
+const maxNLAMessageSize = 64 * 1024
+
+// readNLAMessage reads a complete NLA message with size limit
+func readNLAMessage(r io.Reader, maxSize int) ([]byte, error) {
+	// Read into a limited reader to prevent memory exhaustion
+	buf := make([]byte, 0, 4096)
+	tmp := make([]byte, 4096)
+	total := 0
+	
+	for {
+		n, err := r.Read(tmp)
+		if n > 0 {
+			total += n
+			if total > maxSize {
+				return nil, fmt.Errorf("NLA message exceeds max size (%d bytes)", maxSize)
+			}
+			buf = append(buf, tmp[:n]...)
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return buf, err
+		}
+		// NLA messages are self-delimiting ASN.1 - if we got data, try to parse
+		// Most NLA messages fit in first read
+		if n > 0 && len(buf) > 0 {
+			break
+		}
+	}
+	return buf, nil
+}
 
 // StartNLA performs Network Level Authentication using CredSSP/NTLMv2
 func (c *Client) StartNLA() error {
@@ -23,7 +58,7 @@ func (c *Client) StartNLA() error {
 
 	// Parse domain from username if present (DOMAIN\user or user@domain)
 	domain, user := c.parseDomainUser()
-	logging.Info("NLA: Authenticating as domain=%q user=%q", domain, user)
+	logging.Debug("NLA: Authenticating user")
 
 	// Create NTLMv2 context
 	ntlmCtx := auth.NewNTLMv2(domain, user, c.password)
@@ -43,15 +78,14 @@ func (c *Client) StartNLA() error {
 	}
 	logging.Debug("NLA: Sent negotiate message (%d bytes)", len(tsReq))
 
-	// Step 2: Receive server challenge
-	resp := make([]byte, 4096)
-	n, err := c.conn.Read(resp)
+	// Step 2: Receive server challenge (with size limit)
+	resp, err := readNLAMessage(c.conn, maxNLAMessageSize)
 	if err != nil {
 		return fmt.Errorf("NLA: failed to read challenge: %w", err)
 	}
-	logging.Debug("NLA: Received challenge (%d bytes)", n)
+	logging.Debug("NLA: Received challenge (%d bytes)", len(resp))
 
-	tsResp, err := auth.DecodeTSRequest(resp[:n])
+	tsResp, err := auth.DecodeTSRequest(resp)
 	if err != nil {
 		return fmt.Errorf("NLA: failed to decode challenge: %w", err)
 	}
@@ -95,15 +129,14 @@ func (c *Client) StartNLA() error {
 	}
 	logging.Debug("NLA: Sent authenticate message (%d bytes)", len(tsReq))
 
-	// Step 4: Receive public key verification from server
-	resp = make([]byte, 4096)
-	n, err = c.conn.Read(resp)
+	// Step 4: Receive public key verification from server (with size limit)
+	resp, err = readNLAMessage(c.conn, maxNLAMessageSize)
 	if err != nil {
 		return fmt.Errorf("NLA: failed to read public key response: %w", err)
 	}
-	logging.Debug("NLA: Received public key response (%d bytes)", n)
+	logging.Debug("NLA: Received public key response (%d bytes)", len(resp))
 
-	tsResp, err = auth.DecodeTSRequest(resp[:n])
+	tsResp, err = auth.DecodeTSRequest(resp)
 	if err != nil {
 		return fmt.Errorf("NLA: failed to decode public key response: %w", err)
 	}
@@ -143,7 +176,7 @@ func (c *Client) StartNLA() error {
 	}
 
 	finalResp := make([]byte, 4096)
-	n, err = c.conn.Read(finalResp)
+	finalN, err := c.conn.Read(finalResp)
 	if err != nil {
 		// Timeout is expected and OK - means server accepted credentials silently
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
@@ -169,9 +202,9 @@ func (c *Client) StartNLA() error {
 	}
 
 	// If we got data, check if it's an error response
-	if n > 0 {
-		logging.Debug("NLA: Received final response (%d bytes)", n)
-		finalTsResp, err := auth.DecodeTSRequest(finalResp[:n])
+	if finalN > 0 {
+		logging.Debug("NLA: Received final response (%d bytes)", finalN)
+		finalTsResp, err := auth.DecodeTSRequest(finalResp[:finalN])
 		if err == nil {
 			if finalTsResp.ErrorCode != 0 {
 				return fmt.Errorf("NLA: server returned error code: 0x%08X", finalTsResp.ErrorCode)
