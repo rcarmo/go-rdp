@@ -151,7 +151,7 @@
 				
 				<option value="file47">github.com/rcarmo/rdp-html5/internal/protocol/mcs/types.go (100.0%)</option>
 				
-				<option value="file48">github.com/rcarmo/rdp-html5/internal/protocol/pdu/basic_settings_exchange.go (81.7%)</option>
+				<option value="file48">github.com/rcarmo/rdp-html5/internal/protocol/pdu/basic_settings_exchange.go (81.4%)</option>
 				
 				<option value="file49">github.com/rcarmo/rdp-html5/internal/protocol/pdu/cap_bitmap.go (78.7%)</option>
 				
@@ -227,7 +227,7 @@
 				
 				<option value="file85">github.com/rcarmo/rdp-html5/internal/rdp/frame_ack.go (0.0%)</option>
 				
-				<option value="file86">github.com/rcarmo/rdp-html5/internal/rdp/get_update.go (19.6%)</option>
+				<option value="file86">github.com/rcarmo/rdp-html5/internal/rdp/get_update.go (18.1%)</option>
 				
 				<option value="file87">github.com/rcarmo/rdp-html5/internal/rdp/nla.go (8.8%)</option>
 				
@@ -8964,6 +8964,7 @@ import (
         "bytes"
         "encoding/binary"
         "errors"
+        "fmt"
         "io"
 
         "github.com/rcarmo/rdp-html5/internal/codec"
@@ -9457,6 +9458,10 @@ func (c *ServerCertificate) Deserialize(wire io.Reader) error <span class="cov4"
                 return c.ProprietaryCert.Deserialize(wire)
         }</span>
 
+        // Validate certificate length to prevent integer underflow
+        <span class="cov1" title="1">if c.ServerCertLen &lt; 4 </span><span class="cov0" title="0">{
+                return fmt.Errorf("invalid certificate length: %d (minimum 4)", c.ServerCertLen)
+        }</span>
         <span class="cov1" title="1">c.X509Cert = make([]byte, c.ServerCertLen-4)
 
         if _, err = wire.Read(c.X509Cert); err != nil </span><span class="cov0" title="0">{
@@ -14848,23 +14853,39 @@ func (c *Client) getX224Update() (*Update, error) <span class="cov0" title="0">{
         var compressedType uint8
         var compressedLength uint16
 
-        _ = binary.Read(wire, binary.LittleEndian, &amp;shareID)
-        _ = binary.Read(wire, binary.LittleEndian, &amp;padding)
-        _ = binary.Read(wire, binary.LittleEndian, &amp;streamID)
-        _ = binary.Read(wire, binary.LittleEndian, &amp;uncompressedLength)
-        _ = binary.Read(wire, binary.LittleEndian, &amp;pduType2)
-        _ = binary.Read(wire, binary.LittleEndian, &amp;compressedType)
-        _ = binary.Read(wire, binary.LittleEndian, &amp;compressedLength)
+        if err := binary.Read(wire, binary.LittleEndian, &amp;shareID); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("read shareID: %w", err)
+        }</span>
+        <span class="cov0" title="0">if err := binary.Read(wire, binary.LittleEndian, &amp;padding); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("read padding: %w", err)
+        }</span>
+        <span class="cov0" title="0">if err := binary.Read(wire, binary.LittleEndian, &amp;streamID); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("read streamID: %w", err)
+        }</span>
+        <span class="cov0" title="0">if err := binary.Read(wire, binary.LittleEndian, &amp;uncompressedLength); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("read uncompressedLength: %w", err)
+        }</span>
+        <span class="cov0" title="0">if err := binary.Read(wire, binary.LittleEndian, &amp;pduType2); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("read pduType2: %w", err)
+        }</span>
+        <span class="cov0" title="0">if err := binary.Read(wire, binary.LittleEndian, &amp;compressedType); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("read compressedType: %w", err)
+        }</span>
+        <span class="cov0" title="0">if err := binary.Read(wire, binary.LittleEndian, &amp;compressedLength); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("read compressedLength: %w", err)
+        }</span>
 
         // Handle bitmap updates (PDUTYPE2_UPDATE = 0x02)
-        if pduType2.IsUpdate() </span><span class="cov0" title="0">{
+        <span class="cov0" title="0">if pduType2.IsUpdate() </span><span class="cov0" title="0">{
                 return c.handleSlowPathGraphicsUpdate(wire)
         }</span>
 
         // Handle error info
         <span class="cov0" title="0">if pduType2.IsErrorInfo() </span><span class="cov0" title="0">{
                 var errorInfo pdu.ErrorInfoPDUData
-                if err := errorInfo.Deserialize(wire); err == nil </span><span class="cov0" title="0">{
+                if err := errorInfo.Deserialize(wire); err != nil </span><span class="cov0" title="0">{
+                        logging.Warn("Error deserializing error info PDU: %v", err)
+                }</span> else<span class="cov0" title="0"> {
                         logging.Warn("Received error info: %s", errorInfo.String())
                 }</span>
         }

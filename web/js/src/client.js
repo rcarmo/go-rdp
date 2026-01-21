@@ -381,6 +381,11 @@ Client.prototype.handleMessage = function(arrayBuffer) {
     
     // Capabilities/JSON message (0xFF marker)
     if (firstByte === 0xFF) {
+        // Limit JSON message size to prevent DoS (1MB max)
+        if (arrayBuffer.byteLength > 1024 * 1024) {
+            Logger.warn("Message", "JSON message too large, ignoring");
+            return;
+        }
         try {
             // Strip the 0xFF marker and parse JSON
             const jsonData = arrayBuffer.slice(1);
@@ -405,6 +410,13 @@ Client.prototype.handleMessage = function(arrayBuffer) {
     }
     
     // Try parsing as plain JSON (for clipboard, file transfer, etc.)
+    // Only attempt JSON parse for reasonably-sized text messages (max 1MB)
+    if (arrayBuffer.byteLength > 1024 * 1024) {
+        // Large binary data - not JSON, treat as graphics update
+        this.handleBitmapUpdate(new Uint8Array(arrayBuffer));
+        return;
+    }
+    
     try {
         const text = new TextDecoder().decode(arrayBuffer);
         const message = JSON.parse(text);

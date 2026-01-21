@@ -145,13 +145,27 @@ func (c *Client) getX224Update() (*Update, error) {
 	var compressedType uint8
 	var compressedLength uint16
 
-	_ = binary.Read(wire, binary.LittleEndian, &shareID)
-	_ = binary.Read(wire, binary.LittleEndian, &padding)
-	_ = binary.Read(wire, binary.LittleEndian, &streamID)
-	_ = binary.Read(wire, binary.LittleEndian, &uncompressedLength)
-	_ = binary.Read(wire, binary.LittleEndian, &pduType2)
-	_ = binary.Read(wire, binary.LittleEndian, &compressedType)
-	_ = binary.Read(wire, binary.LittleEndian, &compressedLength)
+	if err := binary.Read(wire, binary.LittleEndian, &shareID); err != nil {
+		return nil, fmt.Errorf("read shareID: %w", err)
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &padding); err != nil {
+		return nil, fmt.Errorf("read padding: %w", err)
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &streamID); err != nil {
+		return nil, fmt.Errorf("read streamID: %w", err)
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &uncompressedLength); err != nil {
+		return nil, fmt.Errorf("read uncompressedLength: %w", err)
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &pduType2); err != nil {
+		return nil, fmt.Errorf("read pduType2: %w", err)
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &compressedType); err != nil {
+		return nil, fmt.Errorf("read compressedType: %w", err)
+	}
+	if err := binary.Read(wire, binary.LittleEndian, &compressedLength); err != nil {
+		return nil, fmt.Errorf("read compressedLength: %w", err)
+	}
 
 	// Handle bitmap updates (PDUTYPE2_UPDATE = 0x02)
 	if pduType2.IsUpdate() {
@@ -161,7 +175,9 @@ func (c *Client) getX224Update() (*Update, error) {
 	// Handle error info
 	if pduType2.IsErrorInfo() {
 		var errorInfo pdu.ErrorInfoPDUData
-		if err := errorInfo.Deserialize(wire); err == nil {
+		if err := errorInfo.Deserialize(wire); err != nil {
+			logging.Warn("Error deserializing error info PDU: %v", err)
+		} else {
 			logging.Warn("Received error info: %s", errorInfo.String())
 		}
 	}

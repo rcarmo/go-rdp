@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/rcarmo/rdp-html5/internal/codec"
@@ -497,6 +498,10 @@ func (c *ServerCertificate) Deserialize(wire io.Reader) error {
 		return c.ProprietaryCert.Deserialize(wire)
 	}
 
+	// Validate certificate length to prevent integer underflow
+	if c.ServerCertLen < 4 {
+		return fmt.Errorf("invalid certificate length: %d (minimum 4)", c.ServerCertLen)
+	}
 	c.X509Cert = make([]byte, c.ServerCertLen-4)
 
 	if _, err = wire.Read(c.X509Cert); err != nil {

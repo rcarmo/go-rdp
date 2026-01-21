@@ -2432,6 +2432,10 @@ var RDP = (() => {
       return;
     }
     if (firstByte === 255) {
+      if (arrayBuffer.byteLength > 1024 * 1024) {
+        Logger2.warn("Message", "JSON message too large, ignoring");
+        return;
+      }
       try {
         const jsonData = arrayBuffer.slice(1);
         const text = new TextDecoder().decode(jsonData);
@@ -2450,6 +2454,10 @@ var RDP = (() => {
       } catch (e) {
         Logger2.warn("Message", `Failed to parse 0xFF message: ${e.message}`);
       }
+    }
+    if (arrayBuffer.byteLength > 1024 * 1024) {
+      this.handleBitmapUpdate(new Uint8Array(arrayBuffer));
+      return;
     }
     try {
       const text = new TextDecoder().decode(arrayBuffer);
