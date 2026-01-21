@@ -171,8 +171,9 @@ func (c *Client) StartNLA() error {
 
 	// Step 6: Wait for final server response (optional - some servers send a final TSRequest)
 	// Set a short timeout for this read - if no data comes, credentials were accepted
-	if tcpConn, ok := c.conn.(*tls.Conn); ok {
-		_ = tcpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	// Apply deadline to the underlying net.Conn to ensure it sticks through tls.Conn
+	if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok {
+		_ = setter.SetReadDeadline(time.Now().Add(2 * time.Second))
 	}
 
 	finalResp := make([]byte, 4096)
@@ -182,23 +183,23 @@ func (c *Client) StartNLA() error {
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
 			logging.Debug("NLA: No final response from server (timeout - expected)")
 			// Clear the deadline
-			if tcpConn, ok := c.conn.(*tls.Conn); ok {
-				_ = tcpConn.SetReadDeadline(time.Time{})
+			if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok {
+				_ = setter.SetReadDeadline(time.Time{})
 			}
 			return nil
 		}
 		// Other errors might indicate authentication failure
 		logging.Debug("NLA: Error reading final response: %v", err)
 		// Try to continue anyway - some servers don't send a final response
-		if tcpConn, ok := c.conn.(*tls.Conn); ok {
-			_ = tcpConn.SetReadDeadline(time.Time{})
+		if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok {
+			_ = setter.SetReadDeadline(time.Time{})
 		}
 		return nil
 	}
 
 	// Clear the deadline
-	if tcpConn, ok := c.conn.(*tls.Conn); ok {
-		_ = tcpConn.SetReadDeadline(time.Time{})
+	if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok {
+		_ = setter.SetReadDeadline(time.Time{})
 	}
 
 	// If we got data, check if it's an error response

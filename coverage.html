@@ -15126,8 +15126,9 @@ func (c *Client) StartNLA() error <span class="cov0" title="0">{
 
         // Step 6: Wait for final server response (optional - some servers send a final TSRequest)
         // Set a short timeout for this read - if no data comes, credentials were accepted
-        if tcpConn, ok := c.conn.(*tls.Conn); ok </span><span class="cov0" title="0">{
-                _ = tcpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+        // Apply deadline to the underlying net.Conn to ensure it sticks through tls.Conn
+        if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok </span><span class="cov0" title="0">{
+                _ = setter.SetReadDeadline(time.Now().Add(2 * time.Second))
         }</span>
 
         <span class="cov0" title="0">finalResp := make([]byte, 4096)
@@ -15137,23 +15138,23 @@ func (c *Client) StartNLA() error <span class="cov0" title="0">{
                 if ne, ok := err.(net.Error); ok &amp;&amp; ne.Timeout() </span><span class="cov0" title="0">{
                         logging.Debug("NLA: No final response from server (timeout - expected)")
                         // Clear the deadline
-                        if tcpConn, ok := c.conn.(*tls.Conn); ok </span><span class="cov0" title="0">{
-                                _ = tcpConn.SetReadDeadline(time.Time{})
+                        if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok </span><span class="cov0" title="0">{
+                                _ = setter.SetReadDeadline(time.Time{})
                         }</span>
                         <span class="cov0" title="0">return nil</span>
                 }
                 // Other errors might indicate authentication failure
                 <span class="cov0" title="0">logging.Debug("NLA: Error reading final response: %v", err)
                 // Try to continue anyway - some servers don't send a final response
-                if tcpConn, ok := c.conn.(*tls.Conn); ok </span><span class="cov0" title="0">{
-                        _ = tcpConn.SetReadDeadline(time.Time{})
+                if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok </span><span class="cov0" title="0">{
+                        _ = setter.SetReadDeadline(time.Time{})
                 }</span>
                 <span class="cov0" title="0">return nil</span>
         }
 
         // Clear the deadline
-        <span class="cov0" title="0">if tcpConn, ok := c.conn.(*tls.Conn); ok </span><span class="cov0" title="0">{
-                _ = tcpConn.SetReadDeadline(time.Time{})
+        <span class="cov0" title="0">if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok </span><span class="cov0" title="0">{
+                _ = setter.SetReadDeadline(time.Time{})
         }</span>
 
         // If we got data, check if it's an error response
