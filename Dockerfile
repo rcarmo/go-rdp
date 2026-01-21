@@ -87,6 +87,7 @@ EXPOSE 8080
 # SKIP_TLS_VALIDATION: Set to "true" to connect to RDP servers with self-signed certificates
 # LOG_LEVEL: debug, info, warn, error
 ENV SKIP_TLS_VALIDATION=false \
+    TLS_ALLOW_ANY_SERVER_NAME=true \
     LOG_LEVEL=info
 
 # Run the binary
