@@ -11,7 +11,11 @@ This package implements RDP bitmap decompression and color conversion utilities.
 - **Interleaved RLE** - Run-length encoding for 8/15/16/24 bpp
 - **Color Conversion** - RGB555, RGB565, BGR24, BGRA32 to RGBA
 
-For detailed technical documentation, see [docs/NSCODEC.md](/docs/NSCODEC.md).
+For RemoteFX (RFX) wavelet codec, see the [`rfx/`](./rfx/) subpackage.
+
+For detailed technical documentation:
+- NSCodec: [docs/NSCODEC.md](/docs/NSCODEC.md)
+- RemoteFX: [docs/REMOTEFX.md](/docs/REMOTEFX.md)
 
 ## Files
 
@@ -231,6 +235,7 @@ go test -cover ./internal/codec/...
 
 ## Related Packages
 
+- `internal/codec/rfx` - RemoteFX wavelet codec (64×64 tiles)
 - `internal/rdp` - Uses codecs to process bitmap updates
 - `internal/protocol/fastpath` - Delivers compressed bitmaps
 - `web/wasm` - WASM version of codecs for browser

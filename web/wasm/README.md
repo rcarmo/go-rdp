@@ -6,6 +6,12 @@ TinyGo WebAssembly codec module for browser-side bitmap processing.
 
 This package contains Go code that compiles to WebAssembly using TinyGo. It provides high-performance bitmap decompression and color conversion functions that run in the browser.
 
+**Supported Codecs:**
+- **RLE** - Run-length encoding (8/15/16/24 bpp)
+- **NSCodec** - Network Screen Codec (YCoCg color space)
+- **RemoteFX** - Wavelet-based tile codec (64×64 tiles)
+- **Color Conversion** - RGB565, BGR24, BGRA32 to RGBA
+
 ## Files
 
 | File | Purpose |
@@ -82,6 +88,21 @@ goRLE.bgra32ToRGBA(src, dst)
 
 // 8-bit palette to RGBA
 goRLE.palette8ToRGBA(src, dst)
+```
+
+### RemoteFX (RFX) Decoding
+
+```javascript
+// Set quantization tables (must call before decoding)
+goRLE.setRFXQuant(
+    quantData  // Uint8Array - 15 bytes (3 tables × 5 bytes)
+) → boolean
+
+// Decode single RFX tile
+goRLE.decodeRFXTile(
+    tileData,     // Uint8Array - CBT_TILE block data
+    outputBuffer  // Uint8Array - 16384 bytes (64×64×4 RGBA)
+) → [x, y, width, height] | null
 ```
 
 ### Utilities
@@ -309,11 +330,13 @@ TinyGo produces smaller binaries than standard Go:
 | Compiler | Size | Notes |
 |----------|------|-------|
 | Go 1.21 | ~2MB | Full runtime |
-| TinyGo | ~100KB | Minimal runtime |
-| TinyGo -opt=z | ~80KB | Size optimized |
+| TinyGo | ~380KB | With RFX codec |
+| TinyGo (RLE only) | ~100KB | Minimal runtime |
 
 ## Related Files
 
 - `web/js/wasm_exec.js` - TinyGo JavaScript runtime
+- `web/js/src/wasm.js` - WASMCodec module and RFXDecoder class
 - `web/js/update/bitmap.js` - JavaScript caller
-- `internal/codec/` - Go codec implementation (source of truth)
+- `internal/codec/` - Go codec implementation (RLE, NSCodec)
+- `internal/codec/rfx/` - RemoteFX codec implementation

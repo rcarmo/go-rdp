@@ -68,6 +68,7 @@ See [docs/configuration.md](docs/configuration.md) for full configuration option
 - [Configuration](docs/configuration.md) - All configuration options
 - [Debugging](docs/debugging.md) - Troubleshooting guide
 - [NSCodec](docs/NSCODEC.md) - Bitmap codec implementation
+- [RemoteFX](docs/REMOTEFX.md) - RemoteFX wavelet codec implementation
 - [Known Issues](KNOWN_ISSUES.md) - Current limitations
 - [Security](SECURITY.md) - Security considerations
 - [Changelog](CHANGELOG.md) - Version history
@@ -79,13 +80,13 @@ See [docs/configuration.md](docs/configuration.md) for full configuration option
 - **NLA Authentication** - Network Level Authentication (with limitations)
 - **Clipboard** - Bidirectional text clipboard
 - **Audio** - Basic audio redirection
-- **WebAssembly** - RLE/NSCodec decoding via WASM
+- **WebAssembly** - RLE/NSCodec/RemoteFX decoding via WASM
 - **Configurable** - Environment-based configuration
 
 ## Limitations
 
 - **Windows Compatibility** - Primarily tested with XRDP; Windows servers may have issues
-- **Graphics** - No RemoteFX/H.264 support yet
+- **Graphics** - RemoteFX codec implemented; H.264 not yet supported
 - **NLA** - Works with many configurations but not all (see [KNOWN_ISSUES.md](KNOWN_ISSUES.md))
 
 ## Development
