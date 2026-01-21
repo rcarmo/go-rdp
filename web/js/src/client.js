@@ -114,9 +114,6 @@ Client.prototype.connect = function() {
     const disableNLAEl = document.getElementById('disableNLA');
     const disableNLA = disableNLAEl ? disableNLAEl.checked : false;
 
-    const enableAudioEl = document.getElementById('enableAudio');
-    const enableAudio = enableAudioEl ? enableAudioEl.checked : false;
-
     Logger.debug("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
 
     // Build URL with non-sensitive parameters only (no password!)
@@ -128,11 +125,10 @@ Client.prototype.connect = function() {
         url.searchParams.set('disableNLA', 'true');
         Logger.debug("Connection", "NLA disabled");
     }
-    if (enableAudio) {
-        url.searchParams.set('audio', 'true');
-        this.enableAudio();
-        Logger.debug("Audio", "Audio redirection enabled");
-    }
+    // Audio redirection enabled by default; server will ignore if unsupported
+    url.searchParams.set('audio', 'true');
+    this.enableAudio();
+    Logger.debug("Audio", "Audio redirection enabled");
 
     // Store credentials to send after connection opens
     this._pendingCredentials = { host, user, password };

@@ -2239,8 +2239,6 @@ var RDP = (() => {
     const colorDepth = colorDepthEl ? colorDepthEl.value : "16";
     const disableNLAEl = document.getElementById("disableNLA");
     const disableNLA = disableNLAEl ? disableNLAEl.checked : false;
-    const enableAudioEl = document.getElementById("enableAudio");
-    const enableAudio = enableAudioEl ? enableAudioEl.checked : false;
     Logger2.debug("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
     const url = new URL(this.websocketURL);
     url.searchParams.set("width", screenWidth);
@@ -2250,11 +2248,9 @@ var RDP = (() => {
       url.searchParams.set("disableNLA", "true");
       Logger2.debug("Connection", "NLA disabled");
     }
-    if (enableAudio) {
-      url.searchParams.set("audio", "true");
-      this.enableAudio();
-      Logger2.debug("Audio", "Audio redirection enabled");
-    }
+    url.searchParams.set("audio", "true");
+    this.enableAudio();
+    Logger2.debug("Audio", "Audio redirection enabled");
     this._pendingCredentials = { host, user, password };
     this.socket = new WebSocket(url.toString());
     const pendingCreds = this._pendingCredentials;
