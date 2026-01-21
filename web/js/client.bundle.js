@@ -1,8 +1,13 @@
 var RDP = (() => {
+  var __create = Object.create;
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __commonJS = (cb, mod) => function __require() {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  };
   var __export = (target, all) => {
     for (var name in all)
       __defProp(target, name, { get: all[name], enumerable: true });
@@ -15,12 +20,27 @@ var RDP = (() => {
     }
     return to;
   };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // ../connection-history.js
+  var require_connection_history = __commonJS({
+    "../connection-history.js"() {
+    }
+  });
 
   // index.js
   var src_exports = {};
   __export(src_exports, {
     Client: () => Client,
+    ConnectionHistory: () => import_connection_history.default,
     FallbackCodec: () => FallbackCodec,
     Logger: () => Logger2,
     RFXDecoder: () => RFXDecoder,
@@ -2532,6 +2552,7 @@ var RDP = (() => {
   };
 
   // index.js
+  var import_connection_history = __toESM(require_connection_history(), 1);
   if (typeof window !== "undefined") {
     window.Client = Client;
     window.Logger = Logger2;
@@ -2539,6 +2560,7 @@ var RDP = (() => {
     window.RFXDecoder = RFXDecoder;
     window.FallbackCodec = FallbackCodec;
     window.isWASMSupported = isWASMSupported;
+    window.ConnectionHistory = import_connection_history.default;
   }
   var src_default = Client;
   return __toCommonJS(src_exports);
