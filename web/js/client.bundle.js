@@ -21,6 +21,7 @@ var RDP = (() => {
   var src_exports = {};
   __export(src_exports, {
     Client: () => Client,
+    FallbackCodec: () => FallbackCodec,
     Logger: () => Logger2,
     RFXDecoder: () => RFXDecoder,
     WASMCodec: () => WASMCodec,
@@ -110,7 +111,10 @@ var RDP = (() => {
 
   // session.js
   function generateSessionId() {
-    return "session_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    const hex = Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return "session_" + hex;
   }
   var SessionMixin = {
     /**
@@ -963,6 +967,226 @@ var RDP = (() => {
     }
   };
 
+  // codec-fallback.js
+  var FallbackCodec = {
+    palette: new Uint8Array(256 * 4),
+    // RGBA palette
+    /**
+     * Set color palette for 8-bit mode
+     * @param {Uint8Array} data - RGB palette data (3 bytes per color)
+     * @param {number} numColors - Number of colors
+     */
+    setPalette(data, numColors) {
+      const count = Math.min(numColors, 256);
+      for (let i = 0; i < count; i++) {
+        this.palette[i * 4] = data[i * 3];
+        this.palette[i * 4 + 1] = data[i * 3 + 1];
+        this.palette[i * 4 + 2] = data[i * 3 + 2];
+        this.palette[i * 4 + 3] = 255;
+      }
+    },
+    /**
+     * Convert 8-bit paletted to RGBA
+     * @param {Uint8Array} src - Source paletted data
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     */
+    palette8ToRGBA(src, dst) {
+      for (let i = 0; i < src.length; i++) {
+        const idx = src[i] * 4;
+        const dstIdx = i * 4;
+        dst[dstIdx] = this.palette[idx];
+        dst[dstIdx + 1] = this.palette[idx + 1];
+        dst[dstIdx + 2] = this.palette[idx + 2];
+        dst[dstIdx + 3] = this.palette[idx + 3];
+      }
+    },
+    /**
+     * Convert RGB555 to RGBA
+     * @param {Uint8Array} src - Source RGB555 data (2 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     */
+    rgb555ToRGBA(src, dst) {
+      const pixelCount = Math.floor(src.length / 2);
+      for (let i = 0; i < pixelCount; i++) {
+        const pixel = src[i * 2] | src[i * 2 + 1] << 8;
+        const dstIdx = i * 4;
+        dst[dstIdx] = (pixel >> 10 & 31) << 3;
+        dst[dstIdx + 1] = (pixel >> 5 & 31) << 3;
+        dst[dstIdx + 2] = (pixel & 31) << 3;
+        dst[dstIdx + 3] = 255;
+      }
+    },
+    /**
+     * Convert RGB565 to RGBA
+     * @param {Uint8Array} src - Source RGB565 data (2 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     */
+    rgb565ToRGBA(src, dst) {
+      const pixelCount = Math.floor(src.length / 2);
+      for (let i = 0; i < pixelCount; i++) {
+        const pixel = src[i * 2] | src[i * 2 + 1] << 8;
+        const dstIdx = i * 4;
+        dst[dstIdx] = (pixel >> 11 & 31) << 3;
+        dst[dstIdx + 1] = (pixel >> 5 & 63) << 2;
+        dst[dstIdx + 2] = (pixel & 31) << 3;
+        dst[dstIdx + 3] = 255;
+      }
+    },
+    /**
+     * Convert BGR24 to RGBA
+     * @param {Uint8Array} src - Source BGR24 data (3 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     */
+    bgr24ToRGBA(src, dst) {
+      const pixelCount = Math.floor(src.length / 3);
+      for (let i = 0; i < pixelCount; i++) {
+        const srcIdx = i * 3;
+        const dstIdx = i * 4;
+        dst[dstIdx] = src[srcIdx + 2];
+        dst[dstIdx + 1] = src[srcIdx + 1];
+        dst[dstIdx + 2] = src[srcIdx];
+        dst[dstIdx + 3] = 255;
+      }
+    },
+    /**
+     * Convert BGRA32 to RGBA
+     * @param {Uint8Array} src - Source BGRA32 data (4 bytes per pixel)
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     */
+    bgra32ToRGBA(src, dst) {
+      const pixelCount = Math.floor(src.length / 4);
+      for (let i = 0; i < pixelCount; i++) {
+        const srcIdx = i * 4;
+        const dstIdx = i * 4;
+        dst[dstIdx] = src[srcIdx + 2];
+        dst[dstIdx + 1] = src[srcIdx + 1];
+        dst[dstIdx + 2] = src[srcIdx];
+        dst[dstIdx + 3] = src[srcIdx + 3];
+      }
+    },
+    /**
+     * Flip image vertically (in-place)
+     * @param {Uint8Array} data - Image data
+     * @param {number} width - Image width
+     * @param {number} height - Image height
+     * @param {number} bytesPerPixel - Bytes per pixel
+     */
+    flipVertical(data, width, height, bytesPerPixel) {
+      const rowSize = width * bytesPerPixel;
+      const temp = new Uint8Array(rowSize);
+      const halfHeight = Math.floor(height / 2);
+      for (let y = 0; y < halfHeight; y++) {
+        const topOffset = y * rowSize;
+        const bottomOffset = (height - 1 - y) * rowSize;
+        temp.set(data.subarray(topOffset, topOffset + rowSize));
+        data.set(data.subarray(bottomOffset, bottomOffset + rowSize), topOffset);
+        data.set(temp, bottomOffset);
+      }
+    },
+    /**
+     * Decompress RLE8 data (basic implementation)
+     * @param {Uint8Array} src - Compressed data
+     * @param {Uint8Array} dst - Output buffer
+     * @param {number} width - Image width
+     * @param {number} height - Image height
+     * @returns {boolean}
+     */
+    decompressRLE8(src, dst, width, height) {
+      let srcIdx = 0;
+      let dstIdx = 0;
+      const dstSize = width * height;
+      while (srcIdx < src.length && dstIdx < dstSize) {
+        const code = src[srcIdx++];
+        if (code === 0) {
+          if (srcIdx >= src.length)
+            break;
+          const escape = src[srcIdx++];
+          if (escape === 0) {
+            const rowPos = dstIdx % width;
+            if (rowPos > 0) {
+              dstIdx += width - rowPos;
+            }
+          } else if (escape === 1) {
+            break;
+          } else if (escape === 2) {
+            if (srcIdx + 1 >= src.length)
+              break;
+            const dx = src[srcIdx++];
+            const dy = src[srcIdx++];
+            dstIdx += dx + dy * width;
+          } else {
+            const count = escape;
+            for (let i = 0; i < count && srcIdx < src.length && dstIdx < dstSize; i++) {
+              dst[dstIdx++] = src[srcIdx++];
+            }
+            if (count & 1)
+              srcIdx++;
+          }
+        } else {
+          if (srcIdx >= src.length)
+            break;
+          const pixel = src[srcIdx++];
+          for (let i = 0; i < code && dstIdx < dstSize; i++) {
+            dst[dstIdx++] = pixel;
+          }
+        }
+      }
+      return true;
+    },
+    /**
+     * Process a bitmap with fallback codecs
+     * @param {Uint8Array} src - Source data
+     * @param {number} width - Image width
+     * @param {number} height - Image height
+     * @param {number} bpp - Bits per pixel
+     * @param {boolean} isCompressed - Whether data is compressed
+     * @param {Uint8Array} dst - Destination RGBA buffer
+     * @returns {boolean}
+     */
+    processBitmap(src, width, height, bpp, isCompressed, dst) {
+      const pixelCount = width * height;
+      try {
+        if (isCompressed) {
+          if (bpp === 8) {
+            const temp = new Uint8Array(pixelCount);
+            if (this.decompressRLE8(src, temp, width, height)) {
+              this.palette8ToRGBA(temp, dst);
+              this.flipVertical(dst, width, height, 4);
+              return true;
+            }
+          }
+          Logger2.warn("FallbackCodec", `Compressed ${bpp}bpp not supported in JS fallback`);
+          return false;
+        }
+        switch (bpp) {
+          case 8:
+            this.palette8ToRGBA(src, dst);
+            break;
+          case 15:
+            this.rgb555ToRGBA(src, dst);
+            break;
+          case 16:
+            this.rgb565ToRGBA(src, dst);
+            break;
+          case 24:
+            this.bgr24ToRGBA(src, dst);
+            break;
+          case 32:
+            this.bgra32ToRGBA(src, dst);
+            break;
+          default:
+            Logger2.warn("FallbackCodec", `Unsupported bpp: ${bpp}`);
+            return false;
+        }
+        this.flipVertical(dst, width, height, 4);
+        return true;
+      } catch (e) {
+        Logger2.error("FallbackCodec", `Processing failed: ${e.message}`);
+        return false;
+      }
+    }
+  };
+
   // graphics.js
   var GraphicsMixin = {
     /**
@@ -980,6 +1204,8 @@ var RDP = (() => {
       this.originalHeight = 0;
       this.resizeTimeout = null;
       this.rfxDecoder = new RFXDecoder();
+      this._wasmErrorShown = false;
+      this._usingFallback = false;
       this.handleResize = this.handleResize.bind(this);
     },
     /**
@@ -996,12 +1222,13 @@ var RDP = (() => {
       }
       Logger2.info("Palette", `Received ${numberColors} colors`);
       const paletteData = r.blob(numberColors * 3);
+      const paletteArray = new Uint8Array(paletteData);
       if (WASMCodec.isReady()) {
-        WASMCodec.setPalette(new Uint8Array(paletteData), numberColors);
+        WASMCodec.setPalette(paletteArray, numberColors);
         Logger2.debug("Palette", "Updated via WASM");
-      } else {
-        Logger2.warn("Palette", "WASM not available");
       }
+      FallbackCodec.setPalette(paletteArray, numberColors);
+      Logger2.debug("Palette", "Updated in fallback codec");
     },
     /**
      * Handle bitmap update
@@ -1034,8 +1261,8 @@ var RDP = (() => {
       const rowDelta = width * bytesPerPixel;
       const isCompressed = bitmapData.isCompressed();
       let rgba = new Uint8ClampedArray(size * 4);
+      const srcData = new Uint8Array(bitmapData.bitmapDataStream);
       if (WASMCodec.isReady()) {
-        const srcData = new Uint8Array(bitmapData.bitmapDataStream);
         const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
         if (result) {
           this.ctx.putImageData(
@@ -1048,32 +1275,31 @@ var RDP = (() => {
           }
           return;
         }
-        Logger2.debug("Bitmap", `WASM processBitmap failed, bpp=${bpp}, compressed=${isCompressed}`);
-      } else {
-        if (!this._wasmErrorShown) {
-          this._wasmErrorShown = true;
-          const errorMsg = WASMCodec.getInitError() || "WASM not loaded";
-          Logger2.error("Bitmap", `WASM unavailable: ${errorMsg}`);
-          this.showUserError("Graphics decoder not available. Some images may not display correctly.");
+        Logger2.debug("Bitmap", `WASM processBitmap failed, trying fallback`);
+      }
+      if (!this._usingFallback) {
+        this._usingFallback = true;
+        const reason = WASMCodec.isReady() ? "WASM decode failed" : WASMCodec.getInitError() || "WASM not loaded";
+        Logger2.warn("Bitmap", `Using JavaScript fallback codec (${reason})`);
+      }
+      const fallbackResult = FallbackCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba);
+      if (fallbackResult) {
+        this.ctx.putImageData(
+          new ImageData(rgba, width, height),
+          bitmapData.destLeft,
+          bitmapData.destTop
+        );
+        if (this.bitmapCacheEnabled) {
+          this.cacheBitmap(bitmapData, rgba);
         }
-        if (!isCompressed && bpp === 32) {
-          const src = new Uint8Array(bitmapData.bitmapDataStream);
-          for (let i = 0; i < size; i++) {
-            const srcIdx = i * 4;
-            const dstIdx = i * 4;
-            rgba[dstIdx] = src[srcIdx + 2];
-            rgba[dstIdx + 1] = src[srcIdx + 1];
-            rgba[dstIdx + 2] = src[srcIdx];
-            rgba[dstIdx + 3] = src[srcIdx + 3];
-          }
-          this.ctx.putImageData(
-            new ImageData(rgba, width, height),
-            bitmapData.destLeft,
-            bitmapData.destTop
-          );
-          return;
+        return;
+      }
+      if (!this._wasmErrorShown) {
+        this._wasmErrorShown = true;
+        Logger2.error("Bitmap", `Cannot decode: bpp=${bpp}, compressed=${isCompressed}`);
+        if (isCompressed && bpp !== 8) {
+          this.showUserError("Some compressed graphics cannot be displayed. Try reducing color depth.");
         }
-        Logger2.warn("Bitmap", `Cannot decode: bpp=${bpp}, compressed=${isCompressed} (no WASM fallback)`);
       }
     },
     /**
@@ -2107,6 +2333,7 @@ var RDP = (() => {
     window.Logger = Logger2;
     window.WASMCodec = WASMCodec;
     window.RFXDecoder = RFXDecoder;
+    window.FallbackCodec = FallbackCodec;
     window.isWASMSupported = isWASMSupported;
   }
   var src_default = Client;

@@ -6,6 +6,7 @@
 
 import { Client, Logger } from './client.js';
 import { WASMCodec, RFXDecoder, isWASMSupported } from './wasm.js';
+import { FallbackCodec } from './codec-fallback.js';
 
 // Export to global scope for browser use
 if (typeof window !== 'undefined') {
@@ -13,8 +14,9 @@ if (typeof window !== 'undefined') {
     window.Logger = Logger;
     window.WASMCodec = WASMCodec;
     window.RFXDecoder = RFXDecoder;
+    window.FallbackCodec = FallbackCodec;
     window.isWASMSupported = isWASMSupported;
 }
 
-export { Client, Logger, WASMCodec, RFXDecoder, isWASMSupported };
+export { Client, Logger, WASMCodec, RFXDecoder, FallbackCodec, isWASMSupported };
 export default Client;

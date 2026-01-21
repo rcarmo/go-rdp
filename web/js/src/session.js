@@ -7,11 +7,14 @@
 import { Logger } from './logger.js';
 
 /**
- * Generate a unique session ID
+ * Generate a unique session ID using cryptographically secure random values
  * @returns {string}
  */
 export function generateSessionId() {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    return 'session_' + hex;
 }
 
 /**

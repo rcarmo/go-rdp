@@ -2,9 +2,21 @@ function BinaryReader(arrayBuffer) {
     this.arrayBuffer = arrayBuffer;
     this.dv = new DataView(arrayBuffer);
     this.offset = 0;
+    this.length = arrayBuffer.byteLength;
 }
 
+BinaryReader.prototype.remaining = function() {
+    return this.length - this.offset;
+};
+
+BinaryReader.prototype.hasBytes = function(count) {
+    return this.offset + count <= this.length;
+};
+
 BinaryReader.prototype.uint8 = function () {
+    if (!this.hasBytes(1)) {
+        throw new RangeError('BinaryReader: uint8 read beyond buffer');
+    }
     const data = this.dv.getUint8(this.offset);
     this.offset += 1;
 
@@ -12,6 +24,9 @@ BinaryReader.prototype.uint8 = function () {
 };
 
 BinaryReader.prototype.uint16 = function (littleEndian) {
+    if (!this.hasBytes(2)) {
+        throw new RangeError('BinaryReader: uint16 read beyond buffer');
+    }
     const data = this.dv.getUint16(this.offset, littleEndian);
     this.offset += 2;
 
@@ -19,6 +34,9 @@ BinaryReader.prototype.uint16 = function (littleEndian) {
 };
 
 BinaryReader.prototype.uint32 = function (littleEndian) {
+    if (!this.hasBytes(4)) {
+        throw new RangeError('BinaryReader: uint32 read beyond buffer');
+    }
     const data = this.dv.getUint32(this.offset, littleEndian);
     this.offset += 4;
 
@@ -26,6 +44,9 @@ BinaryReader.prototype.uint32 = function (littleEndian) {
 };
 
 BinaryReader.prototype.blob = function (length) {
+    if (!this.hasBytes(length)) {
+        throw new RangeError('BinaryReader: blob read beyond buffer');
+    }
     const data = new Uint8Array(this.arrayBuffer, this.offset, length);
     this.offset += length;
 
@@ -33,6 +54,9 @@ BinaryReader.prototype.blob = function (length) {
 };
 
 BinaryReader.prototype.string = function (length) {
+    if (!this.hasBytes(length)) {
+        throw new RangeError('BinaryReader: string read beyond buffer');
+    }
     const dec = new TextDecoder();
     const data = dec.decode(this.arrayBuffer.slice(this.offset, this.offset + length));
     this.offset += length;
@@ -41,6 +65,9 @@ BinaryReader.prototype.string = function (length) {
 };
 
 BinaryReader.prototype.skip = function(length) {
+    if (!this.hasBytes(length)) {
+        throw new RangeError('BinaryReader: skip beyond buffer');
+    }
     this.offset += length;
 };
 

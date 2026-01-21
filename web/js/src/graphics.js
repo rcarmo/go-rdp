@@ -6,6 +6,7 @@
 
 import { Logger } from './logger.js';
 import { WASMCodec, RFXDecoder } from './wasm.js';
+import { FallbackCodec } from './codec-fallback.js';
 
 /**
  * Graphics handling mixin - adds graphics functionality to Client
@@ -33,6 +34,10 @@ export const GraphicsMixin = {
         // RFX decoder instance
         this.rfxDecoder = new RFXDecoder();
         
+        // WASM status tracking
+        this._wasmErrorShown = false;
+        this._usingFallback = false;
+        
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
     },
@@ -54,13 +59,17 @@ export const GraphicsMixin = {
         Logger.info("Palette", `Received ${numberColors} colors`);
         
         const paletteData = r.blob(numberColors * 3);
+        const paletteArray = new Uint8Array(paletteData);
         
+        // Set palette in WASM codec
         if (WASMCodec.isReady()) {
-            WASMCodec.setPalette(new Uint8Array(paletteData), numberColors);
+            WASMCodec.setPalette(paletteArray, numberColors);
             Logger.debug("Palette", "Updated via WASM");
-        } else {
-            Logger.warn("Palette", "WASM not available");
         }
+        
+        // Also set in fallback codec (always, in case WASM fails later)
+        FallbackCodec.setPalette(paletteArray, numberColors);
+        Logger.debug("Palette", "Updated in fallback codec");
     },
     
     /**
@@ -99,9 +108,10 @@ export const GraphicsMixin = {
         const isCompressed = bitmapData.isCompressed();
         
         let rgba = new Uint8ClampedArray(size * 4);
+        const srcData = new Uint8Array(bitmapData.bitmapDataStream);
         
+        // Try WASM first (fast path)
         if (WASMCodec.isReady()) {
-            const srcData = new Uint8Array(bitmapData.bitmapDataStream);
             const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
             
             if (result) {
@@ -116,37 +126,38 @@ export const GraphicsMixin = {
                 }
                 return;
             }
-            Logger.debug("Bitmap", `WASM processBitmap failed, bpp=${bpp}, compressed=${isCompressed}`);
-        } else {
-            // WASM not available - show error once and provide fallback for uncompressed data
-            if (!this._wasmErrorShown) {
-                this._wasmErrorShown = true;
-                const errorMsg = WASMCodec.getInitError() || 'WASM not loaded';
-                Logger.error("Bitmap", `WASM unavailable: ${errorMsg}`);
-                this.showUserError('Graphics decoder not available. Some images may not display correctly.');
-            }
+            Logger.debug("Bitmap", `WASM processBitmap failed, trying fallback`);
+        }
+        
+        // WASM not available or failed - use JavaScript fallback
+        if (!this._usingFallback) {
+            this._usingFallback = true;
+            const reason = WASMCodec.isReady() ? 'WASM decode failed' : (WASMCodec.getInitError() || 'WASM not loaded');
+            Logger.warn("Bitmap", `Using JavaScript fallback codec (${reason})`);
+        }
+        
+        const fallbackResult = FallbackCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba);
+        
+        if (fallbackResult) {
+            this.ctx.putImageData(
+                new ImageData(rgba, width, height),
+                bitmapData.destLeft,
+                bitmapData.destTop
+            );
             
-            // Fallback for uncompressed 32-bit data only
-            if (!isCompressed && bpp === 32) {
-                const src = new Uint8Array(bitmapData.bitmapDataStream);
-                // Convert BGRA to RGBA (simple swap)
-                for (let i = 0; i < size; i++) {
-                    const srcIdx = i * 4;
-                    const dstIdx = i * 4;
-                    rgba[dstIdx] = src[srcIdx + 2];     // R <- B
-                    rgba[dstIdx + 1] = src[srcIdx + 1]; // G <- G
-                    rgba[dstIdx + 2] = src[srcIdx];     // B <- R
-                    rgba[dstIdx + 3] = src[srcIdx + 3]; // A <- A
-                }
-                this.ctx.putImageData(
-                    new ImageData(rgba, width, height),
-                    bitmapData.destLeft,
-                    bitmapData.destTop
-                );
-                return;
+            if (this.bitmapCacheEnabled) {
+                this.cacheBitmap(bitmapData, rgba);
             }
-            
-            Logger.warn("Bitmap", `Cannot decode: bpp=${bpp}, compressed=${isCompressed} (no WASM fallback)`);
+            return;
+        }
+        
+        // Both WASM and fallback failed
+        if (!this._wasmErrorShown) {
+            this._wasmErrorShown = true;
+            Logger.error("Bitmap", `Cannot decode: bpp=${bpp}, compressed=${isCompressed}`);
+            if (isCompressed && bpp !== 8) {
+                this.showUserError('Some compressed graphics cannot be displayed. Try reducing color depth.');
+            }
         }
     },
     
