@@ -217,16 +217,18 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	sendCapabilitiesInfoWithMutex(wsConn, &wsMu, rdpClient)
 
 	// Use WaitGroup to ensure clean goroutine shutdown
+	var cancelOnce sync.Once
+	safeCancel := func() { cancelOnce.Do(cancel) }
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		wsToRdp(ctx, wsConn, rdpClient, cancel)
+		wsToRdp(ctx, wsConn, rdpClient, safeCancel)
 	}()
 	rdpToWsWithMutex(ctx, rdpClient, wsConn, &wsMu)
 	
 	// Cancel context to signal wsToRdp to exit
-	cancel()
+	safeCancel()
 	
 	// Wait for wsToRdp goroutine to finish (with timeout)
 	done := make(chan struct{})
@@ -242,7 +244,6 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 }
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) {
-	defer cancel()
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Error("Panic in wsToRdp: %v", r)
@@ -256,12 +257,16 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
 		default:
 		}
 
+		// Apply a read deadline to avoid hung connections keeping goroutines alive
+		_ = wsConn.SetReadDeadline(time.Now().Add(30 * time.Second))
+
 		var data []byte
 		if err := websocket.Message.Receive(wsConn, &data); err != nil {
 			if err == io.EOF || strings.Contains(err.Error(), "use of closed network connection") {
 				return
 			}
 			logging.Error("Error reading message from WS: %v", err)
+			cancel()
 			return
 		}
 
@@ -334,15 +339,23 @@ func sendCapabilitiesInfoWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, rdp
 func buildCapabilitiesMessage(caps *rdp.ServerCapabilityInfo) []byte {
 	logLevel := strings.ToLower(logging.GetLevelString())
 	
-	jsonData := fmt.Sprintf(`{"type":"capabilities","codecs":[%s],"surfaceCommands":%t,"colorDepth":%d,"desktopSize":"%s","multifragmentSize":%d,"largePointer":%t,"frameAcknowledge":%t,"logLevel":"%s"}`,
-		codecListToJSON(caps.BitmapCodecs),
-		caps.SurfaceCommands,
-		caps.ColorDepth,
-		caps.DesktopSize,
-		caps.MultifragmentSize,
-		caps.LargePointer,
-		caps.FrameAcknowledge,
-		logLevel)
+	payload := map[string]any{
+		"type":              "capabilities",
+		"codecs":            caps.BitmapCodecs,
+		"surfaceCommands":   caps.SurfaceCommands,
+		"colorDepth":        caps.ColorDepth,
+		"desktopSize":       caps.DesktopSize,
+		"multifragmentSize": caps.MultifragmentSize,
+		"largePointer":      caps.LargePointer,
+		"frameAcknowledge":  caps.FrameAcknowledge,
+		"logLevel":          logLevel,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		logging.Error("Failed to marshal capabilities: %v", err)
+		return nil
+	}
 
 	msg := make([]byte, 1+len(jsonData))
 	msg[0] = 0xFF

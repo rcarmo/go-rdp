@@ -260,7 +260,8 @@ var RDP = (() => {
       };
       this.socket.onclose = (e) => {
         if (!this.manualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
-          const exponentialDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+          const exponent = Math.max(0, this.reconnectAttempts - 1);
+          const exponentialDelay = this.reconnectDelay * Math.pow(2, exponent);
           this.scheduleReconnect(Math.min(exponentialDelay, 3e4));
         }
       };
@@ -2256,14 +2257,15 @@ var RDP = (() => {
     }
     this._pendingCredentials = { host, user, password };
     this.socket = new WebSocket(url.toString());
+    const pendingCreds = this._pendingCredentials;
     this.socket.onopen = () => {
       Logger2.debug("Connection", "WebSocket opened, sending credentials");
-      if (this._pendingCredentials) {
+      if (pendingCreds) {
         const credMsg = JSON.stringify({
           type: "credentials",
-          host: this._pendingCredentials.host,
-          user: this._pendingCredentials.user,
-          password: this._pendingCredentials.password
+          host: pendingCreds.host,
+          user: pendingCreds.user,
+          password: pendingCreds.password
         });
         this.socket.send(credMsg);
         this._pendingCredentials = null;
@@ -2317,7 +2319,8 @@ var RDP = (() => {
         this.showUserError(`Connection lost (code: ${e.code})`);
       }
       if (!this.manualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
-        const exponentialDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
+        const exponent = Math.max(0, this.reconnectAttempts - 1);
+        const exponentialDelay = this.reconnectDelay * Math.pow(2, exponent);
         this.scheduleReconnect(Math.min(exponentialDelay, 3e4));
       }
       this.deinitialize();

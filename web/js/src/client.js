@@ -139,16 +139,18 @@ Client.prototype.connect = function() {
 
     this.socket = new WebSocket(url.toString());
 
+    // Ensure onopen doesn't execute before credentials are staged
+    const pendingCreds = this._pendingCredentials;
     this.socket.onopen = () => {
         Logger.debug("Connection", "WebSocket opened, sending credentials");
         
         // Send credentials securely via WebSocket (not URL)
-        if (this._pendingCredentials) {
+        if (pendingCreds) {
             const credMsg = JSON.stringify({
                 type: 'credentials',
-                host: this._pendingCredentials.host,
-                user: this._pendingCredentials.user,
-                password: this._pendingCredentials.password
+                host: pendingCreds.host,
+                user: pendingCreds.user,
+                password: pendingCreds.password
             });
             this.socket.send(credMsg);
             // Clear credentials from memory
@@ -215,7 +217,9 @@ Client.prototype.connect = function() {
         }
         
         if (!this.manualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
-            const exponentialDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
+            // Harmonize backoff with session.js (uses attempts-1 for first retry)
+            const exponent = Math.max(0, this.reconnectAttempts - 1);
+            const exponentialDelay = this.reconnectDelay * Math.pow(2, exponent);
             this.scheduleReconnect(Math.min(exponentialDelay, 30000));
         }
         this.deinitialize();

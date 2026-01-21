@@ -175,7 +175,8 @@ export const SessionMixin = {
         };
         this.socket.onclose = (e) => {
             if (!this.manualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
-                const exponentialDelay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+                const exponent = Math.max(0, this.reconnectAttempts - 1);
+                const exponentialDelay = this.reconnectDelay * Math.pow(2, exponent);
                 this.scheduleReconnect(Math.min(exponentialDelay, 30000));
             }
         };
