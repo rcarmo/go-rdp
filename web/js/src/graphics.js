@@ -42,10 +42,9 @@ export const GraphicsMixin = {
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
         
-        // Check WASM availability and recommend 16-bit if not available
+        // Check WASM availability (log only at debug level)
         if (!WASMCodec.isSupported()) {
-            Logger.warn('Graphics', 'WebAssembly not available - using JS fallback');
-            Logger.info('Graphics', 'For best performance, select 16-bit color depth');
+            Logger.debug('Graphics', 'WebAssembly not available - using JS fallback');
         }
     },
     
@@ -84,7 +83,7 @@ export const GraphicsMixin = {
             return;
         }
         
-        Logger.info("Palette", `Received ${numberColors} colors`);
+        Logger.debug("Palette", `Received ${numberColors} colors`);
         
         const paletteData = r.blob(numberColors * 3);
         const paletteArray = new Uint8Array(paletteData);
@@ -365,7 +364,7 @@ export const GraphicsMixin = {
             const newHeight = window.innerHeight;
             
             if (newWidth !== this.originalWidth || newHeight !== this.originalHeight) {
-                Logger.info("Resize", `${newWidth}x${newHeight}, reconnecting...`);
+                Logger.debug("Resize", `${newWidth}x${newHeight}, reconnecting...`);
                 this.showUserInfo('Resizing desktop...');
                 this.reconnectWithNewSize(newWidth, newHeight);
             }
@@ -376,7 +375,7 @@ export const GraphicsMixin = {
      * Show the canvas (hide login form)
      */
     showCanvas() {
-        Logger.info("Connection", "First bitmap received - session active");
+        Logger.debug("Connection", "First bitmap received - session active");
         
         const loginForm = document.getElementById('login-form');
         const canvasContainer = document.getElementById('canvas-container');

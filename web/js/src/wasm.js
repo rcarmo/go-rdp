@@ -98,7 +98,7 @@ export const WASMCodec = {
             
             this.ready = true;
             this.initError = null;
-            Logger.info('WASM', 'Codec module initialized (RLE + RFX)');
+            Logger.debug('WASM', 'Codec module initialized (RLE + RFX)');
             return true;
             
         } catch (error) {

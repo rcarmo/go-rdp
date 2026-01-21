@@ -29,7 +29,7 @@ const AudioMixin = {
             this.audioGain.gain.value = this.audioVolume;
             this.audioEnabled = true;
             
-            Logger.info('Audio', `Initialized: ${this.audioContext.sampleRate}Hz`);
+            Logger.debug('Audio', `Initialized: ${this.audioContext.sampleRate}Hz`);
         } catch (e) {
             Logger.error('Audio', `Failed to initialize: ${e.message}`);
             this.audioEnabled = false;
@@ -43,7 +43,7 @@ const AudioMixin = {
         }
         this.audioEnabled = false;
         this.audioQueue = [];
-        Logger.info('Audio', 'Disabled');
+        Logger.debug('Audio', 'Disabled');
     },
 
     setAudioVolume(volume) {
@@ -95,7 +95,7 @@ const AudioMixin = {
             this.audioBitsPerSample = bitsPerSample;
             offset = 12;
             
-            Logger.info('Audio', `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);
+            Logger.debug('Audio', `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);
         }
 
         // Get PCM data
@@ -202,7 +202,7 @@ const AudioMixin = {
     resumeAudioContext() {
         if (this.audioContext && this.audioContext.state === 'suspended') {
             this.audioContext.resume().then(() => {
-                Logger.info('Audio', 'Context resumed');
+                Logger.debug('Audio', 'Context resumed');
             });
         }
     }

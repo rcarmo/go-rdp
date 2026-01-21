@@ -38,8 +38,8 @@ var RDP = (() => {
     NONE: 4
   };
   var Logger2 = {
-    level: LogLevel.INFO,
-    // Default to INFO level
+    level: LogLevel.WARN,
+    // Default to WARN - minimal console output
     /**
      * Set log level from string
      * @param {string} levelStr - 'debug', 'info', 'warn', 'error', 'none'
@@ -53,7 +53,7 @@ var RDP = (() => {
         "error": LogLevel.ERROR,
         "none": LogLevel.NONE
       };
-      this.level = levels[levelStr.toLowerCase()] ?? LogLevel.INFO;
+      this.level = levels[levelStr.toLowerCase()] ?? LogLevel.WARN;
     },
     /**
      * Log debug message (protocol details, byte dumps)
@@ -102,10 +102,22 @@ var RDP = (() => {
       this.level = LogLevel.DEBUG;
     },
     /**
-     * Disable all logging except errors
+     * Enable info logging
+     */
+    enableInfo() {
+      this.level = LogLevel.INFO;
+    },
+    /**
+     * Disable all logging except errors (default)
      */
     quiet() {
       this.level = LogLevel.ERROR;
+    },
+    /**
+     * Disable all logging
+     */
+    silent() {
+      this.level = LogLevel.NONE;
     }
   };
 
@@ -205,7 +217,7 @@ var RDP = (() => {
       }
       this.reconnectTimeout = setTimeout(() => {
         if (this.shouldAutoReconnect() && !this.connected) {
-          Logger2.info("Session", `Reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+          Logger2.debug("Session", `Reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
           this.attemptReconnect();
         }
       }, delay);
@@ -315,7 +327,7 @@ var RDP = (() => {
      * Handle idle timeout
      */
     handleIdleTimeout() {
-      Logger2.info("Session", "Disconnected due to inactivity");
+      Logger2.debug("Session", "Disconnected due to inactivity");
       this.showUserWarning("Session disconnected due to inactivity");
       this.disconnect();
     },
@@ -323,7 +335,7 @@ var RDP = (() => {
      * Handle session timeout
      */
     handleSessionTimeout() {
-      Logger2.info("Session", "Maximum session time reached (8 hours)");
+      Logger2.debug("Session", "Maximum session time reached (8 hours)");
       this.showUserWarning("Session disconnected - maximum session time reached (8 hours)");
       this.disconnect();
     },
@@ -734,7 +746,7 @@ var RDP = (() => {
         }
         this.ready = true;
         this.initError = null;
-        Logger2.info("WASM", "Codec module initialized (RLE + RFX)");
+        Logger2.debug("WASM", "Codec module initialized (RLE + RFX)");
         return true;
       } catch (error) {
         this.initError = error.message;
@@ -1215,8 +1227,7 @@ var RDP = (() => {
       this._fallbackWarningShown = false;
       this.handleResize = this.handleResize.bind(this);
       if (!WASMCodec.isSupported()) {
-        Logger2.warn("Graphics", "WebAssembly not available - using JS fallback");
-        Logger2.info("Graphics", "For best performance, select 16-bit color depth");
+        Logger2.debug("Graphics", "WebAssembly not available - using JS fallback");
       }
     },
     /**
@@ -1248,7 +1259,7 @@ var RDP = (() => {
         Logger2.warn("Palette", `Invalid color count: ${numberColors}`);
         return;
       }
-      Logger2.info("Palette", `Received ${numberColors} colors`);
+      Logger2.debug("Palette", `Received ${numberColors} colors`);
       const paletteData = r.blob(numberColors * 3);
       const paletteArray = new Uint8Array(paletteData);
       if (WASMCodec.isReady()) {
@@ -1479,7 +1490,7 @@ var RDP = (() => {
         const newWidth = window.innerWidth;
         const newHeight = window.innerHeight;
         if (newWidth !== this.originalWidth || newHeight !== this.originalHeight) {
-          Logger2.info("Resize", `${newWidth}x${newHeight}, reconnecting...`);
+          Logger2.debug("Resize", `${newWidth}x${newHeight}, reconnecting...`);
           this.showUserInfo("Resizing desktop...");
           this.reconnectWithNewSize(newWidth, newHeight);
         }
@@ -1489,7 +1500,7 @@ var RDP = (() => {
      * Show the canvas (hide login form)
      */
     showCanvas() {
-      Logger2.info("Connection", "First bitmap received - session active");
+      Logger2.debug("Connection", "First bitmap received - session active");
       const loginForm = document.getElementById("login-form");
       const canvasContainer = document.getElementById("canvas-container");
       if (loginForm) {
@@ -1581,7 +1592,7 @@ var RDP = (() => {
      */
     initClipboardSupport() {
       this.clipboardApiSupported = !!(navigator.clipboard && navigator.clipboard.writeText);
-      Logger2.info("Clipboard", `API supported: ${this.clipboardApiSupported}`);
+      Logger2.debug("Clipboard", `API supported: ${this.clipboardApiSupported}`);
     },
     /**
      * Type text to remote by sending key events
@@ -1596,7 +1607,7 @@ var RDP = (() => {
         text = text.substring(0, maxLength);
         this.showUserWarning("Text truncated to " + maxLength + " characters");
       }
-      Logger2.info("Clipboard", `Typing ${text.length} chars to remote`);
+      Logger2.debug("Clipboard", `Typing ${text.length} chars to remote`);
       let index = 0;
       const typeNext = () => {
         if (index >= text.length || !this.connected)
@@ -1883,7 +1894,7 @@ var RDP = (() => {
         this.audioGain.connect(this.audioContext.destination);
         this.audioGain.gain.value = this.audioVolume;
         this.audioEnabled = true;
-        Logger.info("Audio", `Initialized: ${this.audioContext.sampleRate}Hz`);
+        Logger.debug("Audio", `Initialized: ${this.audioContext.sampleRate}Hz`);
       } catch (e) {
         Logger.error("Audio", `Failed to initialize: ${e.message}`);
         this.audioEnabled = false;
@@ -1896,7 +1907,7 @@ var RDP = (() => {
       }
       this.audioEnabled = false;
       this.audioQueue = [];
-      Logger.info("Audio", "Disabled");
+      Logger.debug("Audio", "Disabled");
     },
     setAudioVolume(volume) {
       this.audioVolume = Math.max(0, Math.min(1, volume));
@@ -1935,7 +1946,7 @@ var RDP = (() => {
         this.audioSampleRate = sampleRate;
         this.audioBitsPerSample = bitsPerSample;
         offset = 12;
-        Logger.info("Audio", `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);
+        Logger.debug("Audio", `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);
       }
       const pcmData = data.slice(offset);
       if (pcmData.length === 0) {
@@ -2015,7 +2026,7 @@ var RDP = (() => {
     resumeAudioContext() {
       if (this.audioContext && this.audioContext.state === "suspended") {
         this.audioContext.resume().then(() => {
-          Logger.info("Audio", "Context resumed");
+          Logger.debug("Audio", "Context resumed");
         });
       }
     }
@@ -2088,24 +2099,24 @@ var RDP = (() => {
     const disableNLA = disableNLAEl ? disableNLAEl.checked : false;
     const enableAudioEl = document.getElementById("enableAudio");
     const enableAudio = enableAudioEl ? enableAudioEl.checked : false;
-    Logger2.info("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
+    Logger2.debug("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
     const url = new URL(this.websocketURL);
     url.searchParams.set("width", screenWidth);
     url.searchParams.set("height", screenHeight);
     url.searchParams.set("colorDepth", colorDepth);
     if (disableNLA) {
       url.searchParams.set("disableNLA", "true");
-      Logger2.info("Connection", "NLA disabled");
+      Logger2.debug("Connection", "NLA disabled");
     }
     if (enableAudio) {
       url.searchParams.set("audio", "true");
       this.enableAudio();
-      Logger2.info("Audio", "Audio redirection enabled");
+      Logger2.debug("Audio", "Audio redirection enabled");
     }
     this._pendingCredentials = { host, user, password };
     this.socket = new WebSocket(url.toString());
     this.socket.onopen = () => {
-      Logger2.info("Connection", "WebSocket opened, sending credentials");
+      Logger2.debug("Connection", "WebSocket opened, sending credentials");
       if (this._pendingCredentials) {
         const credMsg = JSON.stringify({
           type: "credentials",
@@ -2138,7 +2149,7 @@ var RDP = (() => {
       this.emitEvent("error", { message: errorMsg, code: e.code });
     };
     this.socket.onclose = (e) => {
-      Logger2.info("Connection", `WebSocket closed (code=${e.code}, reason=${e.reason || "none"})`);
+      Logger2.debug("Connection", `WebSocket closed (code=${e.code}, reason=${e.reason || "none"})`);
       this.emitEvent("disconnected", {
         code: e.code,
         reason: e.reason,
@@ -2277,7 +2288,7 @@ var RDP = (() => {
       const text = new TextDecoder().decode(arrayBuffer);
       const message = JSON.parse(text);
       if (message.type === "clipboard_response") {
-        Logger2.info("Clipboard", "Received remote clipboard data");
+        Logger2.debug("Clipboard", "Received remote clipboard data");
         this.handleRemoteClipboard(message.data);
         return;
       }
@@ -2293,9 +2304,8 @@ var RDP = (() => {
       if (message.type === "capabilities") {
         if (message.logLevel) {
           Logger2.setLevel(message.logLevel);
-          Logger2.info("Config", `Log level synced: ${message.logLevel}`);
         }
-        Logger2.info("Capabilities", `Server: codecs=${message.codecs?.join(",") || "none"}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
+        Logger2.debug("Capabilities", `Server: codecs=${message.codecs?.join(",") || "none"}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
         this.serverCapabilities = message;
         return;
       }

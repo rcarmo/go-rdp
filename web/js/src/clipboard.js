@@ -15,7 +15,7 @@ export const ClipboardMixin = {
      */
     initClipboardSupport() {
         this.clipboardApiSupported = !!(navigator.clipboard && navigator.clipboard.writeText);
-        Logger.info("Clipboard", `API supported: ${this.clipboardApiSupported}`);
+        Logger.debug("Clipboard", `API supported: ${this.clipboardApiSupported}`);
     },
     
     /**
@@ -33,7 +33,7 @@ export const ClipboardMixin = {
             this.showUserWarning('Text truncated to ' + maxLength + ' characters');
         }
         
-        Logger.info("Clipboard", `Typing ${text.length} chars to remote`);
+        Logger.debug("Clipboard", `Typing ${text.length} chars to remote`);
         
         // Type each character with a small delay to prevent overwhelming the connection
         let index = 0;

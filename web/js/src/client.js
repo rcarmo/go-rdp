@@ -117,7 +117,7 @@ Client.prototype.connect = function() {
     const enableAudioEl = document.getElementById('enableAudio');
     const enableAudio = enableAudioEl ? enableAudioEl.checked : false;
 
-    Logger.info("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
+    Logger.debug("Connection", `Connecting to ${host} as ${user} (${screenWidth}x${screenHeight}, ${colorDepth}bpp)`);
 
     // Build URL with non-sensitive parameters only (no password!)
     const url = new URL(this.websocketURL);
@@ -126,12 +126,12 @@ Client.prototype.connect = function() {
     url.searchParams.set('colorDepth', colorDepth);
     if (disableNLA) {
         url.searchParams.set('disableNLA', 'true');
-        Logger.info("Connection", "NLA disabled");
+        Logger.debug("Connection", "NLA disabled");
     }
     if (enableAudio) {
         url.searchParams.set('audio', 'true');
         this.enableAudio();
-        Logger.info("Audio", "Audio redirection enabled");
+        Logger.debug("Audio", "Audio redirection enabled");
     }
 
     // Store credentials to send after connection opens
@@ -140,7 +140,7 @@ Client.prototype.connect = function() {
     this.socket = new WebSocket(url.toString());
 
     this.socket.onopen = () => {
-        Logger.info("Connection", "WebSocket opened, sending credentials");
+        Logger.debug("Connection", "WebSocket opened, sending credentials");
         
         // Send credentials securely via WebSocket (not URL)
         if (this._pendingCredentials) {
@@ -182,7 +182,7 @@ Client.prototype.connect = function() {
     };
 
     this.socket.onclose = (e) => {
-        Logger.info("Connection", `WebSocket closed (code=${e.code}, reason=${e.reason || 'none'})`);
+        Logger.debug("Connection", `WebSocket closed (code=${e.code}, reason=${e.reason || 'none'})`);
 
         this.emitEvent('disconnected', {
             code: e.code,
@@ -372,7 +372,7 @@ Client.prototype.handleMessage = function(arrayBuffer) {
         const message = JSON.parse(text);
         
         if (message.type === 'clipboard_response') {
-            Logger.info("Clipboard", "Received remote clipboard data");
+            Logger.debug("Clipboard", "Received remote clipboard data");
             this.handleRemoteClipboard(message.data);
             return;
         }
@@ -392,9 +392,8 @@ Client.prototype.handleMessage = function(arrayBuffer) {
             // Sync log level with backend
             if (message.logLevel) {
                 Logger.setLevel(message.logLevel);
-                Logger.info("Config", `Log level synced: ${message.logLevel}`);
             }
-            Logger.info("Capabilities", `Server: codecs=${message.codecs?.join(',') || 'none'}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
+            Logger.debug("Capabilities", `Server: codecs=${message.codecs?.join(',') || 'none'}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
             this.serverCapabilities = message;
             return;
         }

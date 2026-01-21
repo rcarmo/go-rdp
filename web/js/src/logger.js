@@ -16,7 +16,7 @@ const LogLevel = {
 };
 
 export const Logger = {
-    level: LogLevel.INFO,  // Default to INFO level
+    level: LogLevel.WARN,  // Default to WARN - minimal console output
     
     /**
      * Set log level from string
@@ -31,7 +31,7 @@ export const Logger = {
             'error': LogLevel.ERROR,
             'none': LogLevel.NONE
         };
-        this.level = levels[levelStr.toLowerCase()] ?? LogLevel.INFO;
+        this.level = levels[levelStr.toLowerCase()] ?? LogLevel.WARN;
     },
     
     /**
@@ -86,10 +86,24 @@ export const Logger = {
     },
     
     /**
-     * Disable all logging except errors
+     * Enable info logging
+     */
+    enableInfo() {
+        this.level = LogLevel.INFO;
+    },
+    
+    /**
+     * Disable all logging except errors (default)
      */
     quiet() {
         this.level = LogLevel.ERROR;
+    },
+    
+    /**
+     * Disable all logging
+     */
+    silent() {
+        this.level = LogLevel.NONE;
     }
 };
 

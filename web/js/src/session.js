@@ -118,7 +118,7 @@ export const SessionMixin = {
         
         this.reconnectTimeout = setTimeout(() => {
             if (this.shouldAutoReconnect() && !this.connected) {
-                Logger.info("Session", `Reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
+                Logger.debug("Session", `Reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts}`);
                 this.attemptReconnect();
             }
         }, delay);
@@ -251,7 +251,7 @@ export const SessionMixin = {
      * Handle idle timeout
      */
     handleIdleTimeout() {
-        Logger.info("Session", "Disconnected due to inactivity");
+        Logger.debug("Session", "Disconnected due to inactivity");
         this.showUserWarning('Session disconnected due to inactivity');
         this.disconnect();
     },
@@ -260,7 +260,7 @@ export const SessionMixin = {
      * Handle session timeout
      */
     handleSessionTimeout() {
-        Logger.info("Session", "Maximum session time reached (8 hours)");
+        Logger.debug("Session", "Maximum session time reached (8 hours)");
         this.showUserWarning('Session disconnected - maximum session time reached (8 hours)');
         this.disconnect();
     },
