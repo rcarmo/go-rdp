@@ -70,6 +70,35 @@ export TLS_SERVER_NAME=
 
 # Enable Network Level Authentication (default: true)
 export USE_NLA=true
+
+# Enable RemoteFX codec support (default: true)
+# Set to false to disable RFX and use simpler codecs for testing
+export RDP_ENABLE_RFX=true
+```
+
+## Command-Line Flags
+
+The server also accepts command-line flags that override environment variables:
+
+```bash
+./rdp-html5 [options]
+
+Options:
+  -host              Server listen host (default: 0.0.0.0)
+  -port              Server listen port (default: 8080)
+  -log-level         Log level: debug, info, warn, error
+  -skip-tls-verify   Skip TLS certificate validation
+  -tls-server-name   Override TLS server name
+  -nla               Enable Network Level Authentication
+  -no-rfx            Disable RemoteFX codec support
+  -help              Show help message
+  -version           Show version information
+```
+
+Example:
+```bash
+# Run with RFX disabled for testing
+./rdp-html5 -port 8080 -no-rfx -log-level debug
 ```
 
 ## Docker Configuration

@@ -42,11 +42,28 @@ docker run -e LOG_LEVEL=debug -p 8080:8080 ghcr.io/rcarmo/rdp-html5:latest
 
 ## Client-side Logging
 
-The browser client has a matching leveled logger that synchronizes with the server's log level.
+The browser client has a matching leveled logger. By default, it only logs warnings and errors to keep the console clean.
 
-### Automatic Level Sync
+### Capabilities Logging
 
-When a connection is established, the server sends its log level to the browser. The browser automatically adjusts to match.
+Upon connection, the client logs its capabilities to the console:
+
+```
+[RDP Client] Capabilities
+  WASM: ✓ loaded
+  Codecs: RemoteFX, RLE, NSCodec
+  Display: 1920×1080
+  Color: 32bpp
+```
+
+If WASM is unavailable:
+```
+[RDP Client] Capabilities
+  WASM: ✗ unsupported
+  Codecs: JS-Fallback
+  Display: 1920×1080
+  Color: 16bpp
+```
 
 ### Manual Override
 
@@ -58,7 +75,9 @@ Logger.setLevel('debug');  // debug, info, warn, error
 
 // Convenience methods
 Logger.enableDebug();  // Set to debug
+Logger.enableInfo();   // Set to info
 Logger.quiet();        // Set to error only
+Logger.silent();       // Disable all logging
 
 // Check current level
 Logger.getLevel();     // Returns current level string
@@ -70,7 +89,7 @@ Logger.getLevel();     // Returns current level string
 |-------|-------------------|
 | `debug` | Bitmap updates, cursor cache, WebSocket frames, timing |
 | `info` | Connection state, capabilities, channel events |
-| `warn` | Performance issues, unsupported features |
+| `warn` | Performance issues, unsupported features (default) |
 | `error` | Connection failures, rendering errors |
 
 ### Browser Console Examples

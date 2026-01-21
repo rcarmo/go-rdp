@@ -227,6 +227,23 @@ Current coverage: **84.6%** (69 tests)
 - JavaScript integration (WASMCodec, RFXDecoder)
 - Audited against FreeRDP reference implementation
 - 84.6% test coverage
+- Server-side enable/disable via `--no-rfx` flag or `RDP_ENABLE_RFX=false`
+
+### Disabling RFX for Testing
+
+To disable RemoteFX and fall back to simpler codecs:
+
+```bash
+# Command line
+./rdp-html5 -no-rfx
+
+# Environment variable
+export RDP_ENABLE_RFX=false
+./rdp-html5
+
+# Docker
+docker run -e RDP_ENABLE_RFX=false -p 8080:8080 ghcr.io/rcarmo/rdp-html5:latest
+```
 
 ### Future Work (Protocol Integration)
 

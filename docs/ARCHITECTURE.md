@@ -510,10 +510,46 @@ func main() {
         "processBitmap":   js.FuncOf(processBitmap),
         "decodeNSCodec":   js.FuncOf(decodeNSCodec),
         "setPalette":      js.FuncOf(setPalette),
+        "setRFXQuant":     js.FuncOf(setRFXQuant),
+        "decodeRFXTile":   js.FuncOf(decodeRFXTile),
     })
     
     select {} // Keep alive
 }
+```
+
+### JavaScript Fallback Codecs
+
+When WASM is unavailable (older browsers, disabled WebAssembly), the client falls back to pure JavaScript implementations:
+
+```javascript
+// web/js/src/codec-fallback.js
+const FallbackCodec = {
+    rgb565ToRGBA(src, dst) { /* ... */ },
+    rgb555ToRGBA(src, dst) { /* ... */ },
+    bgr24ToRGBA(src, dst)  { /* ... */ },
+    bgra32ToRGBA(src, dst) { /* ... */ },
+    palette8ToRGBA(src, dst) { /* ... */ },
+    flipVertical(data, width, height, bytesPerPixel) { /* ... */ },
+    processBitmap(src, width, height, bpp, isCompressed, dst) { /* ... */ }
+};
+```
+
+**Fallback Limitations:**
+- Compressed formats (RLE, NSCodec, RemoteFX) not supported
+- Recommend 16-bit color depth for best performance
+- ~2-5x slower than WASM for color conversion
+
+### Capabilities Detection
+
+Upon connection, the client logs its capabilities:
+
+```
+[RDP Client] Capabilities
+  WASM: ✓ loaded
+  Codecs: RemoteFX, RLE, NSCodec
+  Display: 1920×1080
+  Color: 32bpp
 ```
 
 ### Bitmap Processing Pipeline
