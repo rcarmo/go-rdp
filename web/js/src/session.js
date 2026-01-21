@@ -157,7 +157,9 @@ export const SessionMixin = {
             this.initialize();
         };
         this.socket.onmessage = (e) => {
-            e.data.arrayBuffer().then((arrayBuffer) => this.handleMessage(arrayBuffer));
+            e.data.arrayBuffer()
+                .then((arrayBuffer) => this.handleMessage(arrayBuffer))
+                .catch((err) => Logger.error('Session', `Failed to read message: ${err.message}`));
         };
         this.socket.onerror = (e) => {
             Logger.warn("Session", "Reconnection error");

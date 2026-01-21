@@ -5,5 +5,8 @@ func (c *Client) Close() error {
 		c.railState = RailStateUninitialized
 	}
 
+	if c.conn == nil {
+		return nil
+	}
 	return c.conn.Close()
 }

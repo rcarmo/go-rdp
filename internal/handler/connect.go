@@ -186,8 +186,17 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	// Send server capabilities info to browser
 	sendCapabilitiesInfo(wsConn, rdpClient)
 
-	go wsToRdp(ctx, wsConn, rdpClient, cancel)
+	// Use WaitGroup to ensure clean goroutine shutdown
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		wsToRdp(ctx, wsConn, rdpClient, cancel)
+	}()
 	rdpToWs(ctx, rdpClient, wsConn)
+	
+	// Wait for wsToRdp goroutine to finish
+	wg.Wait()
 }
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) {

@@ -105,7 +105,7 @@
 				
 				<option value="file24">github.com/rcarmo/rdp-html5/internal/config/config.go (90.8%)</option>
 				
-				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (69.7%)</option>
+				<option value="file25">github.com/rcarmo/rdp-html5/internal/handler/connect.go (67.9%)</option>
 				
 				<option value="file26">github.com/rcarmo/rdp-html5/internal/logging/logging.go (88.6%)</option>
 				
@@ -219,7 +219,7 @@
 				
 				<option value="file81">github.com/rcarmo/rdp-html5/internal/rdp/client.go (86.4%)</option>
 				
-				<option value="file82">github.com/rcarmo/rdp-html5/internal/rdp/close.go (100.0%)</option>
+				<option value="file82">github.com/rcarmo/rdp-html5/internal/rdp/close.go (80.0%)</option>
 				
 				<option value="file83">github.com/rcarmo/rdp-html5/internal/rdp/connect.go (38.5%)</option>
 				
@@ -5762,8 +5762,17 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) <span class="cov6"
         // Send server capabilities info to browser
         <span class="cov0" title="0">sendCapabilitiesInfo(wsConn, rdpClient)
 
-        go wsToRdp(ctx, wsConn, rdpClient, cancel)
-        rdpToWs(ctx, rdpClient, wsConn)</span>
+        // Use WaitGroup to ensure clean goroutine shutdown
+        var wg sync.WaitGroup
+        wg.Add(1)
+        go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                wsToRdp(ctx, wsConn, rdpClient, cancel)
+        }</span>()
+        <span class="cov0" title="0">rdpToWs(ctx, rdpClient, wsConn)
+        
+        // Wait for wsToRdp goroutine to finish
+        wg.Wait()</span>
 }
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) <span class="cov5" title="11">{
@@ -14291,6 +14300,9 @@ func (c *Client) Close() error <span class="cov10" title="2">{
                 c.railState = RailStateUninitialized
         }</span>
 
+        <span class="cov10" title="2">if c.conn == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
         <span class="cov10" title="2">return c.conn.Close()</span>
 }
 </pre>

@@ -159,7 +159,9 @@ Client.prototype.connect = function() {
     };
 
     this.socket.onmessage = (e) => {
-        e.data.arrayBuffer().then((arrayBuffer) => this.handleMessage(arrayBuffer));
+        e.data.arrayBuffer()
+            .then((arrayBuffer) => this.handleMessage(arrayBuffer))
+            .catch((err) => Logger.error('Message', `Failed to read message: ${err.message}`));
     };
 
     this.socket.onerror = (e) => {
@@ -370,6 +372,32 @@ Client.prototype.handleMessage = function(arrayBuffer) {
         return;
     }
     
+    // Capabilities/JSON message (0xFF marker)
+    if (firstByte === 0xFF) {
+        try {
+            // Strip the 0xFF marker and parse JSON
+            const jsonData = arrayBuffer.slice(1);
+            const text = new TextDecoder().decode(jsonData);
+            const message = JSON.parse(text);
+            
+            if (message.type === 'capabilities') {
+                // Sync log level with backend
+                if (message.logLevel) {
+                    Logger.setLevel(message.logLevel);
+                }
+                Logger.debug("Capabilities", `Server: codecs=${message.codecs?.join(',') || 'none'}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
+                this.serverCapabilities = message;
+            } else if (message.type === 'error') {
+                this.showUserError(message.message);
+                this.emitEvent('error', {message: message.message});
+            }
+            return;
+        } catch (e) {
+            Logger.warn("Message", `Failed to parse 0xFF message: ${e.message}`);
+        }
+    }
+    
+    // Try parsing as plain JSON (for clipboard, file transfer, etc.)
     try {
         const text = new TextDecoder().decode(arrayBuffer);
         const message = JSON.parse(text);
@@ -388,16 +416,6 @@ Client.prototype.handleMessage = function(arrayBuffer) {
         if (message.type === 'error') {
             this.showUserError(message.message);
             this.emitEvent('error', {message: message.message});
-            return;
-        }
-        
-        if (message.type === 'capabilities') {
-            // Sync log level with backend
-            if (message.logLevel) {
-                Logger.setLevel(message.logLevel);
-            }
-            Logger.debug("Capabilities", `Server: codecs=${message.codecs?.join(',') || 'none'}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
-            this.serverCapabilities = message;
             return;
         }
     } catch (e) {
