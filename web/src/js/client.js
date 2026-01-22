@@ -135,6 +135,7 @@ Client.prototype.connect = function() {
     this._pendingCredentials = { host, user, password };
 
     this.socket = new WebSocket(url.toString());
+    this.socket.binaryType = 'arraybuffer';
 
     // Ensure onopen doesn't execute before credentials are staged
     const pendingCreds = this._pendingCredentials;
@@ -158,9 +159,17 @@ Client.prototype.connect = function() {
     };
 
     this.socket.onmessage = (e) => {
-        e.data.arrayBuffer()
-            .then((arrayBuffer) => this.handleMessage(arrayBuffer))
-            .catch((err) => Logger.error('Message', `Failed to read message: ${err.message}`));
+        // With binaryType='arraybuffer', e.data is already an ArrayBuffer
+        if (e.data instanceof ArrayBuffer) {
+            this.handleMessage(e.data);
+        } else if (e.data instanceof Blob) {
+            // Fallback for Blob (shouldn't happen with binaryType='arraybuffer')
+            e.data.arrayBuffer()
+                .then((arrayBuffer) => this.handleMessage(arrayBuffer))
+                .catch((err) => Logger.error('Message', `Failed to read message: ${err.message}`));
+        } else {
+            Logger.warn('Message', `Unexpected message type: ${typeof e.data}`);
+        }
     };
 
     this.socket.onerror = (e) => {

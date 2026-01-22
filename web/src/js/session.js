@@ -154,6 +154,7 @@ export const SessionMixin = {
         const password = this.passwordEl ? this.passwordEl.value : '';
 
         this.socket = new WebSocket(url.toString());
+        this.socket.binaryType = 'arraybuffer';
         this.socket.onopen = () => {
             // Send credentials securely via WebSocket message (not URL)
             const credMsg = JSON.stringify({
@@ -166,9 +167,14 @@ export const SessionMixin = {
             this.initialize();
         };
         this.socket.onmessage = (e) => {
-            e.data.arrayBuffer()
-                .then((arrayBuffer) => this.handleMessage(arrayBuffer))
-                .catch((err) => Logger.error('Session', `Failed to read message: ${err.message}`));
+            // With binaryType='arraybuffer', e.data is already an ArrayBuffer
+            if (e.data instanceof ArrayBuffer) {
+                this.handleMessage(e.data);
+            } else if (e.data instanceof Blob) {
+                e.data.arrayBuffer()
+                    .then((arrayBuffer) => this.handleMessage(arrayBuffer))
+                    .catch((err) => Logger.error('Session', `Failed to read message: ${err.message}`));
+            }
         };
         this.socket.onerror = (e) => {
             Logger.warn("Session", "Reconnection error");
