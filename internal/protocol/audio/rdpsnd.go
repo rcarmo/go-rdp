@@ -18,20 +18,19 @@ const (
 
 // RDPSND message types (MS-RDPEA 2.2.2)
 const (
-	CYCLIC_WRITE_KEYS     = 0x01
-	SND_WAVE_CONFIRM      = 0x05
-	SND_TRAINING_CONFIRM  = 0x07
-	SND_SERVER_AUDIO_CAPS = 0x07
-	SND_CLIENT_AUDIO_CAPS = 0x07
-	SND_AUDIO_CAPS        = 0x07
-	SND_WAVE              = 0x02
-	SND_WAVE2             = 0x0D
-	SND_TRAINING          = 0x06
-	SND_CLOSE             = 0x09
-	SND_FORMATS           = 0x04 // Client format request
-	SND_QUALITYMODE       = 0x0C
-	SND_CRYPT_KEY         = 0x08
-	SND_WAVE_ENCRYPT      = 0x0F
+	SND_CLOSE         = 0x01
+	SND_WAVE          = 0x02
+	SND_SET_VOLUME    = 0x03
+	SND_SET_PITCH     = 0x04
+	SND_WAVE_CONFIRM  = 0x05
+	SND_TRAINING      = 0x06
+	SND_FORMATS       = 0x07
+	SND_CRYPT_KEY     = 0x08
+	SND_WAVE_ENCRYPT  = 0x09
+	SND_UDP_WAVE      = 0x0A
+	SND_UDP_WAVE_LAST = 0x0B
+	SND_QUALITYMODE   = 0x0C
+	SND_WAVE2         = 0x0D
 )
 
 // Audio format tags (WAVE format identifiers)
@@ -147,12 +146,13 @@ func (f *AudioFormat) String() string {
 
 // ServerAudioFormats represents the server's audio format list (SNDC_FORMATS)
 type ServerAudioFormats struct {
-	Version            uint16
-	Padding            uint16
-	VolumePDUFlags     uint16
-	Padding2           uint16
+	Flags              uint32
+	Volume             uint32
+	Pitch              uint32
+	DGramPort          uint16
 	NumFormats         uint16
-	CbMaxPDUSize       uint8
+	LastBlockConfirmed uint8
+	Version            uint16
 	Pad                uint8
 	Formats            []AudioFormat
 }
@@ -163,22 +163,25 @@ func (s *ServerAudioFormats) Deserialize(data []byte) error {
 	}
 	r := bytes.NewReader(data)
 	
-	if err := binary.Read(r, binary.LittleEndian, &s.Version); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &s.Flags); err != nil {
 		return err
 	}
-	if err := binary.Read(r, binary.LittleEndian, &s.Padding); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &s.Volume); err != nil {
 		return err
 	}
-	if err := binary.Read(r, binary.LittleEndian, &s.VolumePDUFlags); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &s.Pitch); err != nil {
 		return err
 	}
-	if err := binary.Read(r, binary.LittleEndian, &s.Padding2); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &s.DGramPort); err != nil {
 		return err
 	}
 	if err := binary.Read(r, binary.LittleEndian, &s.NumFormats); err != nil {
 		return err
 	}
-	if err := binary.Read(r, binary.LittleEndian, &s.CbMaxPDUSize); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &s.LastBlockConfirmed); err != nil {
+		return err
+	}
+	if err := binary.Read(r, binary.LittleEndian, &s.Version); err != nil {
 		return err
 	}
 	if err := binary.Read(r, binary.LittleEndian, &s.Pad); err != nil {
@@ -197,24 +200,26 @@ func (s *ServerAudioFormats) Deserialize(data []byte) error {
 
 // ClientAudioFormats represents the client's response with supported formats
 type ClientAudioFormats struct {
-	Version            uint16
-	Padding            uint16
-	VolumePDUFlags     uint16
-	Padding2           uint16
+	Flags              uint32
+	Volume             uint32
+	Pitch              uint32
+	DGramPort          uint16
 	NumFormats         uint16
-	CbMaxPDUSize       uint8
+	LastBlockConfirmed uint8
+	Version            uint16
 	Pad                uint8
 	Formats            []AudioFormat
 }
 
 func (c *ClientAudioFormats) Serialize() []byte {
 	var buf bytes.Buffer
-	_ = binary.Write(&buf, binary.LittleEndian, c.Version)
-	_ = binary.Write(&buf, binary.LittleEndian, c.Padding)
-	_ = binary.Write(&buf, binary.LittleEndian, c.VolumePDUFlags)
-	_ = binary.Write(&buf, binary.LittleEndian, c.Padding2)
+	_ = binary.Write(&buf, binary.LittleEndian, c.Flags)
+	_ = binary.Write(&buf, binary.LittleEndian, c.Volume)
+	_ = binary.Write(&buf, binary.LittleEndian, c.Pitch)
+	_ = binary.Write(&buf, binary.LittleEndian, c.DGramPort)
 	_ = binary.Write(&buf, binary.LittleEndian, c.NumFormats)
-	_ = binary.Write(&buf, binary.LittleEndian, c.CbMaxPDUSize)
+	_ = binary.Write(&buf, binary.LittleEndian, c.LastBlockConfirmed)
+	_ = binary.Write(&buf, binary.LittleEndian, c.Version)
 	_ = binary.Write(&buf, binary.LittleEndian, c.Pad)
 
 	for _, format := range c.Formats {

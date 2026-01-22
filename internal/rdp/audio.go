@@ -118,7 +118,7 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 
 	h.serverFormats = serverFormats.Formats
 
-	// Find a format we support - prefer PCM for simplicity with Web Audio
+	// Find a format we support - require PCM for Web Audio
 	selectedIndex := -1
 	for i, format := range serverFormats.Formats {
 		logging.Debug("Audio:   Format %d: %s", i, format.String())
@@ -135,9 +135,15 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 	}
 
 	if selectedIndex == -1 {
-		logging.Debug("Audio: No compatible format found, using first available")
-		selectedIndex = 0
+		logging.Warn("Audio: No PCM formats offered by server; audio disabled")
+		h.selectedFormat = -1
+		h.serverFormats = nil
+		h.Disable()
+		return nil
 	}
+
+	// Log negotiated format for debugging
+	logging.Info("Audio: Negotiated PCM format: %s", serverFormats.Formats[selectedIndex].String())
 
 	if len(h.serverFormats) == 0 {
 		logging.Warn("Audio: No formats available from server")
@@ -167,14 +173,15 @@ func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version ui
 	}
 
 	clientFormats := audio.ClientAudioFormats{
-		Version:        version,
-		Padding:        0,
-		VolumePDUFlags: 0,
-		Padding2:       0,
-		NumFormats:     uint16(len(supportedFormats)),
-		CbMaxPDUSize:   0,
-		Pad:            0,
-		Formats:        supportedFormats,
+		Flags:              0,
+		Volume:             0,
+		Pitch:              0,
+		DGramPort:          0,
+		NumFormats:         uint16(len(supportedFormats)),
+		LastBlockConfirmed: 0,
+		Version:            version,
+		Pad:                0,
+		Formats:            supportedFormats,
 	}
 
 	body := clientFormats.Serialize()
@@ -205,7 +212,7 @@ func (h *AudioHandler) handleTraining(body []byte) error {
 		PackSize:  training.PackSize,
 	}
 
-	pdu := audio.BuildChannelPDU(audio.SND_TRAINING_CONFIRM, confirm.Serialize())
+	pdu := audio.BuildChannelPDU(audio.SND_TRAINING, confirm.Serialize())
 
 	channelID, ok := h.client.channelIDMap[audio.ChannelRDPSND]
 	if !ok {

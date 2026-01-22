@@ -140,7 +140,9 @@ type ServerAudioFormats struct {
     Pitch              uint32  // Initial pitch
     DGramPort          uint16  // UDP port (unused)
     NumFormats         uint16  // Number of formats
-    Version            uint8   // Protocol version
+    LastBlockConfirmed uint8   // Initial block confirmation counter
+    Version            uint16  // Protocol version
+    Pad                uint8   // Unused padding
     Formats            []AudioFormat
 }
 ```

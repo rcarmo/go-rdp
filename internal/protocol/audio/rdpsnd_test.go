@@ -18,7 +18,7 @@ func TestPDUHeader_Serialize(t *testing.T) {
 				Reserved: 0,
 				BodySize: 100,
 			},
-			expected: []byte{0x04, 0x00, 0x64, 0x00},
+			expected: []byte{0x07, 0x00, 0x64, 0x00},
 		},
 		{
 			name: "wave confirm",
@@ -51,7 +51,7 @@ func TestPDUHeader_Deserialize(t *testing.T) {
 	}{
 		{
 			name:        "valid header",
-			data:        []byte{0x04, 0x00, 0x64, 0x00},
+			data:        []byte{0x07, 0x00, 0x64, 0x00},
 			wantMsgType: SND_FORMATS,
 			wantSize:    100,
 			wantErr:     false,
@@ -188,12 +188,13 @@ func TestAudioFormat_String(t *testing.T) {
 func TestServerAudioFormats_Deserialize(t *testing.T) {
 	// Build a server audio formats packet
 	data := []byte{
-		0x06, 0x00, // Version = 6
-		0x00, 0x00, // Padding
-		0x00, 0x00, // VolumePDUFlags
-		0x00, 0x00, // Padding2
+		0x00, 0x00, 0x00, 0x00, // Flags
+		0x00, 0x00, 0x00, 0x00, // Volume
+		0x00, 0x00, 0x00, 0x00, // Pitch
+		0x00, 0x00, // DGramPort
 		0x01, 0x00, // NumFormats = 1
-		0x00,       // CbMaxPDUSize
+		0x00,       // LastBlockConfirmed
+		0x06, 0x00, // Version = 6
 		0x00,       // Pad
 		// Format 1: PCM 44100Hz stereo 16-bit
 		0x01, 0x00, // FormatTag = PCM
@@ -237,13 +238,14 @@ func TestServerAudioFormats_Deserialize_TooShort(t *testing.T) {
 
 func TestClientAudioFormats_Serialize(t *testing.T) {
 	c := ClientAudioFormats{
-		Version:        6,
-		Padding:        0,
-		VolumePDUFlags: 0,
-		Padding2:       0,
-		NumFormats:     1,
-		CbMaxPDUSize:   0,
-		Pad:            0,
+		Flags:              0,
+		Volume:             0,
+		Pitch:              0,
+		DGramPort:          0,
+		NumFormats:         1,
+		LastBlockConfirmed: 0,
+		Version:            6,
+		Pad:                0,
 		Formats: []AudioFormat{
 			{
 				FormatTag:      WAVE_FORMAT_PCM,
@@ -258,9 +260,9 @@ func TestClientAudioFormats_Serialize(t *testing.T) {
 	}
 
 	result := c.Serialize()
-	// Header (12 bytes) + 1 format (18 bytes) = 30 bytes
-	if len(result) != 30 {
-		t.Errorf("Serialize() length = %d, want 30", len(result))
+	// Header (20 bytes) + 1 format (18 bytes) = 38 bytes
+	if len(result) != 38 {
+		t.Errorf("Serialize() length = %d, want 38", len(result))
 	}
 }
 
