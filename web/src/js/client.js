@@ -518,6 +518,9 @@ Client.prototype.reconnectWithNewSize = function(width, height) {
     this.originalWidth = width;
     this.originalHeight = height;
     
+    // Reset canvas shown flag so showCanvas() will update CSS on reconnect
+    this.canvasShown = false;
+    
     if (this.socket) {
         this.manualDisconnect = true;
         this.socket.close(1000);
