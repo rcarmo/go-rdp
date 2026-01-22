@@ -48,6 +48,7 @@ type parsedArgs struct {
 
 // parseFlags parses command line flags and returns the parsed args.
 // Returns action string if help/version was shown (caller should return early).
+//go:noinline
 func parseFlags() (parsedArgs, string) {
 	return parseFlagsWithArgs(os.Args[1:])
 }

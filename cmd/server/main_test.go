@@ -372,16 +372,32 @@ func TestRateLimitMiddleware(t *testing.T) {
 	// would require time-based testing or more sophisticated mocking
 }
 
-func TestMainFunction(t *testing.T) {
-	// Save original os.Args
+func TestParseFlags_UsesOsArgs(t *testing.T) {
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
 
-	// Test help flag
-	os.Args = []string{"server", "-help"}
+	os.Args = []string{"server", "-host", " example ", "-port", " 1234 ", "-log-level", "debug"}
+	args, action := parseFlags()
+	assert.Empty(t, action)
+	assert.Equal(t, "example", args.host)
+	assert.Equal(t, "1234", args.port)
+	assert.Equal(t, "debug", args.logLevel)
+}
 
-	// This would normally call os.Exit, so we can't test it directly
-	// Instead, we'll test the parsing logic separately
+func TestMain_Help(t *testing.T) {
+	originalArgs := os.Args
+	defer func() { os.Args = originalArgs }()
+
+	os.Args = []string{"server", "-help"}
+	main() // should return early after printing help
+}
+
+func TestMain_Version(t *testing.T) {
+	originalArgs := os.Args
+	defer func() { os.Args = originalArgs }()
+
+	os.Args = []string{"server", "-version"}
+	main() // should return early after printing version
 }
 
 func TestCorsMiddlewareOptionsRequest(t *testing.T) {

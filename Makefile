@@ -57,8 +57,9 @@ lint: ## Run golangci-lint
 .PHONY: test
 test: ## Run unit tests with race + coverage
 	@echo "Running tests..."
-	go test -v -race -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
+	go test -v -race -coverprofile=coverage_all.out ./...
+	cp coverage_all.out coverage.out
+	go tool cover -html=coverage_all.out -o coverage.html
 
 .PHONY: test-race
 test-race: ## Run tests with race detection
@@ -218,7 +219,7 @@ install: build ## Install binary to GOPATH/bin
 clean: ## Clean build artifacts and caches
 	@echo "Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)
-	rm -f coverage.out coverage.html
+	rm -f coverage.out coverage_all.out coverage.html
 	go clean -cache
 	go clean -testcache
 

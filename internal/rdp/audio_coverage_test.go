@@ -532,3 +532,79 @@ func TestAudioHandler_HandleWave2Error(t *testing.T) {
 	err := handler.handleWave2([]byte{})
 	assert.Error(t, err)
 }
+
+func TestAudioHandler_HandleWave_ErrorShortBody(t *testing.T) {
+	h := NewAudioHandler(&Client{})
+	err := h.handleWave([]byte{0x01, 0x02})
+	assert.Error(t, err)
+}
+
+func TestAudioHandler_HandleWave_CallbackAndConfirm(t *testing.T) {
+	mockMCS := &MockMCSLayer{}
+	client := &Client{
+		mcsLayer: mockMCS,
+		userID:   1001,
+		channelIDMap: map[string]uint16{
+			audio.ChannelRDPSND: 1007,
+		},
+	}
+
+	h := NewAudioHandler(client)
+	h.serverFormats = []audio.AudioFormat{{FormatTag: audio.WAVE_FORMAT_PCM}}
+
+	var (
+		gotData []byte
+		gotTS   uint16
+		gotFmt  *audio.AudioFormat
+	)
+	h.SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) {
+		gotData = append([]byte(nil), data...)
+		gotFmt = format
+		gotTS = timestamp
+	})
+
+	body := make([]byte, 12+2)
+	binary.LittleEndian.PutUint16(body[0:2], 1234) // Timestamp
+	binary.LittleEndian.PutUint16(body[2:4], 0)    // FormatNo
+	body[4] = 7                                   // BlockNo
+	copy(body[8:12], []byte{0xAA, 0xBB, 0xCC, 0xDD})
+	copy(body[12:], []byte{0x01, 0x02})
+
+	err := h.handleWave(body)
+	require.NoError(t, err)
+	require.NotNil(t, gotFmt)
+	assert.Equal(t, uint16(1234), gotTS)
+	assert.Equal(t, []byte{0xAA, 0xBB, 0xCC, 0xDD, 0x01, 0x02}, gotData)
+	require.Len(t, mockMCS.SendCalls, 1)
+}
+
+func TestAudioHandler_HandleWave2_CallbackAndConfirm(t *testing.T) {
+	mockMCS := &MockMCSLayer{}
+	client := &Client{
+		mcsLayer: mockMCS,
+		userID:   1001,
+		channelIDMap: map[string]uint16{
+			audio.ChannelRDPSND: 1007,
+		},
+	}
+
+	h := NewAudioHandler(client)
+	h.serverFormats = []audio.AudioFormat{{FormatTag: audio.WAVE_FORMAT_PCM}}
+
+	var gotData []byte
+	h.SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) {
+		gotData = append([]byte(nil), data...)
+	})
+
+	body := make([]byte, 12+3)
+	binary.LittleEndian.PutUint16(body[0:2], 2222) // Timestamp
+	binary.LittleEndian.PutUint16(body[2:4], 0)    // FormatNo
+	body[4] = 9                                   // BlockNo
+	binary.LittleEndian.PutUint32(body[8:12], 3)   // DataSize (ignored by Deserialize)
+	copy(body[12:], []byte{0x11, 0x22, 0x33})
+
+	err := h.handleWave2(body)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x11, 0x22, 0x33}, gotData)
+	require.Len(t, mockMCS.SendCalls, 1)
+}
