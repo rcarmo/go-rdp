@@ -41,6 +41,13 @@ export const GraphicsMixin = {
         this._fallbackWarningShown = false;
         this._capabilitiesLogged = false;
         
+        // Performance stats
+        this._frameCount = 0;
+        this._lastFpsTime = 0;
+        this._fps = 0;
+        this._bytesReceived = 0;
+        this._statsInterval = null;
+        
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
         
@@ -48,6 +55,71 @@ export const GraphicsMixin = {
         if (!WASMCodec.isSupported()) {
             Logger.debug('Graphics', 'WebAssembly not available - using JS fallback');
         }
+    },
+    
+    /**
+     * Start performance stats tracking (only in debug mode)
+     */
+    startPerfStats() {
+        // Only enable perf stats in debug mode
+        if (!this.serverCapabilities?.logLevel || this.serverCapabilities.logLevel !== 'debug') {
+            return;
+        }
+        
+        this._frameCount = 0;
+        this._lastFpsTime = performance.now();
+        this._bytesReceived = 0;
+        
+        // Log stats every 10 seconds
+        this._statsInterval = setInterval(() => {
+            this.logPerfStats();
+        }, 10000);
+    },
+    
+    /**
+     * Stop performance stats tracking
+     */
+    stopPerfStats() {
+        if (this._statsInterval) {
+            clearInterval(this._statsInterval);
+            this._statsInterval = null;
+        }
+    },
+    
+    /**
+     * Log performance statistics
+     */
+    logPerfStats() {
+        const now = performance.now();
+        const elapsed = (now - this._lastFpsTime) / 1000;
+        
+        if (elapsed > 0) {
+            this._fps = this._frameCount / elapsed;
+            const kbps = (this._bytesReceived * 8 / 1000) / elapsed;
+            const cacheStats = this.getBitmapCacheStats();
+            
+            console.info(
+                '%c[RDP Stats]',
+                'color: #9C27B0; font-weight: bold',
+                `FPS: ${this._fps.toFixed(1)}`,
+                `| Bandwidth: ${kbps.toFixed(0)} kbps`,
+                `| Cache: ${cacheStats.hitRate} hit rate (${cacheStats.size} items)`
+            );
+        }
+        
+        // Reset counters
+        this._frameCount = 0;
+        this._bytesReceived = 0;
+        this._lastFpsTime = now;
+    },
+    
+    /**
+     * Record a frame for FPS calculation
+     * @param {number} bytes - Bytes received for this frame
+     */
+    recordFrame(bytes) {
+        this._frameCount++;
+        this._bytesReceived += bytes || 0;
     },
     
     /**
@@ -167,11 +239,17 @@ export const GraphicsMixin = {
      * @param {Reader} r - Binary reader
      */
     handleBitmap(r) {
+        const startOffset = r.offset;
         const bitmap = parseBitmapUpdate(r);
+        const bytesRead = r.offset - startOffset;
+        
+        // Record frame for stats
+        this.recordFrame(bytesRead);
         
         if (!this.canvasShown) {
             this.showCanvas();
             this.canvasShown = true;
+            this.startPerfStats();
         }
         
         if (this.multiMonitorMode && !this.multiMonitorMessageShown) {
@@ -327,6 +405,7 @@ export const GraphicsMixin = {
         }
         this.bitmapCacheHits = 0;
         this.bitmapCacheMisses = 0;
+        this.stopPerfStats();
     },
     
     /**

@@ -13,40 +13,61 @@ import (
 // TLS/NLA setup, licensing, and capabilities exchange.
 func (c *Client) Connect() error {
 	var err error
+	connectStart := time.Now()
+	timings := make(map[string]time.Duration)
 
+	phaseStart := time.Now()
 	if err = c.connectionInitiation(); err != nil {
 		return fmt.Errorf("connection initiation: %w", err)
 	}
+	timings["negotiation"] = time.Since(phaseStart)
 
+	phaseStart = time.Now()
 	if err = c.basicSettingsExchange(); err != nil {
 		return fmt.Errorf("basic settings exchange: %w", err)
 	}
+	timings["settings"] = time.Since(phaseStart)
 
+	phaseStart = time.Now()
 	if err = c.channelConnection(); err != nil {
 		return fmt.Errorf("channel connection: %w", err)
 	}
+	timings["channels"] = time.Since(phaseStart)
 
+	phaseStart = time.Now()
 	if err = c.secureSettingsExchange(); err != nil {
 		return fmt.Errorf("secure settings exchange: %w", err)
 	}
+	timings["secure"] = time.Since(phaseStart)
 
+	phaseStart = time.Now()
 	if err = c.licensing(); err != nil {
 		return fmt.Errorf("licensing: %w", err)
 	}
+	timings["licensing"] = time.Since(phaseStart)
 
+	phaseStart = time.Now()
 	if err = c.capabilitiesExchange(); err != nil {
 		return fmt.Errorf("capabilities exchange: %w", err)
 	}
+	timings["capabilities"] = time.Since(phaseStart)
 
+	phaseStart = time.Now()
 	if err = c.connectionFinalization(); err != nil {
 		return fmt.Errorf("connection finalizatioin: %w", err)
 	}
+	timings["finalization"] = time.Since(phaseStart)
 
 	// Request a full screen refresh from the server
 	if err = c.sendRefreshRect(); err != nil {
 		logging.Warn("RDP: Failed to send refresh rect: %v", err)
 		// Don't fail the connection if refresh rect fails
 	}
+
+	totalTime := time.Since(connectStart)
+	logging.Info("Connection timing: total=%v negotiation=%v settings=%v channels=%v secure=%v licensing=%v capabilities=%v finalization=%v",
+		totalTime, timings["negotiation"], timings["settings"], timings["channels"],
+		timings["secure"], timings["licensing"], timings["capabilities"], timings["finalization"])
 
 	return nil
 }
@@ -103,6 +124,20 @@ func (c *Client) connectionInitiation() error {
 
 	// Update selectedProtocol to what the server actually chose
 	c.selectedProtocol = selectedProto
+
+	// Log the selected security protocol
+	var protoName string
+	switch {
+	case selectedProto.IsHybrid():
+		protoName = "NLA/CredSSP"
+	case selectedProto.IsSSL():
+		protoName = "TLS"
+	case selectedProto.IsRDP():
+		protoName = "RDP (no encryption)"
+	default:
+		protoName = fmt.Sprintf("unknown(0x%x)", uint32(selectedProto))
+	}
+	logging.Info("Security: protocol=%s", protoName)
 
 	// Handle Hybrid (NLA) protocol - preferred when available
 	if selectedProto.IsHybrid() {

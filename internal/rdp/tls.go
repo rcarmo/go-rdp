@@ -130,6 +130,14 @@ func (c *Client) StartTLS() error {
 		_ = tcpConn.SetWriteDeadline(time.Time{})
 	}
 
+	// Log TLS connection details
+	state := tlsConn.ConnectionState()
+	logging.Info("TLS: version=%s cipher=%s serverName=%s verified=%v",
+		tlsVersionString(state.Version),
+		tls.CipherSuiteName(state.CipherSuite),
+		state.ServerName,
+		!insecureSkipVerify)
+
 	c.conn = tlsConn
 	c.buffReader = bufio.NewReaderSize(c.conn, readBufferSize)
 
@@ -189,5 +197,20 @@ func (c *Client) getMinTLSVersion(version string) uint16 {
 		return tls.VersionTLS13
 	default:
 		return tls.VersionTLS12 // Safe default
+	}
+}
+
+func tlsVersionString(version uint16) string {
+	switch version {
+	case tls.VersionTLS10:
+		return "TLS1.0"
+	case tls.VersionTLS11:
+		return "TLS1.1"
+	case tls.VersionTLS12:
+		return "TLS1.2"
+	case tls.VersionTLS13:
+		return "TLS1.3"
+	default:
+		return fmt.Sprintf("0x%04x", version)
 	}
 }
