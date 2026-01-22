@@ -44,6 +44,13 @@ const (
 	WAVE_FORMAT_MPEGLAYER3 = 0x0055
 )
 
+// Client capability flags (MS-RDPEA)
+const (
+	TSSNDCAPS_ALIVE  uint32 = 0x00000001
+	TSSNDCAPS_VOLUME uint32 = 0x00000002
+	TSSNDCAPS_PITCH  uint32 = 0x00000004
+)
+
 // PDUHeader represents the RDPSND PDU header
 type PDUHeader struct {
 	MsgType  uint8
@@ -216,7 +223,7 @@ func (c *ClientAudioFormats) Serialize() []byte {
 	_ = binary.Write(&buf, binary.LittleEndian, c.Flags)
 	_ = binary.Write(&buf, binary.LittleEndian, c.Volume)
 	_ = binary.Write(&buf, binary.LittleEndian, c.Pitch)
-	_ = binary.Write(&buf, binary.LittleEndian, c.DGramPort)
+	_ = binary.Write(&buf, binary.BigEndian, c.DGramPort)
 	_ = binary.Write(&buf, binary.LittleEndian, c.NumFormats)
 	_ = binary.Write(&buf, binary.LittleEndian, c.LastBlockConfirmed)
 	_ = binary.Write(&buf, binary.LittleEndian, c.Version)

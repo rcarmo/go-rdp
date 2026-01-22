@@ -238,9 +238,9 @@ func TestServerAudioFormats_Deserialize_TooShort(t *testing.T) {
 
 func TestClientAudioFormats_Serialize(t *testing.T) {
 	c := ClientAudioFormats{
-		Flags:              0,
-		Volume:             0,
-		Pitch:              0,
+		Flags:              TSSNDCAPS_ALIVE,
+		Volume:             0xFFFFFFFF,
+		Pitch:              0x00010000,
 		DGramPort:          0,
 		NumFormats:         1,
 		LastBlockConfirmed: 0,

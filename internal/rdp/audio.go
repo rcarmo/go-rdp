@@ -175,9 +175,9 @@ func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version ui
 	}
 
 	clientFormats := audio.ClientAudioFormats{
-		Flags:              0,
-		Volume:             0,
-		Pitch:              0,
+		Flags:              audio.TSSNDCAPS_ALIVE,
+		Volume:             0xFFFFFFFF,
+		Pitch:              0x00010000,
 		DGramPort:          0,
 		NumFormats:         uint16(len(supportedFormats)),
 		LastBlockConfirmed: 0,
