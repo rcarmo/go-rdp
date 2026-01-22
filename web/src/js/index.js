@@ -19,6 +19,20 @@ if (typeof window !== 'undefined') {
     window.FallbackCodec = FallbackCodec;
     window.isWASMSupported = isWASMSupported;
     window.ConnectionHistory = ConnectionHistory;
+    
+    // Auto-initialize WASM codec when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            WASMCodec.init('js/rle/rle.wasm').catch(err => {
+                Logger.warn('WASM', `Auto-init failed: ${err.message}`);
+            });
+        });
+    } else {
+        // DOM already loaded
+        WASMCodec.init('js/rle/rle.wasm').catch(err => {
+            Logger.warn('WASM', `Auto-init failed: ${err.message}`);
+        });
+    }
 }
 
 export { Client, Logger, WASMCodec, RFXDecoder, FallbackCodec, isWASMSupported, ConnectionHistory };

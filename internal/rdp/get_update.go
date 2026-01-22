@@ -56,30 +56,10 @@ func (c *Client) GetUpdate() (*Update, error) {
 		return nil, err
 	}
 
-	// For native FastPath bitmap updates, inject updateType for JS compatibility
-	// FastPath data format: [updateHeader (1 byte)] [size (2 bytes)] [data...]
-	// JS expects bitmap data to have: [updateType (2 bytes)] [numberRectangles (2 bytes)] [bitmap data...]
-	if len(fpUpdate.Data) >= 3 {
-		updateCode := fpUpdate.Data[0] & 0x0f
-		if updateCode == FastPathUpdateCodeBitmap {
-			// Inject updateType (0x0001 for bitmap) after header+size
-			oldData := fpUpdate.Data
-			newData := make([]byte, len(oldData)+2)
-			copy(newData[0:3], oldData[0:3]) // copy header + size
-			// Update size field to include the extra 2 bytes (with overflow check)
-			origSize := binary.LittleEndian.Uint16(oldData[1:3])
-			if origSize > 0xFFFD { // Check for overflow before adding 2
-				logging.Warn("FastPath size overflow: %d", origSize)
-			} else {
-				binary.LittleEndian.PutUint16(newData[1:3], origSize+2)
-			}
-			// Insert updateType
-			binary.LittleEndian.PutUint16(newData[3:5], SlowPathUpdateTypeBitmap)
-			// Copy rest of data
-			copy(newData[5:], oldData[3:])
-			fpUpdate.Data = newData
-		}
-	}
+	// FastPath bitmap updates already contain bitmapUpdateData with:
+	// [updateType:2] [numberRectangles:2] [rectangles...]
+	// The JS parser expects: [updateHeader:1] [size:2] [updateType:2] [numberRectangles:2] [...]
+	// which is exactly what fpUpdate.Data contains, so no modification needed.
 
 	return &Update{Data: fpUpdate.Data}, nil
 }
