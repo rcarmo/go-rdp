@@ -6,11 +6,14 @@ import (
 "io"
 )
 
+// VirtualChannelCapabilitySet represents the TS_VIRTUALCHANNEL_CAPABILITYSET
+// structure (MS-RDPBCGR 2.2.7.1.10).
 type VirtualChannelCapabilitySet struct {
 	Flags       uint32
 	VCChunkSize uint32
 }
 
+// NewVirtualChannelCapabilitySet creates a new VirtualChannelCapabilitySet.
 func NewVirtualChannelCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType:           CapabilitySetTypeVirtualChannel,
@@ -18,6 +21,7 @@ func NewVirtualChannelCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *VirtualChannelCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -27,6 +31,7 @@ func (s *VirtualChannelCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *VirtualChannelCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

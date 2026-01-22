@@ -1,3 +1,4 @@
+// Package pdu implements RDP Protocol Data Units as defined in MS-RDPBCGR.
 package pdu
 
 import (
@@ -8,12 +9,14 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/codec"
 )
 
+// LicensingBinaryBlob represents a LICENSE_BINARY_BLOB structure (MS-RDPELE 2.2.2.4).
 type LicensingBinaryBlob struct {
 	BlobType uint16
 	BlobLen  uint16
 	BlobData []byte
 }
 
+// Deserialize reads a LICENSE_BINARY_BLOB from wire.
 func (b *LicensingBinaryBlob) Deserialize(wire io.Reader) error {
 	if err := binary.Read(wire, binary.LittleEndian, &b.BlobType); err != nil {
 		return err
@@ -35,12 +38,14 @@ func (b *LicensingBinaryBlob) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// LicensingErrorMessage represents a LICENSE_ERROR_MESSAGE structure (MS-RDPELE 2.2.1.12).
 type LicensingErrorMessage struct {
 	ErrorCode       uint32
 	StateTransition uint32
 	ErrorInfo       LicensingBinaryBlob
 }
 
+// Deserialize reads a LICENSE_ERROR_MESSAGE from wire.
 func (m *LicensingErrorMessage) Deserialize(wire io.Reader) error {
 	if err := binary.Read(wire, binary.LittleEndian, &m.ErrorCode); err != nil {
 		return err
@@ -52,12 +57,14 @@ func (m *LicensingErrorMessage) Deserialize(wire io.Reader) error {
 	return m.ErrorInfo.Deserialize(wire)
 }
 
+// LicensingPreamble represents a LICENSE_PREAMBLE structure (MS-RDPELE 2.2.2.1).
 type LicensingPreamble struct {
 	MsgType uint8
 	Flags   uint8
 	MsgSize uint16
 }
 
+// Deserialize reads a LICENSE_PREAMBLE from wire.
 func (p *LicensingPreamble) Deserialize(wire io.Reader) error {
 	if err := binary.Read(wire, binary.LittleEndian, &p.MsgType); err != nil {
 		return err
@@ -68,6 +75,7 @@ func (p *LicensingPreamble) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &p.MsgSize)
 }
 
+// ServerLicenseError represents a Server License Error PDU (MS-RDPBCGR 2.2.1.12).
 type ServerLicenseError struct {
 	Preamble           LicensingPreamble
 	ValidClientMessage LicensingErrorMessage

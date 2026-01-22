@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// BrushSupportLevel indicates the level of brush support as defined in MS-RDPBCGR section 2.2.7.1.7.
 type BrushSupportLevel uint32
 
 const (
@@ -19,10 +20,12 @@ const (
 	BrushSupportLevelFull BrushSupportLevel = 2
 )
 
+// BrushCapabilitySet advertises brush capabilities as defined in MS-RDPBCGR section 2.2.7.1.7.
 type BrushCapabilitySet struct {
 	BrushSupportLevel BrushSupportLevel
 }
 
+// NewBrushCapabilitySet creates a BrushCapabilitySet with default values.
 func NewBrushCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType:  CapabilitySetTypeBrush,
@@ -30,6 +33,7 @@ func NewBrushCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the BrushCapabilitySet to wire format.
 func (s *BrushCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -38,15 +42,18 @@ func (s *BrushCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the BrushCapabilitySet from wire format.
 func (s *BrushCapabilitySet) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &s.BrushSupportLevel)
 }
 
+// CacheDefinition describes a glyph cache entry as defined in MS-RDPBCGR section 2.2.7.1.8.
 type CacheDefinition struct {
 	CacheEntries         uint16
 	CacheMaximumCellSize uint16
 }
 
+// Serialize encodes the CacheDefinition to wire format.
 func (d *CacheDefinition) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -56,6 +63,7 @@ func (d *CacheDefinition) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the CacheDefinition from wire format.
 func (d *CacheDefinition) Deserialize(wire io.Reader) error {
 	var err error
 

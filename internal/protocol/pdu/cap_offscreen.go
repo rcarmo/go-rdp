@@ -6,12 +6,15 @@ import (
 "io"
 )
 
+// OffscreenBitmapCacheCapabilitySet represents the TS_OFFSCREEN_CAPABILITYSET
+// structure (MS-RDPBCGR 2.2.7.2.6).
 type OffscreenBitmapCacheCapabilitySet struct {
 	OffscreenSupportLevel uint32
 	OffscreenCacheSize    uint16
 	OffscreenCacheEntries uint16
 }
 
+// NewOffscreenBitmapCacheCapabilitySet creates a new OffscreenBitmapCacheCapabilitySet.
 func NewOffscreenBitmapCacheCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType:                 CapabilitySetTypeOffscreenBitmapCache,
@@ -19,6 +22,7 @@ func NewOffscreenBitmapCacheCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *OffscreenBitmapCacheCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -29,6 +33,7 @@ func (s *OffscreenBitmapCacheCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *OffscreenBitmapCacheCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

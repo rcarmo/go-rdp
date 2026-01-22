@@ -6,10 +6,12 @@ import (
 	"io"
 )
 
+// ErrorInfoPDUData represents the TS_SET_ERROR_INFO_PDU structure (MS-RDPBCGR 2.2.5.1.1).
 type ErrorInfoPDUData struct {
 	ErrorInfo uint32
 }
 
+// Deserialize decodes the PDU data from wire format.
 func (pdu *ErrorInfoPDUData) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &pdu.ErrorInfo)
 }
@@ -137,6 +139,7 @@ var errorInfoMap = map[uint32]string{
 	0x00001195: "ERRINFO_DECRYPTFAILED2",
 }
 
+// String returns the string representation of the error info code.
 func (pdu *ErrorInfoPDUData) String() string {
 	code, ok := errorInfoMap[pdu.ErrorInfo]
 	if ok {

@@ -6,12 +6,15 @@ import (
 	"io"
 )
 
+// DrawNineGridCacheCapabilitySet represents the TS_DRAW_NINEGRID_CAPABILITYSET
+// structure (MS-RDPBCGR 2.2.7.2.8).
 type DrawNineGridCacheCapabilitySet struct {
 	drawNineGridSupportLevel uint32
 	drawNineGridCacheSize    uint16
 	drawNineGridCacheEntries uint16
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *DrawNineGridCacheCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -22,6 +25,7 @@ func (s *DrawNineGridCacheCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *DrawNineGridCacheCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -43,6 +47,7 @@ func (s *DrawNineGridCacheCapabilitySet) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// GDICacheEntries contains GDI+ cache entry counts for the DrawGDIPlus capability set.
 type GDICacheEntries struct {
 	GdipGraphicsCacheEntries        uint16
 	GdipBrushCacheEntries           uint16
@@ -51,6 +56,7 @@ type GDICacheEntries struct {
 	GdipImageAttributesCacheEntries uint16
 }
 
+// Serialize encodes the cache entries to wire format.
 func (e *GDICacheEntries) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -63,6 +69,7 @@ func (e *GDICacheEntries) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the cache entries from wire format.
 func (e *GDICacheEntries) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -94,6 +101,7 @@ func (e *GDICacheEntries) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// GDICacheChunkSize contains GDI+ cache chunk sizes for the DrawGDIPlus capability set.
 type GDICacheChunkSize struct {
 	GdipGraphicsCacheChunkSize              uint16
 	GdipObjectBrushCacheChunkSize           uint16
@@ -101,6 +109,7 @@ type GDICacheChunkSize struct {
 	GdipObjectImageAttributesCacheChunkSize uint16
 }
 
+// Serialize encodes the cache chunk sizes to wire format.
 func (s *GDICacheChunkSize) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -112,6 +121,7 @@ func (s *GDICacheChunkSize) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the cache chunk sizes from wire format.
 func (s *GDICacheChunkSize) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -138,12 +148,14 @@ func (s *GDICacheChunkSize) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// GDIImageCacheProperties contains GDI+ image cache properties for the DrawGDIPlus capability set.
 type GDIImageCacheProperties struct {
 	GdipObjectImageCacheChunkSize uint16
 	GdipObjectImageCacheTotalSize uint16
 	GdipObjectImageCacheMaxSize   uint16
 }
 
+// Serialize encodes the image cache properties to wire format.
 func (p *GDIImageCacheProperties) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -154,6 +166,7 @@ func (p *GDIImageCacheProperties) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the image cache properties from wire format.
 func (p *GDIImageCacheProperties) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -175,6 +188,8 @@ func (p *GDIImageCacheProperties) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// DrawGDIPlusCapabilitySet represents the TS_DRAW_GDIPLUS_CAPABILITYSET
+// structure (MS-RDPBCGR 2.2.7.2.9).
 type DrawGDIPlusCapabilitySet struct {
 	drawGDIPlusSupportLevel  uint32
 	GdipVersion              uint32
@@ -184,6 +199,7 @@ type DrawGDIPlusCapabilitySet struct {
 	GdipImageCacheProperties GDIImageCacheProperties
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *DrawGDIPlusCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -198,6 +214,7 @@ func (s *DrawGDIPlusCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *DrawGDIPlusCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

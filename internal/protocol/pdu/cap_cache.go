@@ -6,6 +6,8 @@ import (
 	"io"
 )
 
+// BitmapCacheCapabilitySetRev1 advertises bitmap cache capabilities (revision 1)
+// as defined in MS-RDPBCGR section 2.2.7.1.4.1.
 type BitmapCacheCapabilitySetRev1 struct {
 	Cache0Entries         uint16
 	Cache0MaximumCellSize uint16
@@ -15,6 +17,7 @@ type BitmapCacheCapabilitySetRev1 struct {
 	Cache2MaximumCellSize uint16
 }
 
+// NewBitmapCacheCapabilitySetRev1 creates a BitmapCacheCapabilitySetRev1 with default values.
 func NewBitmapCacheCapabilitySetRev1() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType:            CapabilitySetTypeBitmapCache,
@@ -22,6 +25,7 @@ func NewBitmapCacheCapabilitySetRev1() CapabilitySet {
 	}
 }
 
+// Serialize encodes the BitmapCacheCapabilitySetRev1 to wire format.
 func (s *BitmapCacheCapabilitySetRev1) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -36,6 +40,7 @@ func (s *BitmapCacheCapabilitySetRev1) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the BitmapCacheCapabilitySetRev1 from wire format.
 func (s *BitmapCacheCapabilitySetRev1) Deserialize(wire io.Reader) error {
 	var (
 		padding [24]byte
@@ -80,6 +85,8 @@ func (s *BitmapCacheCapabilitySetRev1) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// BitmapCacheCapabilitySetRev2 advertises bitmap cache capabilities (revision 2)
+// as defined in MS-RDPBCGR section 2.2.7.1.4.2.
 type BitmapCacheCapabilitySetRev2 struct {
 	CacheFlags           uint16
 	NumCellCaches        uint8
@@ -90,6 +97,7 @@ type BitmapCacheCapabilitySetRev2 struct {
 	BitmapCache4CellInfo uint32
 }
 
+// NewBitmapCacheCapabilitySetRev2 creates a BitmapCacheCapabilitySetRev2 with default values.
 func NewBitmapCacheCapabilitySetRev2() *CapabilitySet {
 	return &CapabilitySet{
 		CapabilitySetType:            CapabilitySetTypeBitmapCacheRev2,
@@ -97,6 +105,7 @@ func NewBitmapCacheCapabilitySetRev2() *CapabilitySet {
 	}
 }
 
+// Serialize encodes the BitmapCacheCapabilitySetRev2 to wire format.
 func (s *BitmapCacheCapabilitySetRev2) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -113,6 +122,7 @@ func (s *BitmapCacheCapabilitySetRev2) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the BitmapCacheCapabilitySetRev2 from wire format.
 func (s *BitmapCacheCapabilitySetRev2) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -171,10 +181,13 @@ func (s *BitmapCacheCapabilitySetRev2) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// ColorCacheCapabilitySet advertises color table caching capabilities
+// as defined in MS-RDPBCGR section 2.2.7.1.5.
 type ColorCacheCapabilitySet struct {
 	ColorTableCacheSize uint16
 }
 
+// Serialize encodes the ColorCacheCapabilitySet to wire format.
 func (s *ColorCacheCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -184,6 +197,7 @@ func (s *ColorCacheCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the ColorCacheCapabilitySet from wire format.
 func (s *ColorCacheCapabilitySet) Deserialize(wire io.Reader) error {
 	var (
 		padding uint16

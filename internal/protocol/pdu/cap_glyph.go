@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// GlyphSupportLevel specifies the level of glyph caching support (MS-RDPBCGR 2.2.7.1.8).
 type GlyphSupportLevel uint16
 
 const (
@@ -22,12 +23,14 @@ const (
 	GlyphSupportLevelEncode GlyphSupportLevel = 3
 )
 
+// GlyphCacheCapabilitySet represents the Glyph Cache Capability Set (MS-RDPBCGR 2.2.7.1.8).
 type GlyphCacheCapabilitySet struct {
 	GlyphCache        [10]CacheDefinition
 	FragCache         uint32
 	GlyphSupportLevel GlyphSupportLevel
 }
 
+// NewGlyphCacheCapabilitySet creates a Glyph Cache Capability Set with default values.
 func NewGlyphCacheCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType:       CapabilitySetTypeGlyphCache,
@@ -35,6 +38,7 @@ func NewGlyphCacheCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *GlyphCacheCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -49,6 +53,7 @@ func (s *GlyphCacheCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *GlyphCacheCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

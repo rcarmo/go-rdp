@@ -6,10 +6,12 @@ import (
 "io"
 )
 
+// MultifragmentUpdateCapabilitySet represents the Multifragment Update Capability Set (MS-RDPBCGR 2.2.7.2.6).
 type MultifragmentUpdateCapabilitySet struct {
 	MaxRequestSize uint32
 }
 
+// NewMultifragmentUpdateCapabilitySet creates a Multifragment Update Capability Set with default values.
 func NewMultifragmentUpdateCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType:                CapabilitySetTypeMultifragmentUpdate,
@@ -17,6 +19,7 @@ func NewMultifragmentUpdateCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *MultifragmentUpdateCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -25,37 +28,47 @@ func (s *MultifragmentUpdateCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *MultifragmentUpdateCapabilitySet) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &s.MaxRequestSize)
 }
 
+// LargePointerCapabilitySet represents the Large Pointer Capability Set (MS-RDPBCGR 2.2.7.2.7).
 type LargePointerCapabilitySet struct {
 	LargePointerSupportFlags uint16
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *LargePointerCapabilitySet) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &s.LargePointerSupportFlags)
 }
 
+// DesktopCompositionCapabilitySet represents the Desktop Composition Capability Set (MS-RDPBCGR 2.2.7.2.8).
 type DesktopCompositionCapabilitySet struct {
 	CompDeskSupportLevel uint16
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *DesktopCompositionCapabilitySet) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &s.CompDeskSupportLevel)
 }
 
+// SurfaceCommandsCapabilitySet represents the Surface Commands Capability Set (MS-RDPBCGR 2.2.7.2.9).
 type SurfaceCommandsCapabilitySet struct {
 	CmdFlags uint32
 }
 
-// Surface command flags
+// Surface command flags (MS-RDPBCGR 2.2.7.2.9).
 const (
-	SurfCmdSetSurfaceBits  uint32 = 0x00000002
-	SurfCmdFrameMarker     uint32 = 0x00000010
-	SurfCmdStreamSurfBits  uint32 = 0x00000040
+	// SurfCmdSetSurfaceBits indicates support for Set Surface Bits Command.
+	SurfCmdSetSurfaceBits uint32 = 0x00000002
+	// SurfCmdFrameMarker indicates support for Frame Marker Command.
+	SurfCmdFrameMarker uint32 = 0x00000010
+	// SurfCmdStreamSurfBits indicates support for Stream Surface Bits Command.
+	SurfCmdStreamSurfBits uint32 = 0x00000040
 )
 
+// NewSurfaceCommandsCapabilitySet creates a Surface Commands Capability Set with default values.
 func NewSurfaceCommandsCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeSurfaceCommands,
@@ -65,6 +78,7 @@ func NewSurfaceCommandsCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *SurfaceCommandsCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 	_ = binary.Write(buf, binary.LittleEndian, s.CmdFlags)
@@ -72,6 +86,7 @@ func (s *SurfaceCommandsCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *SurfaceCommandsCapabilitySet) Deserialize(wire io.Reader) error {
 	var (
 		reserved uint32
@@ -91,12 +106,14 @@ func (s *SurfaceCommandsCapabilitySet) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// BitmapCodec represents a bitmap codec entry (MS-RDPBCGR 2.2.7.2.10.1).
 type BitmapCodec struct {
 	CodecGUID       [16]byte
 	CodecID         uint8
 	CodecProperties []byte
 }
 
+// Deserialize decodes the bitmap codec from wire format.
 func (c *BitmapCodec) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -127,10 +144,12 @@ func (c *BitmapCodec) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// BitmapCodecsCapabilitySet represents the Bitmap Codecs Capability Set (MS-RDPBCGR 2.2.7.2.10).
 type BitmapCodecsCapabilitySet struct {
 	BitmapCodecArray []BitmapCodec
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *BitmapCodecsCapabilitySet) Deserialize(wire io.Reader) error {
 	var (
 		bitmapCodecCount uint8
@@ -154,8 +173,8 @@ func (s *BitmapCodecsCapabilitySet) Deserialize(wire io.Reader) error {
 	return nil
 }
 
-// NSCodec GUID: CA8D1BB9-000F-154F-589F-AE2D1A87E2D6
-// Stored in little-endian format as per MS-RDPBCGR
+// NSCodecGUID is the GUID for NSCodec (CA8D1BB9-000F-154F-589F-AE2D1A87E2D6).
+// Stored in little-endian format as per MS-RDPBCGR.
 var NSCodecGUID = [16]byte{
 	0xB9, 0x1B, 0x8D, 0xCA, 0x0F, 0x00, 0x4F, 0x15,
 	0x58, 0x9F, 0xAE, 0x2D, 0x1A, 0x87, 0xE2, 0xD6,
@@ -168,6 +187,7 @@ type NSCodecCapabilitySet struct {
 	ColorLossLevel        uint8
 }
 
+// Serialize encodes the NSCodec properties to wire format.
 func (c *NSCodecCapabilitySet) Serialize() []byte {
 	return []byte{
 		c.FAllowDynamicFidelity,
@@ -176,6 +196,7 @@ func (c *NSCodecCapabilitySet) Serialize() []byte {
 	}
 }
 
+// Serialize encodes the bitmap codec to wire format.
 func (c *BitmapCodec) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -187,6 +208,7 @@ func (c *BitmapCodec) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *BitmapCodecsCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -221,10 +243,12 @@ func NewBitmapCodecsCapabilitySet() CapabilitySet {
 	}
 }
 
+// RailCapabilitySet represents the Remote Programs Capability Set (MS-RDPBCGR 2.2.7.2.4).
 type RailCapabilitySet struct {
 	RailSupportLevel uint32
 }
 
+// NewRailCapabilitySet creates a Remote Programs Capability Set with default values.
 func NewRailCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeRail,
@@ -234,6 +258,7 @@ func NewRailCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *RailCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -242,12 +267,14 @@ func (s *RailCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// WindowListCapabilitySet represents the Window List Capability Set (MS-RDPBCGR 2.2.7.2.5).
 type WindowListCapabilitySet struct {
 	WndSupportLevel     uint32
 	NumIconCaches       uint8
 	NumIconCacheEntries uint16
 }
 
+// NewWindowListCapabilitySet creates a Window List Capability Set with default values.
 func NewWindowListCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeWindow,
@@ -257,6 +284,7 @@ func NewWindowListCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *WindowListCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 

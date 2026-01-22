@@ -6,8 +6,11 @@ import (
 "io"
 )
 
+// BitmapCacheHostSupportCapabilitySet represents the TS_BITMAPCACHE_HOSTSUPPORT_CAPABILITYSET
+// structure (MS-RDPBCGR 2.2.7.2.1).
 type BitmapCacheHostSupportCapabilitySet struct{}
 
+// NewBitmapCacheHostSupportCapabilitySet creates a new BitmapCacheHostSupportCapabilitySet.
 func NewBitmapCacheHostSupportCapabilitySet() *CapabilitySet {
 	return &CapabilitySet{
 		CapabilitySetType:                   CapabilitySetTypeBitmapCacheHostSupport,
@@ -15,6 +18,7 @@ func NewBitmapCacheHostSupportCapabilitySet() *CapabilitySet {
 	}
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *BitmapCacheHostSupportCapabilitySet) Deserialize(wire io.Reader) error {
 	var (
 		cacheVersion uint8
@@ -41,8 +45,10 @@ func (s *BitmapCacheHostSupportCapabilitySet) Deserialize(wire io.Reader) error 
 	return err
 }
 
+// ControlCapabilitySet represents the TS_CONTROL_CAPABILITYSET structure (MS-RDPBCGR 2.2.7.2.2).
 type ControlCapabilitySet struct{}
 
+// Serialize encodes the capability set to wire format.
 func (s *ControlCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -54,14 +60,18 @@ func (s *ControlCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *ControlCapabilitySet) Deserialize(wire io.Reader) error {
 	padding := make([]byte, 8)
 
 	return binary.Read(wire, binary.LittleEndian, &padding)
 }
 
+// WindowActivationCapabilitySet represents the TS_WINDOWACTIVATION_CAPABILITYSET
+// structure (MS-RDPBCGR 2.2.7.2.3).
 type WindowActivationCapabilitySet struct{}
 
+// Serialize encodes the capability set to wire format.
 func (s *WindowActivationCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -73,14 +83,17 @@ func (s *WindowActivationCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *WindowActivationCapabilitySet) Deserialize(wire io.Reader) error {
 	padding := make([]byte, 8)
 
 	return binary.Read(wire, binary.LittleEndian, &padding)
 }
 
+// ShareCapabilitySet represents the TS_SHARE_CAPABILITYSET structure (MS-RDPBCGR 2.2.7.2.4).
 type ShareCapabilitySet struct{}
 
+// Serialize encodes the capability set to wire format.
 func (s *ShareCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -90,16 +103,19 @@ func (s *ShareCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *ShareCapabilitySet) Deserialize(wire io.Reader) error {
 	padding := make([]byte, 4)
 
 	return binary.Read(wire, binary.LittleEndian, &padding)
 }
 
+// FontCapabilitySet represents the TS_FONT_CAPABILITYSET structure (MS-RDPBCGR 2.2.7.2.5).
 type FontCapabilitySet struct {
 	fontSupportFlags uint16
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *FontCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -109,6 +125,7 @@ func (s *FontCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *FontCapabilitySet) Deserialize(wire io.Reader) error {
 	padding := make([]byte, 2)
 

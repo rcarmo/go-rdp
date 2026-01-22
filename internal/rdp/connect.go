@@ -9,6 +9,8 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 )
 
+// Connect performs the RDP connection sequence including negotiation,
+// TLS/NLA setup, licensing, and capabilities exchange.
 func (c *Client) Connect() error {
 	var err error
 

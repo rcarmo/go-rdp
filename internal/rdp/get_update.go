@@ -16,6 +16,8 @@ import (
 // updateCounter tracks total updates processed (for debugging/metrics)
 var updateCounter atomic.Int64
 
+// GetUpdate reads the next screen update from the RDP server.
+// The returned Update contains raw bitmap data for rendering.
 func (c *Client) GetUpdate() (*Update, error) {
 	// If we have a pending slow-path update, return it first
 	if c.pendingSlowPathUpdate != nil {

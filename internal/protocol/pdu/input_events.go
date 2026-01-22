@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 )
 
+// EventCode represents a fast-path input event code (MS-RDPBCGR 2.2.8.1.2.2).
 type EventCode uint8
 
 const (
@@ -27,6 +28,7 @@ const (
 	EventCodeQoETimestamp EventCode = 6
 )
 
+// InputEvent represents a fast-path input event (MS-RDPBCGR 2.2.8.1.2.2).
 type InputEvent struct {
 	EventFlags           uint8
 	EventCode            EventCode
@@ -37,6 +39,7 @@ type InputEvent struct {
 	qualityOfExperience  *qualityOfExperience
 }
 
+// Serialize encodes the input event to wire format.
 func (e *InputEvent) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -81,6 +84,7 @@ const (
 	KBDFlagsExtended1 uint8 = 0x04
 )
 
+// NewKeyboardEvent creates a new keyboard scancode input event.
 func NewKeyboardEvent(flags uint8, keyCode uint8) *InputEvent {
 	return &InputEvent{
 		EventFlags: flags,
@@ -99,6 +103,7 @@ type unicodeKeyboardEvent struct {
 	UnicodeCode uint16
 }
 
+// NewUnicodeKeyboardEvent creates a new Unicode keyboard input event.
 func NewUnicodeKeyboardEvent(unicodeCode uint16) *InputEvent {
 	return &InputEvent{
 		EventFlags: KBDFlagsRelease,
@@ -134,6 +139,7 @@ type mouseEvent struct {
 	yPos         uint16
 }
 
+// NewMouseEvent creates a new mouse input event.
 func NewMouseEvent(pointerFlags, xPos, yPos uint16) *InputEvent {
 	return &InputEvent{
 		EventCode: EventCodeMouse,
@@ -167,6 +173,7 @@ type extendedMouseEvent struct {
 	yPos         uint16
 }
 
+// NewExtendedMouseEvent creates a new extended mouse input event for X buttons.
 func NewExtendedMouseEvent(pointerFlags, xPos, yPos uint16) *InputEvent {
 	return &InputEvent{
 		EventCode: EventCodeMouseX,
@@ -195,6 +202,7 @@ const (
 	SyncKanaLock   uint8 = 0x08
 )
 
+// NewSynchronizeEvent creates a new synchronize input event for lock key state.
 func NewSynchronizeEvent(eventFlags uint8) *InputEvent {
 	return &InputEvent{
 		EventFlags: eventFlags,
@@ -206,6 +214,7 @@ type qualityOfExperience struct {
 	timestamp uint32
 }
 
+// NewQualityOfExperienceEvent creates a new QoE timestamp input event.
 func NewQualityOfExperienceEvent(timestamp uint32) *InputEvent {
 	return &InputEvent{
 		EventCode: EventCodeQoETimestamp,

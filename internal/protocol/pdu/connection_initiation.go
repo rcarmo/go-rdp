@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// NegotiationType represents the type field in RDP negotiation structures (MS-RDPBCGR 2.2.1.1).
 type NegotiationType uint8
 
 const (
@@ -20,14 +21,17 @@ const (
 	NegotiationTypeFailure NegotiationType = 0x03
 )
 
+// IsRequest returns true if the type is a negotiation request.
 func (t NegotiationType) IsRequest() bool {
 	return t == NegotiationTypeRequest
 }
 
+// IsResponse returns true if the type is a negotiation response.
 func (t NegotiationType) IsResponse() bool {
 	return t == NegotiationTypeResponse
 }
 
+// IsFailure returns true if the type is a negotiation failure.
 func (t NegotiationType) IsFailure() bool {
 	return t == NegotiationTypeFailure
 }
@@ -46,14 +50,17 @@ const (
 	NegReqFlagCorrelationInfoPresent NegotiationRequestFlag = 0x08
 )
 
+// IsRestrictedAdminModeRequired returns true if restricted admin mode is required.
 func (f NegotiationRequestFlag) IsRestrictedAdminModeRequired() bool {
 	return f&NegReqFlagRestrictedAdminModeRequired == NegReqFlagRestrictedAdminModeRequired
 }
 
+// IsRedirectedAuthenticationModeRequired returns true if redirected authentication mode is required.
 func (f NegotiationRequestFlag) IsRedirectedAuthenticationModeRequired() bool {
 	return f&NegReqFlagRedirectedAuthenticationModeRequired == NegReqFlagRedirectedAuthenticationModeRequired
 }
 
+// IsCorrelationInfoPresent returns true if correlation info is present.
 func (f NegotiationRequestFlag) IsCorrelationInfoPresent() bool {
 	return f&NegReqFlagCorrelationInfoPresent == NegReqFlagCorrelationInfoPresent
 }
@@ -78,22 +85,27 @@ const (
 	NegotiationProtocolHybridEx NegotiationProtocol = 0x00000008
 )
 
+// IsRDP returns true if the protocol is standard RDP security.
 func (p NegotiationProtocol) IsRDP() bool {
 	return p == NegotiationProtocolRDP
 }
 
+// IsSSL returns true if the protocol is TLS security.
 func (p NegotiationProtocol) IsSSL() bool {
 	return p == NegotiationProtocolSSL
 }
 
+// IsHybrid returns true if the protocol is CredSSP (TLS + NLA).
 func (p NegotiationProtocol) IsHybrid() bool {
 	return p == NegotiationProtocolHybrid
 }
 
+// IsRDSTLS returns true if the protocol is RDSTLS.
 func (p NegotiationProtocol) IsRDSTLS() bool {
 	return p == NegotiationProtocolRDSTLS
 }
 
+// IsHybridEx returns true if the protocol is CredSSP with Early User Auth.
 func (p NegotiationProtocol) IsHybridEx() bool {
 	return p == NegotiationProtocolHybridEx
 }
@@ -104,6 +116,7 @@ type NegotiationRequest struct {
 	RequestedProtocols NegotiationProtocol    // supported security protocols
 }
 
+// Serialize encodes the negotiation request to wire format.
 func (r NegotiationRequest) Serialize() []byte {
 	const negReqLen = uint16(8)
 
@@ -128,6 +141,7 @@ type CorrelationInfo struct {
 	correlationID []byte
 }
 
+// SetCorrelationID sets the correlation ID and validates it per MS-RDPBCGR 2.2.1.1.2.
 func (i CorrelationInfo) SetCorrelationID(correlationID []byte) error {
 	if len(correlationID) != 16 {
 		return ErrInvalidCorrelationID
@@ -148,6 +162,7 @@ func (i CorrelationInfo) SetCorrelationID(correlationID []byte) error {
 	return nil
 }
 
+// Serialize encodes the correlation info to wire format.
 func (i CorrelationInfo) Serialize() []byte {
 	const corrInfoLen = uint16(36)
 
@@ -191,22 +206,27 @@ const (
 	NegotiationResponseFlagAuthModeSupported NegotiationResponseFlag = 0x10
 )
 
+// IsExtendedClientDataSupported returns true if extended client data is supported.
 func (f NegotiationResponseFlag) IsExtendedClientDataSupported() bool {
 	return f&NegotiationResponseFlagECDBSupported == NegotiationResponseFlagECDBSupported
 }
 
+// IsGFXProtocolSupported returns true if GFX protocol is supported.
 func (f NegotiationResponseFlag) IsGFXProtocolSupported() bool {
 	return f&NegotiationResponseFlagGFXSupported == NegotiationResponseFlagGFXSupported
 }
 
+// IsRestrictedAdminModeSupported returns true if restricted admin mode is supported.
 func (f NegotiationResponseFlag) IsRestrictedAdminModeSupported() bool {
 	return f&NegotiationResponseFlagAdminModeSupported == NegotiationResponseFlagAdminModeSupported
 }
 
+// IsRedirectedAuthModeSupported returns true if redirected auth mode is supported.
 func (f NegotiationResponseFlag) IsRedirectedAuthModeSupported() bool {
 	return f&NegotiationResponseFlagAuthModeSupported == NegotiationResponseFlagAuthModeSupported
 }
 
+// String returns a human-readable representation of the response flags.
 func (f NegotiationResponseFlag) String() string {
 	var features []string
 
@@ -247,6 +267,7 @@ const (
 	NegotiationFailureCodeSSLWithUserAuthRequired NegotiationFailureCode = 0x00000006
 )
 
+// NegotiationFailureCodeMap maps failure codes to their string representations.
 var NegotiationFailureCodeMap = map[NegotiationFailureCode]string{
 	NegotiationFailureCodeSSLRequired:             "SSL_REQUIRED_BY_SERVER",
 	NegotiationFailureCodeSSLNotAllowed:           "SSL_NOT_ALLOWED_BY_SERVER",
@@ -256,6 +277,7 @@ var NegotiationFailureCodeMap = map[NegotiationFailureCode]string{
 	NegotiationFailureCodeSSLWithUserAuthRequired: "SSL_WITH_USER_AUTH_REQUIRED_BY_SERVER",
 }
 
+// String returns the string representation of the failure code.
 func (c NegotiationFailureCode) String() string {
 	return NegotiationFailureCodeMap[c]
 }
@@ -268,6 +290,7 @@ type ClientConnectionRequest struct {
 	CorrelationInfo    CorrelationInfo    // Correlation Info
 }
 
+// Serialize encodes the connection request to wire format.
 func (pdu *ClientConnectionRequest) Serialize() []byte {
 	const (
 		CRLF         = "\r\n"
@@ -294,6 +317,7 @@ func (pdu *ClientConnectionRequest) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// ServerConnectionConfirm represents the Server X.224 Connection Confirm PDU (MS-RDPBCGR 2.2.1.2).
 type ServerConnectionConfirm struct {
 	Type   NegotiationType
 	Flags  NegotiationResponseFlag // RDP Negotiation Response flags
@@ -301,14 +325,17 @@ type ServerConnectionConfirm struct {
 	data   uint32 // RDP Negotiation Response selectedProtocol or RDP Negotiation Failure failureCode
 }
 
+// SelectedProtocol returns the selected security protocol from the response.
 func (pdu *ServerConnectionConfirm) SelectedProtocol() NegotiationProtocol {
 	return NegotiationProtocol(pdu.data)
 }
 
+// FailureCode returns the failure code if the negotiation failed.
 func (pdu *ServerConnectionConfirm) FailureCode() NegotiationFailureCode {
 	return NegotiationFailureCode(pdu.data)
 }
 
+// Deserialize decodes the connection confirm from wire format.
 func (pdu *ServerConnectionConfirm) Deserialize(wire io.Reader) error {
 	err := binary.Read(wire, binary.LittleEndian, &pdu.Type)
 	if err != nil {

@@ -1,3 +1,5 @@
+// Package pdu implements RDP Protocol Data Units for the connection sequence,
+// capabilities exchange, input/output events, and licensing as specified in MS-RDPBCGR.
 package pdu
 
 import (
@@ -7,6 +9,7 @@ import (
 	"io"
 )
 
+// Type represents the PDU type field in share control headers (MS-RDPBCGR 2.2.8.1.1.1.1).
 type Type uint16
 
 const (
@@ -23,22 +26,27 @@ const (
 	TypeData Type = 0x17
 )
 
+// IsDemandActive returns true if the PDU type is Demand Active.
 func (t Type) IsDemandActive() bool {
 	return t == TypeDemandActive
 }
 
+// IsConfirmActive returns true if the PDU type is Confirm Active.
 func (t Type) IsConfirmActive() bool {
 	return t == TypeConfirmActive
 }
 
+// IsDeactivateAll returns true if the PDU type is Deactivate All.
 func (t Type) IsDeactivateAll() bool {
 	return t == TypeDeactivateAll
 }
 
+// IsData returns true if the PDU type is Data.
 func (t Type) IsData() bool {
 	return t == TypeData
 }
 
+// ShareControlHeader represents the TS_SHARECONTROLHEADER structure (MS-RDPBCGR 2.2.8.1.1.1.1).
 type ShareControlHeader struct {
 	TotalLength uint16
 	PDUType     Type
@@ -52,6 +60,7 @@ func newShareControlHeader(pduType Type, pduSource uint16) *ShareControlHeader {
 	}
 }
 
+// Serialize encodes the header to wire format.
 func (header *ShareControlHeader) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -62,6 +71,7 @@ func (header *ShareControlHeader) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the header from wire format.
 func (header *ShareControlHeader) Deserialize(wire io.Reader) error {
 	if err := binary.Read(wire, binary.LittleEndian, &header.TotalLength); err != nil {
 		return err
@@ -72,6 +82,7 @@ func (header *ShareControlHeader) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &header.PDUSource)
 }
 
+// Type2 represents the PDU type 2 field in share data headers (MS-RDPBCGR 2.2.8.1.1.1.2).
 type Type2 uint8
 
 const (
@@ -103,42 +114,52 @@ const (
 	Type2SaveSessionInfo Type2 = 0x26
 )
 
+// IsUpdate returns true if the PDU type 2 is Update.
 func (t Type2) IsUpdate() bool {
 	return t == Type2Update
 }
 
+// IsControl returns true if the PDU type 2 is Control.
 func (t Type2) IsControl() bool {
 	return t == Type2Control
 }
 
+// IsPointer returns true if the PDU type 2 is Pointer.
 func (t Type2) IsPointer() bool {
 	return t == Type2Pointer
 }
 
+// IsInput returns true if the PDU type 2 is Input.
 func (t Type2) IsInput() bool {
 	return t == Type2Input
 }
 
+// IsSynchronize returns true if the PDU type 2 is Synchronize.
 func (t Type2) IsSynchronize() bool {
 	return t == Type2Synchronize
 }
 
+// IsFontlist returns true if the PDU type 2 is Font List.
 func (t Type2) IsFontlist() bool {
 	return t == Type2Fontlist
 }
 
+// IsErrorInfo returns true if the PDU type 2 is Error Info.
 func (t Type2) IsErrorInfo() bool {
 	return t == Type2ErrorInfo
 }
 
+// IsFontmap returns true if the PDU type 2 is Font Map.
 func (t Type2) IsFontmap() bool {
 	return t == Type2Fontmap
 }
 
+// IsSaveSessionInfo returns true if the PDU type 2 is Save Session Info.
 func (t Type2) IsSaveSessionInfo() bool {
 	return t == Type2SaveSessionInfo
 }
 
+// ShareDataHeader represents the TS_SHAREDATAHEADER structure (MS-RDPBCGR 2.2.8.1.1.1.2).
 type ShareDataHeader struct {
 	ShareControlHeader ShareControlHeader
 	ShareID            uint32
@@ -158,6 +179,7 @@ func newShareDataHeader(shareID uint32, pduSource uint16, pduType Type, pduType2
 	}
 }
 
+// Serialize encodes the header to wire format.
 func (header *ShareDataHeader) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -173,6 +195,7 @@ func (header *ShareDataHeader) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the header from wire format.
 func (header *ShareDataHeader) Deserialize(wire io.Reader) error {
 	var (
 		padding uint8
@@ -225,6 +248,7 @@ func (header *ShareDataHeader) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// Data represents a share data PDU containing one of several data types (MS-RDPBCGR 2.2.8.1.1.1).
 type Data struct {
 	ShareDataHeader    ShareDataHeader
 	SynchronizePDUData *SynchronizePDUData
@@ -234,6 +258,7 @@ type Data struct {
 	ErrorInfoPDUData   *ErrorInfoPDUData
 }
 
+// Serialize encodes the PDU to wire format.
 func (pdu *Data) Serialize() []byte {
 	var data []byte
 
@@ -257,6 +282,7 @@ func (pdu *Data) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the PDU from wire format.
 func (pdu *Data) Deserialize(wire io.Reader) error {
 	var err error
 

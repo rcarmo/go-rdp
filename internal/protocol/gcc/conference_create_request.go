@@ -1,3 +1,5 @@
+// Package gcc implements Generic Conference Control (T.124) structures
+// used in RDP connection sequence as specified in MS-RDPBCGR.
 package gcc
 
 import (

@@ -21,7 +21,7 @@ var NSCodecGUID = [16]byte{
 	0x58, 0x9F, 0xAE, 0x2D, 0x1A, 0x87, 0xE2, 0xD6,
 }
 
-// BitmapStream represents the NSCODEC_BITMAP_STREAM structure
+// BitmapStream represents the NSCODEC_BITMAP_STREAM structure as specified in MS-RDPNSC.
 type BitmapStream struct {
 	LumaPlaneByteCount         uint32
 	OrangeChromaPlaneByteCount uint32
@@ -35,7 +35,7 @@ type BitmapStream struct {
 	AlphaPlane                 []byte
 }
 
-// ParseBitmapStream parses an NSCODEC_BITMAP_STREAM from raw bytes
+// ParseBitmapStream parses an NSCODEC_BITMAP_STREAM from raw bytes.
 func ParseBitmapStream(data []byte) (*BitmapStream, error) {
 	if len(data) < 18 { // Minimum header size
 		return nil, ErrInvalidStream
@@ -95,9 +95,8 @@ func ParseBitmapStream(data []byte) (*BitmapStream, error) {
 	return stream, nil
 }
 
-// Decode decodes an NSCodec bitmap stream to RGBA pixels
-// width and height are the dimensions of the original image
-// Returns RGBA pixel data (4 bytes per pixel)
+// Decode decodes an NSCodec bitmap stream to RGBA pixels.
+// Width and height specify the image dimensions. Returns RGBA pixel data (4 bytes per pixel).
 func Decode(data []byte, width, height int) ([]byte, error) {
 	stream, err := ParseBitmapStream(data)
 	if err != nil {

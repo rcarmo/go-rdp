@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// InputCapabilitySet represents the Input Capability Set (MS-RDPBCGR 2.2.7.1.6).
 type InputCapabilitySet struct {
 	InputFlags          uint16
 	KeyboardLayout      uint32
@@ -15,6 +16,7 @@ type InputCapabilitySet struct {
 	ImeFileName         [64]byte
 }
 
+// NewInputCapabilitySet creates an Input Capability Set with default client values.
 func NewInputCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeInput,
@@ -27,6 +29,7 @@ func NewInputCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *InputCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -41,6 +44,7 @@ func (s *InputCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *InputCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

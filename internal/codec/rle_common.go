@@ -122,5 +122,5 @@ func ExtractRunLength(code uint, src []byte, idx int) (length int, nextIdx int) 
 	return 0, idx + 1
 }
 
-// FgBgBitmasks is the bitmask table for foreground/background image orders
+// FgBgBitmasks contains bit masks used for foreground/background image orders.
 var FgBgBitmasks = []byte{0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80}

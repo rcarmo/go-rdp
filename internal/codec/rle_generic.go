@@ -1,7 +1,6 @@
 package codec
 
-// PixelFormat defines the operations needed for a specific pixel bit depth.
-// Go generics monomorphize at compile time, so there's no runtime overhead.
+// PixelFormat defines the operations for a specific pixel bit depth in RLE decompression.
 type PixelFormat[T uint8 | uint16 | uint32] struct {
 	BytesPerPixel int
 	WhitePixel    T
@@ -10,7 +9,7 @@ type PixelFormat[T uint8 | uint16 | uint32] struct {
 	WritePixel    func(data []byte, idx int, pixel T)
 }
 
-// Pixel8 is the 8-bit pixel format (1 byte per pixel)
+// Pixel8 defines the 8-bit pixel format (1 byte per pixel).
 var Pixel8 = PixelFormat[uint8]{
 	BytesPerPixel: 1,
 	WhitePixel:    0xFF,
@@ -29,7 +28,7 @@ var Pixel8 = PixelFormat[uint8]{
 	},
 }
 
-// Pixel15 is the 15-bit pixel format (2 bytes per pixel, RGB555)
+// Pixel15 defines the 15-bit pixel format (2 bytes per pixel, RGB555).
 var Pixel15 = PixelFormat[uint16]{
 	BytesPerPixel: 2,
 	WhitePixel:    0x7FFF,
@@ -49,7 +48,7 @@ var Pixel15 = PixelFormat[uint16]{
 	},
 }
 
-// Pixel16 is the 16-bit pixel format (2 bytes per pixel, RGB565)
+// Pixel16 defines the 16-bit pixel format (2 bytes per pixel, RGB565).
 var Pixel16 = PixelFormat[uint16]{
 	BytesPerPixel: 2,
 	WhitePixel:    0xFFFF,
@@ -69,7 +68,7 @@ var Pixel16 = PixelFormat[uint16]{
 	},
 }
 
-// Pixel24 is the 24-bit pixel format (3 bytes per pixel, RGB888)
+// Pixel24 defines the 24-bit pixel format (3 bytes per pixel, RGB888).
 var Pixel24 = PixelFormat[uint32]{
 	BytesPerPixel: 3,
 	WhitePixel:    0xFFFFFF,
@@ -90,7 +89,7 @@ var Pixel24 = PixelFormat[uint32]{
 	},
 }
 
-// Pixel32 is the 32-bit pixel format (4 bytes per pixel, RGBA8888)
+// Pixel32 defines the 32-bit pixel format (4 bytes per pixel, RGBA8888).
 var Pixel32 = PixelFormat[uint32]{
 	BytesPerPixel: 4,
 	WhitePixel:    0xFFFFFFFF,
@@ -139,8 +138,7 @@ func writeFgBgImage[T uint8 | uint16 | uint32](pf PixelFormat[T], dest []byte, d
 	return destIdx
 }
 
-// RLEDecompress is the generic RLE decompression algorithm.
-// It decompresses RLE-encoded bitmap data for any supported pixel format.
+// RLEDecompress decompresses RLE-encoded bitmap data using the specified pixel format.
 func RLEDecompress[T uint8 | uint16 | uint32](pf PixelFormat[T], src []byte, dest []byte, rowDelta int) bool {
 	srcIdx := 0
 	destIdx := 0

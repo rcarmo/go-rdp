@@ -1,3 +1,5 @@
+// Package config provides configuration loading from environment variables
+// and command-line flags for the RDP HTML5 gateway server.
 package config
 
 import (

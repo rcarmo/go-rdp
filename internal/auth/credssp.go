@@ -1,3 +1,4 @@
+// Package auth implements authentication for RDP NLA (NTLMv2 + CredSSP).
 package auth
 
 import (

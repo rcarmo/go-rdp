@@ -1,3 +1,5 @@
+// Package fastpath implements the RDP Fast-Path protocol as specified in MS-RDPBCGR.
+// Fast-Path provides optimized encoding for input and output PDUs.
 package fastpath
 
 import (

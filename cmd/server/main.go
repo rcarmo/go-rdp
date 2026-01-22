@@ -1,3 +1,5 @@
+// Package main implements the RDP HTML5 gateway server.
+// It serves static web assets and proxies WebSocket connections to RDP servers.
 package main
 
 import (

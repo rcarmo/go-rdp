@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// ChannelFlag represents flags for RDP virtual channel PDUs.
 type ChannelFlag uint32
 
 const (
@@ -42,6 +43,7 @@ type ChannelPDUHeader struct {
 	Flags ChannelFlag
 }
 
+// Serialize encodes the ChannelPDUHeader to wire format.
 func (h *ChannelPDUHeader) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -51,6 +53,7 @@ func (h *ChannelPDUHeader) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes a ChannelPDUHeader from wire format.
 func (h *ChannelPDUHeader) Deserialize(wire io.Reader) error {
 	var (
 		err    error

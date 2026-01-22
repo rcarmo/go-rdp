@@ -6,10 +6,12 @@ import (
 "io"
 )
 
+// SoundCapabilitySet represents the Sound Capability Set (MS-RDPBCGR 2.2.7.1.11).
 type SoundCapabilitySet struct {
 	SoundFlags uint16
 }
 
+// NewSoundCapabilitySet creates a Sound Capability Set with default values.
 func NewSoundCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType:  CapabilitySetTypeSound,
@@ -17,6 +19,7 @@ func NewSoundCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *SoundCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -26,6 +29,7 @@ func (s *SoundCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *SoundCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

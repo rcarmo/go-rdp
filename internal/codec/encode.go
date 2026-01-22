@@ -6,6 +6,7 @@ import (
 	"unicode/utf16"
 )
 
+// Encode converts a string to UTF-16LE encoded bytes.
 func Encode(s string) []byte {
 	buf := new(bytes.Buffer)
 

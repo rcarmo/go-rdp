@@ -12,6 +12,7 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/logging"
 )
 
+// StartTLS upgrades the connection to TLS for RDP security.
 func (c *Client) StartTLS() error {
 	// Use client-specific TLS configuration if set, otherwise fall back to global config
 	insecureSkipVerify := c.skipTLSValidation

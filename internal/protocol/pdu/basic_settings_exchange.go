@@ -31,6 +31,8 @@ const (
 	ECFSupportHeartbeatPDU      uint16 = 0x0400
 )
 
+// ClientCoreData contains client core settings sent during the Basic Settings Exchange phase.
+// See MS-RDPBCGR section 2.2.1.3.2 for the Client Core Data (TS_UD_CS_CORE) structure.
 type ClientCoreData struct {
 	Version                uint32
 	DesktopWidth           uint16
@@ -154,6 +156,8 @@ const (
 	FIPSEncryptionFlag uint32 = 0x00000010
 )
 
+// ClientSecurityData contains client security settings for encryption negotiation.
+// See MS-RDPBCGR section 2.2.1.3.3 for the Client Security Data (TS_UD_CS_SEC) structure.
 type ClientSecurityData struct {
 	EncryptionMethods    uint32
 	ExtEncryptionMethods uint32
@@ -168,21 +172,28 @@ func newClientSecurityData() *ClientSecurityData {
 	return &data
 }
 
+// ChannelDefinitionStructure defines a static virtual channel requested by the client.
+// See MS-RDPBCGR section 2.2.1.3.4.1 for the Channel Definition Structure (CHANNEL_DEF).
 type ChannelDefinitionStructure struct {
 	Name    [8]byte // seven ANSI chars with null-termination char in the end
 	Options uint32
 }
 
+// ClientNetworkData contains the list of static virtual channels requested by the client.
+// See MS-RDPBCGR section 2.2.1.3.4 for the Client Network Data (TS_UD_CS_NET) structure.
 type ClientNetworkData struct {
 	ChannelCount    uint32
 	ChannelDefArray []ChannelDefinitionStructure
 }
 
+// ClientClusterData contains client cluster settings for session redirection.
+// See MS-RDPBCGR section 2.2.1.3.5 for the Client Cluster Data (TS_UD_CS_CLUSTER) structure.
 type ClientClusterData struct {
 	Flags               uint32
 	RedirectedSessionID uint32
 }
 
+// ClientUserDataSet aggregates all client GCC user data blocks sent to the server.
 type ClientUserDataSet struct {
 	ClientCoreData     *ClientCoreData
 	ClientSecurityData *ClientSecurityData
@@ -190,6 +201,7 @@ type ClientUserDataSet struct {
 	ClientClusterData  *ClientClusterData
 }
 
+// NewClientUserDataSet creates a new ClientUserDataSet with the specified connection parameters.
 func NewClientUserDataSet(selectedProtocol uint32,
 	desktopWidth, desktopHeight uint16,
 	colorDepth int,
@@ -201,6 +213,7 @@ func NewClientUserDataSet(selectedProtocol uint32,
 	}
 }
 
+// Serialize encodes the ClientCoreData into its wire format with a CS_CORE header.
 func (data ClientCoreData) Serialize() []byte {
 	// Updated dataLen to include optional extended fields:
 	// Base: 216 bytes (header + fields up to ServerSelectedProtocol)
@@ -259,6 +272,7 @@ const (
 	EncryptionMethodFlagFIPS uint32 = 0x00000010
 )
 
+// Serialize encodes the ClientSecurityData into its wire format with a CS_SECURITY header.
 func (data ClientSecurityData) Serialize() []byte {
 	const dataLen uint16 = 12
 
@@ -273,6 +287,7 @@ func (data ClientSecurityData) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Serialize encodes the ChannelDefinitionStructure into its wire format.
 func (s ChannelDefinitionStructure) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -301,6 +316,7 @@ func newClientNetworkData(channelNames []string) *ClientNetworkData {
 	return &data
 }
 
+// Serialize encodes the ClientNetworkData into its wire format with a CS_NET header.
 func (data ClientNetworkData) Serialize() []byte {
 	const headerLen = 8
 
@@ -322,6 +338,7 @@ func (data ClientNetworkData) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Serialize encodes the ClientClusterData into its wire format with a CS_CLUSTER header.
 func (d ClientClusterData) Serialize() []byte {
 	const dataLen uint16 = 12
 
@@ -336,6 +353,7 @@ func (d ClientClusterData) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Serialize encodes all client user data blocks into their combined wire format.
 func (ud ClientUserDataSet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -351,6 +369,8 @@ func (ud ClientUserDataSet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// ServerCoreData contains server core settings received during the Basic Settings Exchange phase.
+// See MS-RDPBCGR section 2.2.1.4.2 for the Server Core Data (TS_UD_SC_CORE) structure.
 type ServerCoreData struct {
 	Version                  uint32
 	ClientRequestedProtocols uint32
@@ -359,6 +379,7 @@ type ServerCoreData struct {
 	DataLen uint16
 }
 
+// Deserialize decodes the ServerCoreData from its wire format.
 func (d *ServerCoreData) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -385,6 +406,8 @@ func (d *ServerCoreData) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// RSAPublicKey represents an RSA public key used in server proprietary certificates.
+// See MS-RDPBCGR section 2.2.1.4.3.1.1.1 for the RSA Public Key (RSA_PUBLIC_KEY) structure.
 type RSAPublicKey struct {
 	Magic   uint32
 	KeyLen  uint32
@@ -394,6 +417,7 @@ type RSAPublicKey struct {
 	Modulus []byte
 }
 
+// Deserialize decodes the RSAPublicKey from its wire format.
 func (k *RSAPublicKey) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -426,6 +450,8 @@ func (k *RSAPublicKey) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// ServerProprietaryCertificate contains the server's proprietary certificate for encryption.
+// See MS-RDPBCGR section 2.2.1.4.3.1.1 for the Server Proprietary Certificate structure.
 type ServerProprietaryCertificate struct {
 	DwSigAlgId        uint32
 	DwKeyAlgId        uint32
@@ -437,6 +463,7 @@ type ServerProprietaryCertificate struct {
 	SignatureBlob     []byte
 }
 
+// Deserialize decodes the ServerProprietaryCertificate from its wire format.
 func (c *ServerProprietaryCertificate) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -477,6 +504,8 @@ func (c *ServerProprietaryCertificate) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// ServerCertificate contains the server's certificate (proprietary or X.509).
+// See MS-RDPBCGR section 2.2.1.4.3.1 for the Server Certificate structure.
 type ServerCertificate struct {
 	DwVersion       uint32
 	ProprietaryCert *ServerProprietaryCertificate
@@ -485,6 +514,7 @@ type ServerCertificate struct {
 	ServerCertLen uint32
 }
 
+// Deserialize decodes the ServerCertificate from its wire format.
 func (c *ServerCertificate) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -511,6 +541,8 @@ func (c *ServerCertificate) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// ServerSecurityData contains server security settings including encryption parameters.
+// See MS-RDPBCGR section 2.2.1.4.3 for the Server Security Data (TS_UD_SC_SEC1) structure.
 type ServerSecurityData struct {
 	EncryptionMethod  uint32
 	EncryptionLevel   uint32
@@ -520,6 +552,7 @@ type ServerSecurityData struct {
 	ServerCertificate *ServerCertificate
 }
 
+// Deserialize decodes the ServerSecurityData from its wire format.
 func (d *ServerSecurityData) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -560,12 +593,15 @@ func (d *ServerSecurityData) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// ServerNetworkData contains the MCS channel ID and virtual channel IDs assigned by the server.
+// See MS-RDPBCGR section 2.2.1.4.4 for the Server Network Data (TS_UD_SC_NET) structure.
 type ServerNetworkData struct {
 	MCSChannelId   uint16
 	ChannelCount   uint16
 	ChannelIdArray []uint16
 }
 
+// Deserialize decodes the ServerNetworkData from its wire format.
 func (d *ServerNetworkData) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -600,14 +636,19 @@ func (d *ServerNetworkData) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// ServerMessageChannelData contains the MCS channel ID for the message channel.
+// See MS-RDPBCGR section 2.2.1.4.5 for the Server Message Channel Data (TS_UD_SC_MCS_MSGCHANNEL).
 type ServerMessageChannelData struct {
 	MCSChannelID uint16
 }
 
+// ServerMultitransportChannelData contains multitransport channel flags.
+// See MS-RDPBCGR section 2.2.1.4.6 for the Server Multitransport Channel Data (TS_UD_SC_MULTITRANSPORT).
 type ServerMultitransportChannelData struct {
 	Flags uint32
 }
 
+// ServerUserData aggregates all server GCC user data blocks received from the server.
 type ServerUserData struct {
 	ServerCoreData                  *ServerCoreData
 	ServerNetworkData               *ServerNetworkData
@@ -616,6 +657,7 @@ type ServerUserData struct {
 	ServerMultitransportChannelData *ServerMultitransportChannelData
 }
 
+// Deserialize decodes all server user data blocks from their combined wire format.
 func (ud *ServerUserData) Deserialize(wire io.Reader) error {
 	var (
 		dataType uint16

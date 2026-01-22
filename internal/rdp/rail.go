@@ -18,15 +18,20 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/codec"
 )
 
+// RailState represents the current state of the RAIL protocol state machine.
 type RailState uint8
 
-// State machine described in [MS-RDPERP] 3.1.1.1.
-
+// RailState constants define the RAIL protocol state machine states.
 const (
+	// RailStateUninitialized indicates RAIL is not initialized.
 	RailStateUninitialized RailState = iota
+	// RailStateInitializing indicates RAIL handshake is in progress.
 	RailStateInitializing
+	// RailStateSyncDesktop indicates desktop synchronization phase.
 	RailStateSyncDesktop
+	// RailStateWaitForData indicates waiting for server data.
 	RailStateWaitForData
+	// RailStateExecuteApp indicates application execution phase.
 	RailStateExecuteApp
 )
 
@@ -58,6 +63,7 @@ func (c *Client) handleRail(wire io.Reader) error {
 	return nil
 }
 
+// RailOrder represents a RAIL PDU order type as defined in MS-RDPERP.
 type RailOrder uint16
 
 const (
@@ -140,6 +146,7 @@ const (
 	RailOrderCaretBlinkInfo RailOrder = 0x001A
 )
 
+// RailPDU represents a RAIL protocol data unit.
 type RailPDU struct {
 	channelHeader                  ChannelPDUHeader
 	header                         RailPDUHeader
@@ -151,6 +158,7 @@ type RailPDU struct {
 	RailPDUClientSystemParamUpdate *RailPDUClientSystemParamUpdate
 }
 
+// Serialize encodes the RailPDU to wire format.
 func (pdu *RailPDU) Serialize() []byte {
 	var data []byte
 
@@ -174,6 +182,7 @@ func (pdu *RailPDU) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes a RailPDU from wire format.
 func (pdu *RailPDU) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -205,11 +214,13 @@ func (pdu *RailPDU) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// RailPDUHeader contains the header fields for a RAIL PDU.
 type RailPDUHeader struct {
 	OrderType   RailOrder
 	OrderLength uint16
 }
 
+// Serialize encodes the RailPDUHeader to wire format.
 func (h *RailPDUHeader) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -219,6 +230,7 @@ func (h *RailPDUHeader) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes a RailPDUHeader from wire format.
 func (h *RailPDUHeader) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -237,10 +249,12 @@ func (h *RailPDUHeader) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// RailPDUHandshake represents a RAIL handshake PDU.
 type RailPDUHandshake struct {
 	buildNumber uint32
 }
 
+// NewRailHandshakePDU creates a new RAIL handshake PDU.
 func NewRailHandshakePDU() *RailPDU {
 	return &RailPDU{
 		channelHeader: ChannelPDUHeader{
@@ -255,6 +269,7 @@ func NewRailHandshakePDU() *RailPDU {
 	}
 }
 
+// Serialize encodes the RailPDUHandshake to wire format.
 func (pdu *RailPDUHandshake) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -263,6 +278,7 @@ func (pdu *RailPDUHandshake) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes a RailPDUHandshake from wire format.
 func (pdu *RailPDUHandshake) Deserialize(wire io.Reader) error {
 	err := binary.Read(wire, binary.LittleEndian, &pdu.buildNumber)
 	if err != nil {
@@ -272,10 +288,12 @@ func (pdu *RailPDUHandshake) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// RailPDUClientInfo represents a RAIL client info PDU.
 type RailPDUClientInfo struct {
 	Flags uint32
 }
 
+// NewRailClientInfoPDU creates a new RAIL client info PDU.
 func NewRailClientInfoPDU() *RailPDU {
 	return &RailPDU{
 		channelHeader: ChannelPDUHeader{
@@ -290,6 +308,7 @@ func NewRailClientInfoPDU() *RailPDU {
 	}
 }
 
+// Serialize encodes the RailPDUClientInfo to wire format.
 func (pdu *RailPDUClientInfo) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -298,11 +317,13 @@ func (pdu *RailPDUClientInfo) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// RailPDUClientSystemParamUpdate represents a RAIL system parameter update PDU.
 type RailPDUClientSystemParamUpdate struct {
 	SystemParam uint32
 	Body        uint8
 }
 
+// NewRailPDUClientSystemParamUpdate creates a new RAIL system parameter update PDU.
 func NewRailPDUClientSystemParamUpdate(systemParam uint32, body uint8) *RailPDU {
 	return &RailPDU{
 		channelHeader: ChannelPDUHeader{
@@ -318,6 +339,7 @@ func NewRailPDUClientSystemParamUpdate(systemParam uint32, body uint8) *RailPDU 
 	}
 }
 
+// Serialize encodes the RailPDUClientSystemParamUpdate to wire format.
 func (pdu *RailPDUClientSystemParamUpdate) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -349,11 +371,13 @@ func (c *Client) railHandshake(*RailPDU) error {
 	return c.railStartRemoteApp()
 }
 
+// RailPDUSystemParameters represents a RAIL system parameters PDU from the server.
 type RailPDUSystemParameters struct {
 	SystemParameter uint32
 	Body            uint8
 }
 
+// Deserialize decodes a RailPDUSystemParameters from wire format.
 func (pdu *RailPDUSystemParameters) Deserialize(wire io.Reader) error {
 	var err error
 
@@ -370,6 +394,7 @@ func (pdu *RailPDUSystemParameters) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// RailPDUClientExecute represents a RAIL client execute PDU.
 type RailPDUClientExecute struct {
 	Flags      uint16
 	ExeOrFile  string
@@ -377,6 +402,7 @@ type RailPDUClientExecute struct {
 	Arguments  string
 }
 
+// NewRailClientExecutePDU creates a new RAIL client execute PDU.
 func NewRailClientExecutePDU(app, workDir, args string) *RailPDU {
 	return &RailPDU{
 		channelHeader: ChannelPDUHeader{
@@ -393,6 +419,7 @@ func NewRailClientExecutePDU(app, workDir, args string) *RailPDU {
 	}
 }
 
+// Serialize encodes the RailPDUClientExecute to wire format.
 func (pdu *RailPDUClientExecute) Serialize() []byte {
 	exeOrFile := codec.Encode(pdu.ExeOrFile)
 	exeOrFileLength := uint16(len(exeOrFile))
@@ -424,6 +451,7 @@ func (c *Client) railStartRemoteApp() error {
 	return c.mcsLayer.Send(c.userID, c.channelIDMap["rail"], clientExecute.Serialize())
 }
 
+// RailPDUExecResult represents a RAIL execution result PDU from the server.
 type RailPDUExecResult struct {
 	Flags      uint16
 	ExecResult uint16
@@ -431,6 +459,7 @@ type RailPDUExecResult struct {
 	ExeOrFile  string
 }
 
+// Deserialize decodes a RailPDUExecResult from wire format.
 func (pdu *RailPDUExecResult) Deserialize(wire io.Reader) error {
 	var err error
 

@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// WrapSecurityFlag wraps data with an RDP security header containing the specified flag.
 func WrapSecurityFlag(flag uint16, data []byte) []byte {
 	buf := new(bytes.Buffer)
 
@@ -17,6 +18,7 @@ func WrapSecurityFlag(flag uint16, data []byte) []byte {
 	return buf.Bytes()
 }
 
+// UnwrapSecurityFlag reads and returns the security flag from an RDP security header.
 func UnwrapSecurityFlag(wire io.Reader) (uint16, error) {
 	var (
 		flags   uint16

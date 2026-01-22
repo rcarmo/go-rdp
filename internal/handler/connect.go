@@ -1,3 +1,5 @@
+// Package handler implements HTTP handlers for the RDP HTML5 gateway,
+// including WebSocket connection management and RDP session proxying.
 package handler
 
 import (
@@ -40,6 +42,7 @@ type connectionRequest struct {
 	Password string `json:"password"`
 }
 
+// Connect handles WebSocket connections for RDP sessions.
 func Connect(w http.ResponseWriter, r *http.Request) {
 	// Check origin
 	origin := r.Header.Get("Origin")

@@ -1,3 +1,5 @@
+// Package rdp implements a Remote Desktop Protocol client supporting RDP 5+
+// with NLA authentication, bitmap updates, and virtual channels.
 package rdp
 
 import (
@@ -14,12 +16,16 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/protocol/x224"
 )
 
+// RemoteApp contains configuration for running a remote application (RAIL).
+// Note: RAIL is not supported in the HTML5 client as browsers cannot create
+// native OS windows.
 type RemoteApp struct {
 	App        string
 	WorkingDir string
 	Args       string
 }
 
+// Client represents an RDP client connection to a remote desktop server.
 type Client struct {
 	conn       net.Conn
 	buffReader *bufio.Reader
@@ -66,6 +72,7 @@ const (
 	readBufferSize       = 64 * 1024
 )
 
+// NewClient creates a new RDP client and establishes a TCP connection to the server.
 func NewClient(
 	hostname, username, password string,
 	desktopWidth, desktopHeight int,

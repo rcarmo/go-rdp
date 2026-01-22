@@ -8,6 +8,8 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/codec"
 )
 
+// SystemTime represents the Windows SYSTEMTIME structure used for timezone
+// information in the extended client info (MS-RDPBCGR section 2.2.1.11.1.1.1).
 type SystemTime struct {
 	Year         uint16
 	Month        uint16
@@ -34,6 +36,8 @@ func (t *SystemTime) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// TimeZoneInformation contains client timezone data sent during
+// the Secure Settings Exchange phase (MS-RDPBCGR section 2.2.1.11.1.1.1).
 type TimeZoneInformation struct {
 	Bias         uint32
 	StandardName [64]byte
@@ -62,6 +66,7 @@ func (i *TimeZoneInformation) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// AddressFamily indicates the address family for client network info.
 type AddressFamily uint16
 
 const (
@@ -72,6 +77,8 @@ const (
 	AddressFamilyINET6 AddressFamily = 0x0017
 )
 
+// ExtendedInfoPacket contains optional extended client information
+// sent during the Secure Settings Exchange (MS-RDPBCGR section 2.2.1.11.1.1.1).
 type ExtendedInfoPacket struct {
 	PerformanceFlags uint32
 }
@@ -91,6 +98,8 @@ func (p *ExtendedInfoPacket) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// ClientInfoPacket contains the client information PDU sent during the
+// Secure Settings Exchange phase (MS-RDPBCGR section 2.2.1.11.1.1).
 type ClientInfoPacket struct {
 	CodePage       uint32
 	Flags          InfoFlag
@@ -161,10 +170,13 @@ func (p *ClientInfoPacket) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// ClientInfo wraps the client information packet for the Secure Settings Exchange.
 type ClientInfo struct {
 	InfoPacket ClientInfoPacket
 }
 
+// InfoFlag defines flags for client capabilities and options
+// in the Client Info PDU (MS-RDPBCGR section 2.2.1.11.1.1).
 type InfoFlag uint32
 
 const (
@@ -234,6 +246,7 @@ const (
 	CompressionTypeRDP61 uint32 = 0x3
 )
 
+// NewClientInfo creates a new ClientInfo with the given credentials and default flags.
 func NewClientInfo(domain, username, password string) *ClientInfo {
 	return &ClientInfo{
 		InfoPacket: ClientInfoPacket{

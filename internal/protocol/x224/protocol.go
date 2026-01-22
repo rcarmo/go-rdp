@@ -1,3 +1,5 @@
+// Package x224 implements the X.224 connection-oriented transport protocol
+// used in the RDP connection sequence for initial negotiation.
 package x224
 
 import (

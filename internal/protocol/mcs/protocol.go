@@ -1,3 +1,5 @@
+// Package mcs implements the Multipoint Communication Service (T.125) protocol
+// layer for RDP connections as specified in MS-RDPBCGR.
 package mcs
 
 import "github.com/rcarmo/rdp-html5/internal/protocol/x224"

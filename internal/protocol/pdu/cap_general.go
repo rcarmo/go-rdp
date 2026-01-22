@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// GeneralCapabilitySet represents the General Capability Set (MS-RDPBCGR 2.2.7.1.1).
 type GeneralCapabilitySet struct {
 	OSMajorType           uint16
 	OSMinorType           uint16
@@ -14,6 +15,7 @@ type GeneralCapabilitySet struct {
 	SuppressOutputSupport uint8
 }
 
+// NewGeneralCapabilitySet creates a General Capability Set with default client values.
 func NewGeneralCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeGeneral,
@@ -27,6 +29,7 @@ func NewGeneralCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *GeneralCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -45,6 +48,7 @@ func (s *GeneralCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *GeneralCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

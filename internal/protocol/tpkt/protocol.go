@@ -1,3 +1,5 @@
+// Package tpkt implements the TPKT transport protocol (RFC 1006) used as
+// the base transport layer for RDP connections.
 package tpkt
 
 import (

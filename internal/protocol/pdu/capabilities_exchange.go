@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// CapabilitySetType identifies the type of capability set as defined in MS-RDPBCGR section 2.2.7.
 type CapabilitySetType uint16
 
 const (
@@ -94,6 +95,8 @@ const (
 	CapabilitySetTypeFrameAcknowledge CapabilitySetType = 0x001E
 )
 
+// CapabilitySet represents a capability set exchanged during the RDP capabilities negotiation
+// phase as defined in MS-RDPBCGR section 2.2.7.1.
 type CapabilitySet struct {
 	CapabilitySetType                   CapabilitySetType
 	GeneralCapabilitySet                *GeneralCapabilitySet
@@ -126,6 +129,7 @@ type CapabilitySet struct {
 	FrameAcknowledgeCapabilitySet       *FrameAcknowledgeCapabilitySet
 }
 
+// Serialize encodes the CapabilitySet to wire format.
 func (set *CapabilitySet) Serialize() []byte {
 	var data []byte
 
@@ -193,6 +197,7 @@ func (set *CapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// DeserializeQuick reads a capability set from wire format without fully parsing the data.
 func (set *CapabilitySet) DeserializeQuick(wire io.Reader) error {
 	var (
 		lengthCapability uint16
@@ -217,6 +222,7 @@ func (set *CapabilitySet) DeserializeQuick(wire io.Reader) error {
 	return nil
 }
 
+// Deserialize reads and fully parses a capability set from wire format.
 func (set *CapabilitySet) Deserialize(wire io.Reader) error {
 	var (
 		lengthCapability uint16
@@ -326,21 +332,25 @@ func (set *CapabilitySet) Deserialize(wire io.Reader) error {
 	return nil
 }
 
-// Frame Acknowledge Capability Set - for RDP 8.0+
+// FrameAcknowledgeCapabilitySet advertises support for frame acknowledgement (RDP 8.0+)
+// as defined in MS-RDPBCGR section 2.2.7.2.2.
 type FrameAcknowledgeCapabilitySet struct {
 	MaxUnacknowledgedFrames uint32
 }
 
+// Serialize encodes the FrameAcknowledgeCapabilitySet to wire format.
 func (s *FrameAcknowledgeCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 	_ = binary.Write(buf, binary.LittleEndian, s.MaxUnacknowledgedFrames)
 	return buf.Bytes()
 }
 
+// Deserialize decodes the FrameAcknowledgeCapabilitySet from wire format.
 func (s *FrameAcknowledgeCapabilitySet) Deserialize(wire io.Reader) error {
 	return binary.Read(wire, binary.LittleEndian, &s.MaxUnacknowledgedFrames)
 }
 
+// NewFrameAcknowledgeCapabilitySet creates a FrameAcknowledgeCapabilitySet with default values.
 func NewFrameAcknowledgeCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeFrameAcknowledge,
@@ -350,6 +360,8 @@ func NewFrameAcknowledgeCapabilitySet() CapabilitySet {
 	}
 }
 
+// ServerDemandActive represents the Demand Active PDU sent by the server during the
+// capabilities exchange phase as defined in MS-RDPBCGR section 2.2.1.13.1.
 type ServerDemandActive struct {
 	ShareControlHeader         ShareControlHeader
 	ShareID                    uint32
@@ -362,6 +374,7 @@ type ServerDemandActive struct {
 	SessionId                  uint32
 }
 
+// Deserialize decodes the ServerDemandActive PDU from wire format.
 func (pdu *ServerDemandActive) Deserialize(wire io.Reader) error {
 	err := pdu.ShareControlHeader.Deserialize(wire)
 	if err != nil {
@@ -420,6 +433,8 @@ func (pdu *ServerDemandActive) Deserialize(wire io.Reader) error {
 	return nil
 }
 
+// ClientConfirmActive represents the Confirm Active PDU sent by the client during the
+// capabilities exchange phase as defined in MS-RDPBCGR section 2.2.1.13.2.
 type ClientConfirmActive struct {
 	ShareControlHeader ShareControlHeader
 	ShareID            uint32
@@ -427,6 +442,7 @@ type ClientConfirmActive struct {
 	CapabilitySets     []CapabilitySet
 }
 
+// NewClientConfirmActive creates a ClientConfirmActive PDU with the specified parameters.
 func NewClientConfirmActive(shareID uint32, userId, desktopWidth, desktopHeight uint16, withRemoteApp bool) *ClientConfirmActive {
 	pdu := ClientConfirmActive{
 		ShareControlHeader: ShareControlHeader{
@@ -462,6 +478,7 @@ func NewClientConfirmActive(shareID uint32, userId, desktopWidth, desktopHeight 
 	return &pdu
 }
 
+// Serialize encodes the ClientConfirmActive PDU to wire format.
 func (pdu *ClientConfirmActive) Serialize() []byte {
 	capBuf := bytes.Buffer{}
 
@@ -493,6 +510,7 @@ func (pdu *ClientConfirmActive) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the ClientConfirmActive PDU from wire format.
 func (pdu *ClientConfirmActive) Deserialize(wire io.Reader) error {
 	var err error
 

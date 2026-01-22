@@ -6,6 +6,7 @@ import (
 "io"
 )
 
+// PointerCapabilitySet represents the Pointer Capability Set (MS-RDPBCGR 2.2.7.1.5).
 type PointerCapabilitySet struct {
 	ColorPointerFlag      uint16
 	ColorPointerCacheSize uint16
@@ -13,6 +14,7 @@ type PointerCapabilitySet struct {
 	lengthCapability      uint16
 }
 
+// NewPointerCapabilitySet creates a Pointer Capability Set with default client values.
 func NewPointerCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypePointer,
@@ -23,6 +25,7 @@ func NewPointerCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *PointerCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -33,6 +36,7 @@ func (s *PointerCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *PointerCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 

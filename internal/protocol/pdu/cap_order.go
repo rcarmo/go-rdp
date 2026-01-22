@@ -6,6 +6,7 @@ import (
 "io"
 )
 
+// OrderCapabilitySet represents the Order Capability Set (MS-RDPBCGR 2.2.7.1.3).
 type OrderCapabilitySet struct {
 	OrderFlags          uint16
 	OrderSupport        [32]byte
@@ -15,6 +16,7 @@ type OrderCapabilitySet struct {
 	textANSICodePage    uint16
 }
 
+// NewOrderCapabilitySet creates an Order Capability Set with default client values.
 func NewOrderCapabilitySet() CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeOrder,
@@ -25,6 +27,7 @@ func NewOrderCapabilitySet() CapabilitySet {
 	}
 }
 
+// Serialize encodes the capability set to wire format.
 func (s *OrderCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -48,6 +51,7 @@ func (s *OrderCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the capability set from wire format.
 func (s *OrderCapabilitySet) Deserialize(wire io.Reader) error {
 	var (
 		err                     error

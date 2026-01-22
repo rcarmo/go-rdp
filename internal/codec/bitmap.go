@@ -1,3 +1,5 @@
+// Package codec implements RDP bitmap decompression algorithms including
+// interleaved RLE, planar, and NSCodec as specified in MS-RDPBCGR and MS-RDPNSC.
 package codec
 
 import "sync"

@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// BitmapCapabilitySet advertises bitmap-related capabilities as defined in MS-RDPBCGR section 2.2.7.1.2.
 type BitmapCapabilitySet struct {
 	PreferredBitsPerPixel uint16
 	Receive1BitPerPixel   uint16
@@ -17,6 +18,7 @@ type BitmapCapabilitySet struct {
 	DrawingFlags          uint8
 }
 
+// NewBitmapCapabilitySet creates a BitmapCapabilitySet with the specified desktop dimensions.
 func NewBitmapCapabilitySet(desktopWidth, desktopHeight uint16) CapabilitySet {
 	return CapabilitySet{
 		CapabilitySetType: CapabilitySetTypeBitmap,
@@ -32,6 +34,7 @@ func NewBitmapCapabilitySet(desktopWidth, desktopHeight uint16) CapabilitySet {
 	}
 }
 
+// Serialize encodes the BitmapCapabilitySet to wire format.
 func (s *BitmapCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
@@ -52,6 +55,7 @@ func (s *BitmapCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// Deserialize decodes the BitmapCapabilitySet from wire format.
 func (s *BitmapCapabilitySet) Deserialize(wire io.Reader) error {
 	var err error
 
