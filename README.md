@@ -13,7 +13,7 @@ A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssemb
 docker run -d -p 8080:8080 ghcr.io/rcarmo/rdp-html5:latest
 
 # Run with TLS validation disabled (for self-signed certs)
-docker run -d -p 8080:8080 -e SKIP_TLS_VALIDATION=true ghcr.io/rcarmo/rdp-html5:latest
+docker run -d -p 8080:8080 -e TLS_SKIP_VERIFY=true ghcr.io/rcarmo/rdp-html5:latest
 
 # Run with debug logging
 docker run -d -p 8080:8080 -e LOG_LEVEL=debug ghcr.io/rcarmo/rdp-html5:latest
@@ -53,10 +53,10 @@ Environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `8080` | HTTP server port |
+| `SERVER_PORT` | `8080` | HTTP server port |
 | `LOG_LEVEL` | `info` | Logging level: debug, info, warn, error |
 | `TLS_SKIP_VERIFY` | `false` (Docker default: `false`) | Skip RDP server TLS certificate validation |
-| `TLS_ALLOW_ANY_SERVER_NAME` | `false` (Docker default: `true`) | Allow connecting without enforcing SNI (lab/testing) |
+| `TLS_ALLOW_ANY_SERVER_NAME` | `false` (Docker default: `false`) | Allow connecting without enforcing SNI (lab/testing) |
 | `ENABLE_TLS` | `false` | Enable HTTPS for the web interface |
 | `TLS_CERT_FILE` | - | Path to TLS certificate |
 | `TLS_KEY_FILE` | - | Path to TLS private key |
@@ -80,13 +80,10 @@ See [docs/configuration.md](docs/configuration.md) for full configuration option
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) - System design and data flow
-- [Configuration](docs/configuration.md) - All configuration options
+- [Configuration](docs/configuration.md) - Configuration options (env vars + flags)
 - [Debugging](docs/debugging.md) - Troubleshooting guide
 - [NSCodec](docs/NSCODEC.md) - Bitmap codec implementation
 - [RemoteFX](docs/REMOTEFX.md) - RemoteFX wavelet codec implementation
-- [Known Issues](KNOWN_ISSUES.md) - Current limitations
-- [Security](SECURITY.md) - Security considerations
-- [Changelog](CHANGELOG.md) - Version history
 
 ## Features
 
@@ -102,7 +99,7 @@ See [docs/configuration.md](docs/configuration.md) for full configuration option
 
 - **Windows Compatibility** - Primarily tested with XRDP; Windows servers may have issues
 - **Graphics** - RemoteFX codec implemented; H.264 not yet supported
-- **NLA** - Works with many configurations but not all (see [KNOWN_ISSUES.md](KNOWN_ISSUES.md))
+- **NLA** - Works with many configurations but not all (see limitations below)
 
 ## Development
 
