@@ -41,7 +41,7 @@ func TestAudioHandler_SendClientFormatsFunc(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "no PCM format - accept all",
+			name: "no PCM format - disable audio",
 			formats: []audio.AudioFormat{
 				{
 					FormatTag:      0x0055, // MP3
@@ -90,7 +90,11 @@ func TestAudioHandler_SendClientFormatsFunc(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.NotEmpty(t, sentData)
+				if tt.name == "no PCM format - disable audio" {
+					assert.Empty(t, sentData)
+				} else {
+					assert.NotEmpty(t, sentData)
+				}
 			}
 		})
 	}

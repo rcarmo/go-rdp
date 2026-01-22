@@ -167,9 +167,11 @@ func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version ui
 		}
 	}
 
-	// If no PCM formats, accept all (server will send what it can)
+	// If no PCM formats, disable audio (browser only supports PCM)
 	if len(supportedFormats) == 0 {
-		supportedFormats = formats
+		logging.Warn("Audio: No PCM formats to send; audio disabled")
+		h.Disable()
+		return nil
 	}
 
 	clientFormats := audio.ClientAudioFormats{
@@ -242,6 +244,9 @@ func (h *AudioHandler) handleWave(body []byte) error {
 		if int(waveInfo.FormatNo) < len(h.serverFormats) {
 			format = &h.serverFormats[waveInfo.FormatNo]
 		}
+		if format != nil {
+			logging.Debug("Audio: Wave format %s, %d bytes", format.String(), len(fullData))
+		}
 		h.callback(fullData, format, waveInfo.Timestamp)
 	}
 
@@ -260,6 +265,9 @@ func (h *AudioHandler) handleWave2(body []byte) error {
 		var format *audio.AudioFormat
 		if int(wave2.FormatNo) < len(h.serverFormats) {
 			format = &h.serverFormats[wave2.FormatNo]
+		}
+		if format != nil {
+			logging.Debug("Audio: Wave2 format %s, %d bytes", format.String(), len(wave2.Data))
 		}
 		h.callback(wave2.Data, format, wave2.Timestamp)
 	}

@@ -47,6 +47,7 @@ export const GraphicsMixin = {
         this._fps = 0;
         this._bytesReceived = 0;
         this._statsInterval = null;
+        this._activeDecoder = null;
         
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
@@ -111,6 +112,22 @@ export const GraphicsMixin = {
         this._frameCount = 0;
         this._bytesReceived = 0;
         this._lastFpsTime = now;
+    },
+    
+    /**
+     * Track and log the active bitmap decoder (WASM vs JS fallback)
+     * @param {string} decoderName
+     */
+    setActiveDecoder(decoderName) {
+        if (this._activeDecoder === decoderName) {
+            return;
+        }
+        this._activeDecoder = decoderName;
+        console.info(
+            '%c[RDP Client] Active decoder',
+            'color: #FF9800; font-weight: bold',
+            decoderName
+        );
     },
     
     /**
@@ -283,6 +300,7 @@ export const GraphicsMixin = {
             const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
             
             if (result) {
+                this.setActiveDecoder('WASM');
                 this.ctx.putImageData(
                     new ImageData(rgba, width, height),
                     bitmapData.destLeft,
@@ -307,6 +325,7 @@ export const GraphicsMixin = {
         const fallbackResult = FallbackCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba);
         
         if (fallbackResult) {
+            this.setActiveDecoder('JS-Fallback');
             this.ctx.putImageData(
                 new ImageData(rgba, width, height),
                 bitmapData.destLeft,
