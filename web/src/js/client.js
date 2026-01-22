@@ -12,6 +12,7 @@ import { GraphicsMixin } from './graphics.js';
 import { ClipboardMixin } from './clipboard.js';
 import { UIMixin } from './ui.js';
 import AudioMixin from './audio.js';
+import { parseUpdateHeader, parseNewPointerUpdate, parseCachedPointerUpdate, parsePointerPositionUpdate } from './protocol.js';
 
 // Re-export Logger for external use
 export { Logger };
