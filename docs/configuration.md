@@ -37,7 +37,7 @@ The log level is automatically synchronized to the browser client when a connect
 ```bash
 # CORS Configuration
 # If ALLOWED_ORIGINS is not set, all origins are allowed (development mode)
-# For production, explicitly set allowed origins (localhost/127.0.0.1 always allowed)
+# For production, explicitly set allowed origins
 export ALLOWED_ORIGINS="https://example.com,https://app.example.com"
 
 export MAX_CONNECTIONS=100
@@ -67,6 +67,9 @@ export TLS_SKIP_VERIFY=false
 
 # Override TLS server name for certificate validation
 export TLS_SERVER_NAME=
+
+# Allow connecting without enforcing SNI (lab/testing only)
+export TLS_ALLOW_ANY_SERVER_NAME=false
 
 # Enable Network Level Authentication (default: true)
 export USE_NLA=true

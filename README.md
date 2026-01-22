@@ -55,8 +55,8 @@ Environment variables:
 |----------|---------|-------------|
 | `SERVER_PORT` | `8080` | HTTP server port |
 | `LOG_LEVEL` | `info` | Logging level: debug, info, warn, error |
-| `TLS_SKIP_VERIFY` | `false` (Docker default: `false`) | Skip RDP server TLS certificate validation |
-| `TLS_ALLOW_ANY_SERVER_NAME` | `false` (Docker default: `false`) | Allow connecting without enforcing SNI (lab/testing) |
+| `TLS_SKIP_VERIFY` | `false` | Skip RDP server TLS certificate validation |
+| `TLS_ALLOW_ANY_SERVER_NAME` | `false` | Allow connecting without enforcing SNI (lab/testing) |
 | `ENABLE_TLS` | `false` | Enable HTTPS for the web interface |
 | `TLS_CERT_FILE` | - | Path to TLS certificate |
 | `TLS_KEY_FILE` | - | Path to TLS private key |

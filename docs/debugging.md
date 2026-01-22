@@ -114,7 +114,7 @@ Logger.getLevel();     // Returns current level string
 
 1. Try disabling NLA: check "Disable NLA" in the connection dialog
 2. Check server logs for NTLM negotiation details at debug level
-3. See [KNOWN_ISSUES.md](../KNOWN_ISSUES.md) for NLA limitations
+3. NLA has known limitations with some server configurations
 
 ### No Display Updates
 

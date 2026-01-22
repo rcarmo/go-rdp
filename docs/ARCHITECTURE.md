@@ -189,7 +189,7 @@ Browser                    Go Server                   RDP Server
 │   User Input (mouse move, click, keypress)                             │
 │       │                                                                 │
 │       ▼                                                                 │
-│   InputMixin [web/src/js/mixins/input.js]                              │
+│   Input handler [web/src/js/input.js]                                  │
 │       │                                                                 │
 │       ▼                                                                 │
 │   ┌───────────────────────────────────────────────────────────────┐    │
@@ -443,19 +443,21 @@ FastPath Update PDU:
 
 ```
 web/
-├── index.html              # Main HTML page
-├── js/
-│   └── src/
-│       ├── client.js       # Main client class
-│       └── mixins/
-│           ├── session.js  # Connection management
-│           ├── input.js    # Mouse/keyboard handling
-│           ├── graphics.js # Canvas rendering
-│           ├── clipboard.js# Copy/paste
-│           ├── ui.js       # UI state
-│           └── audio.js    # Audio playback
-└── wasm/
-    └── main.go             # TinyGo WASM module
+├── src/
+│   ├── index.html          # Main HTML page
+│   ├── js/
+│   │   ├── client.js       # Main client class
+│   │   ├── session.js      # Connection management
+│   │   ├── input.js        # Mouse/keyboard handling
+│   │   ├── graphics.js     # Canvas rendering
+│   │   ├── clipboard.js    # Copy/paste
+│   │   ├── ui.js           # UI state
+│   │   ├── audio.js        # Audio playback
+│   │   ├── wasm.js         # WASM codec wrapper
+│   │   └── codec-fallback.js # Pure JS fallback codecs
+│   └── wasm/
+│       └── main.go         # TinyGo WASM module
+└── dist/                   # Built/bundled assets
 ```
 
 ### Client Architecture
@@ -463,35 +465,35 @@ web/
 The JavaScript client uses a mixin-based architecture:
 
 ```javascript
-class RDPClient {
-    constructor(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        this.ws = null;
-        
-        // Apply mixins
-        Object.assign(this, SessionMixin);
-        Object.assign(this, InputMixin);
-        Object.assign(this, GraphicsMixin);
-        Object.assign(this, ClipboardMixin);
-        Object.assign(this, UIMixin);
-        Object.assign(this, AudioMixin);
-    }
+// web/src/js/client.js
+import { SessionMixin } from './session.js';
+import { InputMixin } from './input.js';
+import { GraphicsMixin } from './graphics.js';
+import { ClipboardMixin } from './clipboard.js';
+import { UIMixin } from './ui.js';
+import AudioMixin from './audio.js';
+
+function Client(websocketURL, canvasID, hostID, userID, passwordID) {
+    this.websocketURL = websocketURL;
+    this.canvas = document.getElementById(canvasID);
+    this.ctx = this.canvas.getContext('2d');
+    this.socket = null;
     
-    connect(host, user, password, options) {
-        const params = new URLSearchParams({
-            host, user, password,
-            width: options.width,
-            height: options.height,
-            colorDepth: options.colorDepth,
-            audio: options.audio
-        });
-        
-        this.ws = new WebSocket(`ws://${location.host}/connect?${params}`);
-        this.ws.binaryType = 'arraybuffer';
-        this.ws.onmessage = (e) => this.handleMessage(e.data);
-    }
+    // Initialize all mixins
+    this.initSession();
+    this.initInput();
+    this.initGraphics();
+    this.initUI();
+    this.initAudio();
 }
+
+// Apply mixins to prototype
+applyMixin(SessionMixin);
+applyMixin(InputMixin);
+applyMixin(GraphicsMixin);
+applyMixin(ClipboardMixin);
+applyMixin(UIMixin);
+applyMixin(AudioMixin);
 ```
 
 ### WASM Module
@@ -501,20 +503,20 @@ The TinyGo WASM module exposes codec functions to JavaScript:
 ```go
 // web/src/wasm/main.go
 func main() {
-    js.Global().Set("goRLE", map[string]interface{}{
-        "decompressRLE16": js.FuncOf(decompressRLE16),
-        "flipVertical":    js.FuncOf(flipVertical),
-        "rgb565toRGBA":    js.FuncOf(rgb565toRGBA),
-        "bgr24toRGBA":     js.FuncOf(bgr24toRGBA),
-        "bgra32toRGBA":    js.FuncOf(bgra32toRGBA),
-        "processBitmap":   js.FuncOf(processBitmap),
-        "decodeNSCodec":   js.FuncOf(decodeNSCodec),
-        "setPalette":      js.FuncOf(setPalette),
-        "setRFXQuant":     js.FuncOf(setRFXQuant),
-        "decodeRFXTile":   js.FuncOf(decodeRFXTile),
-    })
+    js.Global().Set("goRLE", js.ValueOf(map[string]interface{}{
+        "decompressRLE16": js.FuncOf(jsDecompressRLE16),
+        "flipVertical":    js.FuncOf(jsFlipVertical),
+        "rgb565toRGBA":    js.FuncOf(jsRGB565toRGBA),
+        "bgr24toRGBA":     js.FuncOf(jsBGR24toRGBA),
+        "bgra32toRGBA":    js.FuncOf(jsBGRA32toRGBA),
+        "processBitmap":   js.FuncOf(jsProcessBitmap),
+        "decodeNSCodec":   js.FuncOf(jsDecodeNSCodec),
+        "setPalette":      js.FuncOf(jsSetPalette),
+        "decodeRFXTile":   js.FuncOf(jsDecodeRFXTile),
+        "setRFXQuant":     js.FuncOf(jsSetRFXQuant),
+    }))
     
-    select {} // Keep alive
+    <-c // Keep alive
 }
 ```
 
@@ -720,7 +722,7 @@ RDP Server (RDPSND Virtual Channel)
          │ WebSocket binary message
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ AudioMixin (web/src/js/mixins/audio.js)                          │
+│ Audio handler (web/src/js/audio.js)                              │
 │                                                                  │
 │  initAudio()                                                     │
 │    • Create AudioContext                                         │
@@ -795,8 +797,8 @@ type LoggingConfig struct {
 | Host | `-host` | `SERVER_HOST` | `0.0.0.0` |
 | Port | `-port` | `SERVER_PORT` | `8080` |
 | Log Level | `-log-level` | `LOG_LEVEL` | `info` |
-| Skip TLS | `-tls-skip-verify` | `TLS_SKIP_VERIFY` | `false` (Docker default: `false`) |
-| Allow any SNI | `-tls-allow-any-server-name` | `TLS_ALLOW_ANY_SERVER_NAME` | `false` (Docker default: `true`) |
+| Skip TLS | `-tls-skip-verify` | `TLS_SKIP_VERIFY` | `false` |
+| Allow any SNI | `-tls-allow-any-server-name` | `TLS_ALLOW_ANY_SERVER_NAME` | `false` |
 | Use NLA | `-nla` | `USE_NLA` | `true` |
 
 ---
@@ -911,7 +913,7 @@ RUN go build -o rdp-html5 ./cmd/server
 FROM alpine:latest
 COPY --from=builder /app/rdp-html5 /app/
 COPY --from=builder /app/web /app/web
-ENV SKIP_TLS_VALIDATION=true
+ENV TLS_SKIP_VERIFY=true
 EXPOSE 8080
 CMD ["/app/rdp-html5"]
 ```
@@ -924,7 +926,7 @@ SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
 
 # Security
-SKIP_TLS_VALIDATION=true   # For self-signed RDP certs
+TLS_SKIP_VERIFY=true       # For self-signed RDP certs
 USE_NLA=true               # Enable NLA authentication
 ALLOWED_ORIGINS=https://example.com
 
