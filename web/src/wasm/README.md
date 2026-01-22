@@ -1,4 +1,4 @@
-# web/wasm
+# web/src/wasm
 
 TinyGo WebAssembly codec module for browser-side bitmap processing.
 
@@ -181,31 +181,31 @@ make wasm
 ### Directly with TinyGo
 
 ```bash
-tinygo build -o web/wasm/rle.wasm -target wasm ./web/wasm/
+tinygo build -o web/src/dist/js/rle/rle.wasm -target wasm ./web/src/wasm/
 ```
 
 ### Build Options
 
 ```bash
 # Optimized for size
-tinygo build -o rle.wasm -target wasm -opt=z ./web/wasm/
+tinygo build -o rle.wasm -target wasm -opt=z ./web/src/wasm/
 
 # With debug info
-tinygo build -o rle.wasm -target wasm -no-debug=false ./web/wasm/
+tinygo build -o rle.wasm -target wasm -no-debug=false ./web/src/wasm/
 ```
 
 ## Loading in Browser
 
 ```html
 <!-- TinyGo WASM runtime (provides Go class) -->
-<script src="js/wasm_exec.js"></script>
+<script src="dist/js/rle/wasm_exec.js"></script>
 
 <script>
     async function loadWasm() {
         const go = new Go();
         
         const result = await WebAssembly.instantiateStreaming(
-            fetch('wasm/rle.wasm'),
+            fetch('dist/js/rle/rle.wasm'),
             go.importObject
         );
         
@@ -320,7 +320,7 @@ func log(msg string) {
 ### Build with Debug Info
 
 ```bash
-tinygo build -o rle.wasm -target wasm -no-debug=false ./web/wasm/
+tinygo build -o rle.wasm -target wasm -no-debug=false ./web/src/wasm/
 ```
 
 ## Size Optimization
@@ -335,8 +335,8 @@ TinyGo produces smaller binaries than standard Go:
 
 ## Related Files
 
-- `web/js/wasm_exec.js` - TinyGo JavaScript runtime
-- `web/js/src/wasm.js` - WASMCodec module and RFXDecoder class
-- `web/js/update/bitmap.js` - JavaScript caller
+- `web/dist/js/rle/wasm_exec.js` - TinyGo JavaScript runtime
+- `web/src/js/wasm.js` - WASMCodec module and RFXDecoder class
+- `web/src/legacy/js/update/bitmap.js` - JavaScript caller
 - `internal/codec/` - Go codec implementation (RLE, NSCodec)
 - `internal/codec/rfx/` - RemoteFX codec implementation

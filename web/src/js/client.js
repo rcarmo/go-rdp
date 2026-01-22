@@ -6,6 +6,7 @@
 
 import { Logger } from './logger.js';
 import { SessionMixin } from './session.js';
+import BinaryReader from './binary.js';
 import { InputMixin, elementOffset, mouseButtonMap } from './input.js';
 import { GraphicsMixin } from './graphics.js';
 import { ClipboardMixin } from './clipboard.js';

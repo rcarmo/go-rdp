@@ -1,4 +1,4 @@
-package main
+package web_test
 
 import (
 	"os"
@@ -9,24 +9,18 @@ import (
 // TestWebInterfaceFiles tests that required web interface files exist
 func TestWebInterfaceFiles(t *testing.T) {
 	// Test that main HTML file exists
-	htmlPath := "index.html"
+	htmlPath := "src/index.html"
 	if _, err := os.Stat(htmlPath); os.IsNotExist(err) {
 		t.Errorf("Main HTML file %s not found", htmlPath)
 	}
 
 	// Test that required JavaScript files exist
 	jsFiles := []string{
-		"js/binary.js",
-		"js/client.bundle.min.js",
-		"js/input/keyboard.js",
-		"js/input/keymap.js",
-		"js/input/mouse.js",
-		"js/input/header.js",
-		"js/color.js",
-		"js/update/header.js",
-		"js/update/bitmap.js",
-		"js/update/pointer.js",
-		"js/rle/wasm_exec.js",
+		"src/js/binary.js",
+		"src/js/client.js",
+		"src/js/index.js",
+		"dist/js/client.bundle.min.js",
+		"dist/js/rle/wasm_exec.js",
 	}
 
 	for _, jsFile := range jsFiles {
@@ -37,7 +31,7 @@ func TestWebInterfaceFiles(t *testing.T) {
 
 	// Test that WASM files exist
 	wasmFiles := []string{
-		"js/rle/rle.wasm",
+		"dist/js/rle/rle.wasm",
 	}
 
 	for _, wasmFile := range wasmFiles {
@@ -50,9 +44,9 @@ func TestWebInterfaceFiles(t *testing.T) {
 // TestWebInterfaceContentStructure tests that HTML has required content
 func TestWebInterfaceContentStructure(t *testing.T) {
 	// Read HTML file content
-	content, err := os.ReadFile("index.html")
+	content, err := os.ReadFile("src/index.html")
 	if err != nil {
-		t.Fatalf("Failed to read index.html: %v", err)
+		t.Fatalf("Failed to read src/index.html: %v", err)
 	}
 
 	htmlContent := string(content)
@@ -76,7 +70,7 @@ func TestWebInterfaceContentStructure(t *testing.T) {
 		}
 	}
 
-	// Test that required scripts are included
+	// Test that required scripts are included (paths relative to served root)
 	requiredScripts := []string{
 		"js/client.bundle.min.js",
 	}

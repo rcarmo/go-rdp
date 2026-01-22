@@ -78,14 +78,14 @@ test-rfx: ## Run RemoteFX codec tests
 .PHONY: test-js
 test-js: ## Run JavaScript fallback codec tests
 	@echo "Running JavaScript tests..."
-	cd web/js/src && node --test codec-fallback.test.js
+	cd web/src/js && node --test codec-fallback.test.js
 
 # Building
 .PHONY: build
 build: build-frontend build-backend ## Build frontend (WASM+JS) and backend
 	@echo "Full build complete:"
-	@echo "  - WASM:    web/js/rle/rle.wasm"
-	@echo "  - JS:      web/js/client.bundle.min.js"
+	@echo "  - WASM:    web/dist/js/rle/rle.wasm"
+	@echo "  - JS:      web/dist/js/client.bundle.min.js"
 	@echo "  - Binary:  $(BUILD_DIR)/$(BINARY_NAME)"
 
 .PHONY: build-backend
@@ -96,8 +96,15 @@ build-backend: ## Build Go backend only
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)
 
 .PHONY: build-frontend
-build-frontend: build-wasm build-js-min ## Build WASM and JS assets
-	@echo "Frontend assets built (WASM + JS)"
+build-frontend: build-html build-wasm build-js-min ## Build WASM and JS assets
+	@echo "Frontend assets built (HTML + WASM + JS)"
+
+.PHONY: build-html
+build-html: ## Copy HTML files from src to dist
+	@echo "Copying HTML files to dist..."
+	@mkdir -p web/dist
+	@cp web/src/*.html web/dist/
+	@echo "HTML files copied to web/dist/"
 
 .PHONY: build-all
 build-all: build-frontend ## Build binaries for common platforms
@@ -125,38 +132,41 @@ build-all: build-frontend ## Build binaries for common platforms
 .PHONY: build-wasm
 build-wasm: ## Build WebAssembly module (TinyGo preferred)
 	@echo "Building Go WebAssembly RLE module with TinyGo (optimized for size)..."
+	@mkdir -p web/dist/js/rle
 	@if command -v tinygo >/dev/null 2>&1; then \
-		tinygo build -o web/js/rle/rle.wasm -target wasm -opt=z ./web/wasm/; \
-		cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/js/rle/wasm_exec.js; \
+		tinygo build -o web/dist/js/rle/rle.wasm -target wasm -opt=z ./web/src/wasm/; \
+		cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/dist/js/rle/wasm_exec.js; \
 	else \
 		echo "TinyGo not found, using standard Go (larger output)..."; \
-		GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o web/js/rle/rle.wasm ./web/wasm/; \
+		GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o web/dist/js/rle/rle.wasm ./web/src/wasm/; \
 		GOROOT=$$(go env GOROOT); \
 		if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
-			cp "$$GOROOT/misc/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
+			cp "$$GOROOT/misc/wasm/wasm_exec.js" web/dist/js/rle/wasm_exec.js; \
 		elif [ -f "$$GOROOT/lib/wasm/wasm_exec.js" ]; then \
-			cp "$$GOROOT/lib/wasm/wasm_exec.js" web/js/rle/wasm_exec.js; \
+			cp "$$GOROOT/lib/wasm/wasm_exec.js" web/dist/js/rle/wasm_exec.js; \
 		fi; \
 	fi
-	@ls -lh web/js/rle/rle.wasm
-	@echo "WebAssembly module built: web/js/rle/rle.wasm"
+	@ls -lh web/dist/js/rle/rle.wasm
+	@echo "WebAssembly module built: web/dist/js/rle/rle.wasm"
 
 # JavaScript bundling
 .PHONY: build-js
 build-js: ## Build JavaScript bundle (non-minified)
 	@echo "Building JavaScript bundle..."
-	@cd web/js/src && npm install --silent 2>/dev/null && npm run build || \
-		npx --yes esbuild web/js/src/index.js --bundle --outfile=web/js/client.bundle.js --format=iife --global-name=RDP
-	@ls -lh web/js/client.bundle.js
-	@echo "JavaScript bundle built: web/js/client.bundle.js"
+	@mkdir -p web/dist/js
+	@cd web/src/js && npm install --silent 2>/dev/null && npm run build || \
+		npx --yes esbuild index.js --bundle --outfile=../../dist/js/client.bundle.js --format=iife --global-name=RDP
+	@ls -lh web/dist/js/client.bundle.js
+	@echo "JavaScript bundle built: web/dist/js/client.bundle.js"
 
 .PHONY: build-js-min
 build-js-min: ## Build minified JavaScript bundle
 	@echo "Building minified JavaScript bundle..."
-	@cd web/js/src && npm install --silent 2>/dev/null && npm run build:min || \
-		npx --yes esbuild web/js/src/index.js --bundle --minify --outfile=web/js/client.bundle.min.js --format=iife --global-name=RDP
-	@ls -lh web/js/client.bundle.min.js
-	@echo "Minified JavaScript bundle built: web/js/client.bundle.min.js"
+	@mkdir -p web/dist/js
+	@cd web/src/js && npm install --silent 2>/dev/null && npm run build:min || \
+		npx --yes esbuild index.js --bundle --minify --outfile=../../dist/js/client.bundle.min.js --format=iife --global-name=RDP
+	@ls -lh web/dist/js/client.bundle.min.js
+	@echo "Minified JavaScript bundle built: web/dist/js/client.bundle.min.js"
 
 # Docker
 .PHONY: docker
@@ -212,8 +222,15 @@ clean: ## Clean build artifacts and caches
 	go clean -cache
 	go clean -testcache
 
+.PHONY: clean-frontend
+clean-frontend: ## Clean frontend build artifacts
+	@echo "Cleaning frontend build artifacts..."
+	rm -f web/dist/*.html
+	rm -f web/dist/js/*.js web/dist/js/*.js.map
+	rm -f web/dist/js/rle/*.wasm web/dist/js/rle/*.js
+
 .PHONY: clean-all
-clean-all: clean ## Deep clean (vendor, go mod cache, docker prune)
+clean-all: clean clean-frontend ## Deep clean (vendor, go mod cache, docker prune)
 	@echo "Cleaning everything..."
 	rm -rf vendor/
 	go mod tidy -cache

@@ -6,6 +6,7 @@
     <meta name="description" content="Secure HTML5 RDP Client">
     <title>RDP Client</title>
     <!-- Single bundled client -->
+    <script src="js/rle/wasm_exec.js"></script>
     <script src="js/client.bundle.min.js?v=2"></script>
     <style>
         :root {
@@ -1128,6 +1129,7 @@
             const recentConnectionsEl = document.getElementById('recent-connections');
             const recentConnectionsList = document.getElementById('recent-connections-list');
             const clearHistoryBtn = document.getElementById('clear-history');
+            const historyApi = window.ConnectionHistory || {get: () => [], save: () => {}, clear: () => {}, remove: () => {}};
             
             // HTML escape helper
             function escapeHtml(text) {
@@ -1138,7 +1140,7 @@
             
             // Render recent connections
             function renderRecentConnections() {
-                const history = ConnectionHistory.get();
+                const history = historyApi.get();
                 
                 if (history.length === 0) {
                     recentConnectionsEl.style.display = 'none';
@@ -1169,7 +1171,7 @@
                     // Click X to remove
                     item.querySelector('.recent-connection-remove').addEventListener('click', function(e) {
                         e.stopPropagation();
-                        ConnectionHistory.remove(conn.host, conn.username);
+                        historyApi.remove(conn.host, conn.username);
                         renderRecentConnections();
                     });
                     
@@ -1180,7 +1182,7 @@
             // Clear history button
             clearHistoryBtn.addEventListener('click', function() {
                 if (confirm('Clear all recent connections?')) {
-                    ConnectionHistory.clear();
+                    historyApi.clear();
                     renderRecentConnections();
                 }
             });
@@ -1198,7 +1200,7 @@
                 if (host && user) {
                     // Remove :3389 before saving
                     const hostForHistory = host.replace(/:3389$/, '');
-                    ConnectionHistory.save(hostForHistory, user);
+                    historyApi.save(hostForHistory, user);
                     renderRecentConnections();
                 }
                 

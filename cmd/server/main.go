@@ -14,6 +14,7 @@ import (
 	"github.com/rcarmo/rdp-html5/internal/config"
 	"github.com/rcarmo/rdp-html5/internal/handler"
 	"github.com/rcarmo/rdp-html5/internal/logging"
+	"github.com/rcarmo/rdp-html5/web"
 )
 
 const (
@@ -130,8 +131,14 @@ func run(args parsedArgs) error {
 func createServer(cfg *config.Config) *http.Server {
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 
+	// Get embedded static assets
+	staticFS, err := web.DistFS()
+	if err != nil {
+		log.Fatalf("failed to load embedded assets: %v", err)
+	}
+
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir("./web")))
+	mux.Handle("/", http.FileServerFS(staticFS))
 	mux.HandleFunc("/connect", handler.Connect)
 
 	h := applySecurityMiddleware(mux, cfg)

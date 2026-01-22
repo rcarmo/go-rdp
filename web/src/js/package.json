@@ -5,8 +5,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild index.js --bundle --outfile=../client.bundle.js --format=iife --global-name=RDP",
-    "build:min": "esbuild index.js --bundle --minify --outfile=../client.bundle.min.js --format=iife --global-name=RDP",
+    "build": "esbuild index.js --bundle --outfile=../../dist/js/client.bundle.js --format=iife --global-name=RDP",
+    "build:min": "esbuild index.js --bundle --minify --outfile=../../dist/js/client.bundle.min.js --format=iife --global-name=RDP",
     "test": "node --test codec-fallback.test.js",
     "test:verbose": "node --test --test-reporter=spec codec-fallback.test.js"
   },

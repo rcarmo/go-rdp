@@ -1,4 +1,4 @@
-function BinaryReader(arrayBuffer) {
+export default function BinaryReader(arrayBuffer) {
     this.arrayBuffer = arrayBuffer;
     this.dv = new DataView(arrayBuffer);
     this.offset = 0;
@@ -71,7 +71,7 @@ BinaryReader.prototype.skip = function(length) {
     this.offset += length;
 };
 
-function BinaryWriter(array) {
+export function BinaryWriter(array) {
     this.offset = 0;
     this.array = array;
     this.dv = new DataView(this.array);
