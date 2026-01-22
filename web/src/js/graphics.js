@@ -7,7 +7,7 @@
 import { Logger } from './logger.js';
 import { WASMCodec, RFXDecoder } from './wasm.js';
 import { FallbackCodec } from './codec-fallback.js';
-import { parseNewPointerUpdate, parseCachedPointerUpdate, parsePointerPositionUpdate } from './protocol.js';
+import { parseNewPointerUpdate, parseCachedPointerUpdate, parsePointerPositionUpdate, parseBitmapUpdate } from './protocol.js';
 
 /**
  * Graphics handling mixin - adds graphics functionality to Client

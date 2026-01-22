@@ -231,3 +231,89 @@ export function parsePointerPositionUpdate(r) {
     const y = r.uint16(true);
     return new PointerPositionUpdate(x, y);
 }
+
+/**
+ * Bitmap update containing multiple rectangles
+ */
+export class BitmapUpdate {
+    constructor(rectangles) {
+        this.rectangles = rectangles;
+    }
+}
+
+/**
+ * Single bitmap rectangle data
+ */
+export class BitmapData {
+    constructor(destLeft, destTop, destRight, destBottom, width, height, bitsPerPixel, flags, bitmapLength, bitmapDataStream) {
+        this.destLeft = destLeft;
+        this.destTop = destTop;
+        this.destRight = destRight;
+        this.destBottom = destBottom;
+        this.width = width;
+        this.height = height;
+        this.bitsPerPixel = bitsPerPixel;
+        this.flags = flags;
+        this.bitmapLength = bitmapLength;
+        this.bitmapDataStream = bitmapDataStream;
+    }
+
+    isCompressed() {
+        return (this.flags & 0x0001) !== 0;
+    }
+
+    hasNoCompressionHdr() {
+        return (this.flags & 0x0400) !== 0;
+    }
+}
+
+/**
+ * Parse bitmap update from binary reader
+ * Format: TS_UPDATE_BITMAP_DATA (MS-RDPBCGR 2.2.9.1.1.3.1.2)
+ * @param {BinaryReader} r - Binary reader
+ * @returns {BitmapUpdate}
+ */
+export function parseBitmapUpdate(r) {
+    // updateType already consumed by caller or injected
+    const updateType = r.uint16(true);
+    const numberRectangles = r.uint16(true);
+    
+    const rectangles = [];
+    for (let i = 0; i < numberRectangles; i++) {
+        const destLeft = r.uint16(true);
+        const destTop = r.uint16(true);
+        const destRight = r.uint16(true);
+        const destBottom = r.uint16(true);
+        const width = r.uint16(true);
+        const height = r.uint16(true);
+        const bitsPerPixel = r.uint16(true);
+        const flags = r.uint16(true);
+        const bitmapLength = r.uint16(true);
+        
+        let bitmapDataStream;
+        if (flags & 0x0001) {
+            // Compressed
+            if (flags & 0x0400) {
+                // NO_BITMAP_COMPRESSION_HDR - data follows directly
+                bitmapDataStream = r.blob(bitmapLength);
+            } else {
+                // Has compression header
+                const cbCompFirstRowSize = r.uint16(true);
+                const cbCompMainBodySize = r.uint16(true);
+                const cbScanWidth = r.uint16(true);
+                const cbUncompressedSize = r.uint16(true);
+                bitmapDataStream = r.blob(cbCompMainBodySize);
+            }
+        } else {
+            // Uncompressed
+            bitmapDataStream = r.blob(bitmapLength);
+        }
+        
+        rectangles.push(new BitmapData(
+            destLeft, destTop, destRight, destBottom,
+            width, height, bitsPerPixel, flags, bitmapLength, bitmapDataStream
+        ));
+    }
+    
+    return new BitmapUpdate(rectangles);
+}
