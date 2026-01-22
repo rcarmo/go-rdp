@@ -107,7 +107,7 @@ bin
 !bin/.gitkeep
 
 # Go coverage
-coverage.out
+# coverage.out is generated from coverage_all.out (kept for CI/codecov upload)
 *.coverprofile
 
 # IDE

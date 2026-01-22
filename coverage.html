@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/rcarmo/rdp-html5/cmd/server/main.go (91.1%)</option>
+				<option value="file0">github.com/rcarmo/rdp-html5/cmd/server/main.go (94.3%)</option>
 				
 				<option value="file1">github.com/rcarmo/rdp-html5/internal/auth/credssp.go (95.7%)</option>
 				
@@ -215,11 +215,11 @@
 				
 				<option value="file79">github.com/rcarmo/rdp-html5/internal/protocol/x224/send.go (100.0%)</option>
 				
-				<option value="file80">github.com/rcarmo/rdp-html5/internal/rdp/audio.go (66.7%)</option>
+				<option value="file80">github.com/rcarmo/rdp-html5/internal/rdp/audio.go (82.5%)</option>
 				
 				<option value="file81">github.com/rcarmo/rdp-html5/internal/rdp/capabilities_exchange.go (90.0%)</option>
 				
-				<option value="file82">github.com/rcarmo/rdp-html5/internal/rdp/client.go (86.4%)</option>
+				<option value="file82">github.com/rcarmo/rdp-html5/internal/rdp/client.go (100.0%)</option>
 				
 				<option value="file83">github.com/rcarmo/rdp-html5/internal/rdp/close.go (100.0%)</option>
 				
@@ -300,9 +300,9 @@ const (
         appVersion = "1.0.0"
 )
 
-func main() <span class="cov0" title="0">{
+func main() <span class="cov3" title="2">{
         args, action := parseFlags()
-        if action != "" </span><span class="cov0" title="0">{
+        if action != "" </span><span class="cov3" title="2">{
                 return
         }</span>
         <span class="cov0" title="0">if err := run(args); err != nil </span><span class="cov0" title="0">{
@@ -324,12 +324,13 @@ type parsedArgs struct {
 
 // parseFlags parses command line flags and returns the parsed args.
 // Returns action string if help/version was shown (caller should return early).
-func parseFlags() (parsedArgs, string) <span class="cov0" title="0">{
+//go:noinline
+func parseFlags() (parsedArgs, string) <span class="cov4" title="3">{
         return parseFlagsWithArgs(os.Args[1:])
 }</span>
 
 // parseFlagsWithArgs parses the given arguments and returns the parsed args.
-func parseFlagsWithArgs(args []string) (parsedArgs, string) <span class="cov6" title="6">{
+func parseFlagsWithArgs(args []string) (parsedArgs, string) <span class="cov8" title="9">{
         fs := flag.NewFlagSet("server", flag.ContinueOnError)
         hostFlag := fs.String("host", "", "RDP HTML5 server host")
         portFlag := fs.String("port", "", "RDP HTML5 server port")
@@ -344,24 +345,24 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) <span class="cov6" t
 
         _ = fs.Parse(args)
 
-        if *helpFlag </span><span class="cov1" title="1">{
+        if *helpFlag </span><span class="cov3" title="2">{
                 showHelp()
                 return parsedArgs{}, "help"
         }</span>
 
-        <span class="cov6" title="5">if *versionFlag </span><span class="cov1" title="1">{
+        <span class="cov7" title="7">if *versionFlag </span><span class="cov3" title="2">{
                 showVersion()
                 return parsedArgs{}, "version"
         }</span>
 
         // Handle RFX flag - only set if explicitly disabled
-        <span class="cov5" title="4">var enableRFX *bool
+        <span class="cov6" title="5">var enableRFX *bool
         if *noRFX </span><span class="cov1" title="1">{
                 rfxValue := false
                 enableRFX = &amp;rfxValue
         }</span>
 
-        <span class="cov5" title="4">return parsedArgs{
+        <span class="cov6" title="5">return parsedArgs{
                 host:          strings.TrimSpace(*hostFlag),
                 port:          strings.TrimSpace(*portFlag),
                 logLevel:      strings.TrimSpace(*logLevelFlag),
@@ -540,7 +541,7 @@ func startServer(server *http.Server, _ *config.Config) error <span class="cov6"
         <span class="cov4" title="3">return err</span>
 }
 
-func showHelp() <span class="cov3" title="2">{
+func showHelp() <span class="cov4" title="3">{
         fmt.Println(appName)
         fmt.Println("USAGE: rdp-html5 [options]")
         fmt.Println("OPTIONS:")
@@ -558,7 +559,7 @@ func showHelp() <span class="cov3" title="2">{
         fmt.Println("EXAMPLES: rdp-html5 -host 0.0.0.0 -port 8080")
 }</span>
 
-func showVersion() <span class="cov3" title="2">{
+func showVersion() <span class="cov4" title="3">{
         fmt.Printf("%s %s\n", appName, appVersion)
         fmt.Println("Built with Go", time.Now().Year())
         fmt.Println("Protocol: RDP 10.x")
@@ -13720,7 +13721,7 @@ type AudioHandler struct {
 }
 
 // NewAudioHandler creates a new audio handler
-func NewAudioHandler(client *Client) *AudioHandler <span class="cov10" title="24">{
+func NewAudioHandler(client *Client) *AudioHandler <span class="cov10" title="27">{
         return &amp;AudioHandler{
                 client:         client,
                 selectedFormat: -1,
@@ -13728,7 +13729,7 @@ func NewAudioHandler(client *Client) *AudioHandler <span class="cov10" title="24
 }</span>
 
 // SetCallback sets the function to call when audio data is available
-func (h *AudioHandler) SetCallback(cb AudioCallback) <span class="cov2" title="2">{
+func (h *AudioHandler) SetCallback(cb AudioCallback) <span class="cov4" title="4">{
         h.callback = cb
 }</span>
 
@@ -13762,7 +13763,7 @@ func (h *AudioHandler) HandleChannelData(data []byte) error <span class="cov6" t
         }</span>
 
         // Parse channel PDU
-        <span class="cov6" title="6">chunk, err := audio.ParseChannelData(data)
+        <span class="cov5" title="6">chunk, err := audio.ParseChannelData(data)
         if err != nil </span><span class="cov1" title="1">{
                 return err
         }</span>
@@ -13914,13 +13915,13 @@ func (h *AudioHandler) handleTraining(body []byte) error <span class="cov4" titl
 }
 
 // handleWave processes SNDC_WAVE from server (first part of audio)
-func (h *AudioHandler) handleWave(body []byte) error <span class="cov0" title="0">{
+func (h *AudioHandler) handleWave(body []byte) error <span class="cov2" title="2">{
         var waveInfo audio.WaveInfoPDU
-        if err := waveInfo.Deserialize(body); err != nil </span><span class="cov0" title="0">{
+        if err := waveInfo.Deserialize(body); err != nil </span><span class="cov1" title="1">{
                 return err
         }</span>
 
-        <span class="cov0" title="0">h.pendingWaveInfo = &amp;waveInfo
+        <span class="cov1" title="1">h.pendingWaveInfo = &amp;waveInfo
 
         // The rest of the data follows in the same PDU after the header
         audioData := body[12:] // Skip WaveInfo header
@@ -13928,39 +13929,39 @@ func (h *AudioHandler) handleWave(body []byte) error <span class="cov0" title="0
         // Combine initial data with rest
         fullData := append(waveInfo.InitialData, audioData...)
 
-        if h.callback != nil &amp;&amp; len(fullData) &gt; 0 </span><span class="cov0" title="0">{
+        if h.callback != nil &amp;&amp; len(fullData) &gt; 0 </span><span class="cov1" title="1">{
                 var format *audio.AudioFormat
-                if int(waveInfo.FormatNo) &lt; len(h.serverFormats) </span><span class="cov0" title="0">{
+                if int(waveInfo.FormatNo) &lt; len(h.serverFormats) </span><span class="cov1" title="1">{
                         format = &amp;h.serverFormats[waveInfo.FormatNo]
                 }</span>
-                <span class="cov0" title="0">h.callback(fullData, format, waveInfo.Timestamp)</span>
+                <span class="cov1" title="1">h.callback(fullData, format, waveInfo.Timestamp)</span>
         }
 
         // Send wave confirm
-        <span class="cov0" title="0">return h.sendWaveConfirm(waveInfo.Timestamp, waveInfo.BlockNo)</span>
+        <span class="cov1" title="1">return h.sendWaveConfirm(waveInfo.Timestamp, waveInfo.BlockNo)</span>
 }
 
 // handleWave2 processes SNDC_WAVE2 from server (simplified wave PDU)
-func (h *AudioHandler) handleWave2(body []byte) error <span class="cov2" title="2">{
+func (h *AudioHandler) handleWave2(body []byte) error <span class="cov4" title="3">{
         var wave2 audio.Wave2PDU
         if err := wave2.Deserialize(body); err != nil </span><span class="cov2" title="2">{
                 return err
         }</span>
 
-        <span class="cov0" title="0">if h.callback != nil &amp;&amp; len(wave2.Data) &gt; 0 </span><span class="cov0" title="0">{
+        <span class="cov1" title="1">if h.callback != nil &amp;&amp; len(wave2.Data) &gt; 0 </span><span class="cov1" title="1">{
                 var format *audio.AudioFormat
-                if int(wave2.FormatNo) &lt; len(h.serverFormats) </span><span class="cov0" title="0">{
+                if int(wave2.FormatNo) &lt; len(h.serverFormats) </span><span class="cov1" title="1">{
                         format = &amp;h.serverFormats[wave2.FormatNo]
                 }</span>
-                <span class="cov0" title="0">h.callback(wave2.Data, format, wave2.Timestamp)</span>
+                <span class="cov1" title="1">h.callback(wave2.Data, format, wave2.Timestamp)</span>
         }
 
         // Send wave confirm
-        <span class="cov0" title="0">return h.sendWaveConfirm(wave2.Timestamp, wave2.BlockNo)</span>
+        <span class="cov1" title="1">return h.sendWaveConfirm(wave2.Timestamp, wave2.BlockNo)</span>
 }
 
 // sendWaveConfirm sends SNDC_WAVECONFIRM to server
-func (h *AudioHandler) sendWaveConfirm(timestamp uint16, blockNo uint8) error <span class="cov4" title="3">{
+func (h *AudioHandler) sendWaveConfirm(timestamp uint16, blockNo uint8) error <span class="cov5" title="5">{
         confirm := audio.WaveConfirmPDU{
                 Timestamp:      timestamp,
                 ConfirmedBlock: blockNo,
@@ -13974,7 +13975,7 @@ func (h *AudioHandler) sendWaveConfirm(timestamp uint16, blockNo uint8) error <s
                 return nil
         }</span>
 
-        <span class="cov4" title="3">return h.client.mcsLayer.Send(h.client.userID, channelID, pdu)</span>
+        <span class="cov5" title="5">return h.client.mcsLayer.Send(h.client.userID, channelID, pdu)</span>
 }
 
 // EnableAudio registers the rdpsnd channel for audio redirection
@@ -14105,13 +14106,13 @@ func NewClient(
         hostname, username, password string,
         desktopWidth, desktopHeight int,
         colorDepth int,
-) (*Client, error) <span class="cov6" title="8">{
+) (*Client, error) <span class="cov6" title="10">{
         // Add default RDP port if not specified
         if !strings.Contains(hostname, ":") </span><span class="cov2" title="2">{
                 hostname = hostname + ":3389"
         }</span>
 
-        <span class="cov6" title="8">c := Client{
+        <span class="cov6" title="10">c := Client{
                 domain:   "",
                 username: username,
                 password: password,
@@ -14129,11 +14130,11 @@ func NewClient(
         var err error
 
         c.conn, err = net.DialTimeout("tcp", hostname, tcpConnectionTimeout)
-        if err != nil </span><span class="cov6" title="8">{
+        if err != nil </span><span class="cov6" title="9">{
                 return nil, fmt.Errorf("tcp connect: %w", err)
         }</span>
 
-        <span class="cov0" title="0">c.buffReader = bufio.NewReaderSize(c.conn, readBufferSize)
+        <span class="cov1" title="1">c.buffReader = bufio.NewReaderSize(c.conn, readBufferSize)
 
         c.tpktLayer = tpkt.New(&amp;c)
         c.x224Layer = x224.New(c.tpktLayer)
@@ -14250,15 +14251,15 @@ func (c *Client) GetServerCapabilities() *ServerCapabilityInfo <span class="cov7
 		<pre class="file" id="file83" style="display: none">package rdp
 
 // Close closes the RDP connection and releases resources.
-func (c *Client) Close() error <span class="cov10" title="4">{
+func (c *Client) Close() error <span class="cov10" title="5">{
         if c.remoteApp != nil </span><span class="cov1" title="1">{
                 c.railState = RailStateUninitialized
         }</span>
 
-        <span class="cov10" title="4">if c.conn == nil </span><span class="cov1" title="1">{
+        <span class="cov10" title="5">if c.conn == nil </span><span class="cov1" title="1">{
                 return nil
         }</span>
-        <span class="cov8" title="3">return c.conn.Close()</span>
+        <span class="cov8" title="4">return c.conn.Close()</span>
 }
 </pre>
 		
