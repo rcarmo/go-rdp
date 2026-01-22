@@ -202,3 +202,74 @@ func Test_Decompress(t *testing.T) {
 		})
 	}
 }
+
+// TestRLEGenericMatchesOriginal verifies the generic implementation produces
+// identical results to what the original per-bitdepth implementations produced.
+func TestRLEGenericMatchesOriginal(t *testing.T) {
+// Test data: simple RLE with color run order
+// Color run (code 3) with length 4, pixel value varies by bpp
+testCases := []struct {
+name     string
+bpp      int
+src      []byte
+rowDelta int
+expected []byte
+}{
+{
+name:     "8-bit color run",
+bpp:      8,
+src:      []byte{0x64, 0xAB}, // Color run, len=4, pixel=0xAB
+rowDelta: 4,
+expected: []byte{0xAB, 0xAB, 0xAB, 0xAB},
+},
+{
+name:     "16-bit color run",
+bpp:      16,
+src:      []byte{0x62, 0x34, 0x12}, // Color run, len=2, pixel=0x1234
+rowDelta: 4,
+expected: []byte{0x34, 0x12, 0x34, 0x12},
+},
+{
+name:     "24-bit color run",
+bpp:      24,
+src:      []byte{0x62, 0x56, 0x34, 0x12}, // Color run, len=2, pixel=0x123456
+rowDelta: 6,
+expected: []byte{0x56, 0x34, 0x12, 0x56, 0x34, 0x12},
+},
+{
+name:     "32-bit color run",
+bpp:      32,
+src:      []byte{0x62, 0x78, 0x56, 0x34, 0x12}, // Color run, len=2, pixel=0x12345678
+rowDelta: 8,
+expected: []byte{0x78, 0x56, 0x34, 0x12, 0x78, 0x56, 0x34, 0x12},
+},
+}
+
+for _, tc := range testCases {
+t.Run(tc.name, func(t *testing.T) {
+dest := make([]byte, len(tc.expected))
+var success bool
+
+switch tc.bpp {
+case 8:
+success = RLEDecompress8(tc.src, dest, tc.rowDelta)
+case 16:
+success = RLEDecompress16(tc.src, dest, tc.rowDelta)
+case 24:
+success = RLEDecompress24(tc.src, dest, tc.rowDelta)
+case 32:
+success = RLEDecompress32(tc.src, dest, tc.rowDelta)
+}
+
+if !success {
+t.Fatal("decompression failed")
+}
+
+for i, b := range tc.expected {
+if dest[i] != b {
+t.Errorf("byte %d: got 0x%02X, want 0x%02X", i, dest[i], b)
+}
+}
+})
+}
+}
