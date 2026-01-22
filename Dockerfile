@@ -49,8 +49,8 @@ COPY --from=wasm-builder /app/web/dist/js/rle/wasm_exec.js ./web/dist/js/rle/was
 COPY --from=js-builder /app/web/dist/js/client.bundle.min.js ./web/dist/js/client.bundle.min.js
 
 # Build the binary
-ARG TARGETOS
-ARG TARGETARCH
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o rdp-html5 cmd/server/main.go
 
