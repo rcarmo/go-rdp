@@ -1,12 +1,230 @@
 /**
  * RDP Protocol Parsing Functions
- * Handles FastPath and pointer update parsing
+ * Handles FastPath updates, input events, and pointer parsing
  * @module protocol
  */
 
+// ============================================================================
+// Keyboard Scancode Mapping (US keyboard layout)
+// ============================================================================
+const SCANCODE_MAP = {
+    'Escape': 0x01, 'Digit1': 0x02, 'Digit2': 0x03, 'Digit3': 0x04, 'Digit4': 0x05,
+    'Digit5': 0x06, 'Digit6': 0x07, 'Digit7': 0x08, 'Digit8': 0x09, 'Digit9': 0x0A,
+    'Digit0': 0x0B, 'Minus': 0x0C, 'Equal': 0x0D, 'Backspace': 0x0E, 'Tab': 0x09,
+    'KeyQ': 0x10, 'KeyW': 0x11, 'KeyE': 0x12, 'KeyR': 0x13, 'KeyT': 0x14,
+    'KeyY': 0x15, 'KeyU': 0x16, 'KeyI': 0x17, 'KeyO': 0x18, 'KeyP': 0x19,
+    'BracketLeft': 0x1A, 'BracketRight': 0x1B, 'Enter': 0x1C, 'ControlLeft': 0x1D,
+    'KeyA': 0x1E, 'KeyS': 0x1F, 'KeyD': 0x20, 'KeyF': 0x21, 'KeyG': 0x22,
+    'KeyH': 0x23, 'KeyJ': 0x24, 'KeyK': 0x25, 'KeyL': 0x26, 'Semicolon': 0x27,
+    'Quote': 0x28, 'Backquote': 0x29, 'ShiftLeft': 0x2A, 'Backslash': 0x2B,
+    'KeyZ': 0x2C, 'KeyX': 0x2D, 'KeyC': 0x2E, 'KeyV': 0x2F, 'KeyB': 0x30,
+    'KeyN': 0x31, 'KeyM': 0x32, 'Comma': 0x33, 'Period': 0x34, 'Slash': 0x35,
+    'ShiftRight': 0x36, 'NumpadMultiply': 0x37, 'AltLeft': 0x38, 'Space': 0x39,
+    'CapsLock': 0x3A, 'F1': 0x3B, 'F2': 0x3C, 'F3': 0x3D, 'F4': 0x3E, 'F5': 0x3F,
+    'F6': 0x40, 'F7': 0x41, 'F8': 0x42, 'F9': 0x43, 'F10': 0x44,
+    'NumLock': 0x45, 'ScrollLock': 0x46,
+    'Numpad7': 0x47, 'Numpad8': 0x48, 'Numpad9': 0x49, 'NumpadSubtract': 0x4A,
+    'Numpad4': 0x4B, 'Numpad5': 0x4C, 'Numpad6': 0x4D, 'NumpadAdd': 0x4E,
+    'Numpad1': 0x4F, 'Numpad2': 0x50, 'Numpad3': 0x51, 'Numpad0': 0x52,
+    'NumpadDecimal': 0x53, 'IntlBackslash': 0x56, 'F11': 0x57, 'F12': 0x58,
+    'NumpadEnter': 0x1C, 'ControlRight': 0x1D, 'NumpadDivide': 0x35,
+    'PrintScreen': 0x37, 'AltRight': 0x38,
+    'Home': 0x47, 'ArrowUp': 0x48, 'PageUp': 0x49,
+    'ArrowLeft': 0x4B, 'ArrowRight': 0x4D,
+    'End': 0x4F, 'ArrowDown': 0x50, 'PageDown': 0x51,
+    'Insert': 0x52, 'Delete': 0x53,
+    'MetaLeft': 0x5B, 'MetaRight': 0x5C, 'ContextMenu': 0x5D,
+};
+
+// Extended keys that need the 0xE0 prefix
+const EXTENDED_KEYS = new Set([
+    'NumpadEnter', 'ControlRight', 'NumpadDivide', 'PrintScreen', 'AltRight',
+    'Home', 'ArrowUp', 'PageUp', 'ArrowLeft', 'ArrowRight', 'End', 'ArrowDown',
+    'PageDown', 'Insert', 'Delete', 'MetaLeft', 'MetaRight', 'ContextMenu'
+]);
+
+// ============================================================================
+// FastPath Input Event Classes
+// ============================================================================
+
 /**
- * FastPath update codes
+ * FastPath keyboard event - key down
  */
+export class KeyboardEventKeyDown {
+    constructor(code) {
+        this.code = code;
+        this.keyCode = SCANCODE_MAP[code];
+        this.extended = EXTENDED_KEYS.has(code);
+    }
+    
+    serialize() {
+        // FastPath keyboard event format:
+        // eventHeader (1 byte): eventFlags (5 bits) + eventCode (3 bits)
+        // keyCode (1 byte): scancode
+        const flags = this.extended ? 0x02 : 0x00; // KBDFLAGS_EXTENDED
+        const eventHeader = (flags << 5) | 0x00; // FASTPATH_INPUT_EVENT_SCANCODE
+        
+        const data = new ArrayBuffer(2);
+        const view = new DataView(data);
+        view.setUint8(0, eventHeader);
+        view.setUint8(1, this.keyCode || 0);
+        return data;
+    }
+}
+
+/**
+ * FastPath keyboard event - key up
+ */
+export class KeyboardEventKeyUp {
+    constructor(code) {
+        this.code = code;
+        this.keyCode = SCANCODE_MAP[code];
+        this.extended = EXTENDED_KEYS.has(code);
+    }
+    
+    serialize() {
+        // KBDFLAGS_RELEASE = 0x01, KBDFLAGS_EXTENDED = 0x02
+        const flags = 0x01 | (this.extended ? 0x02 : 0x00);
+        const eventHeader = (flags << 5) | 0x00; // FASTPATH_INPUT_EVENT_SCANCODE
+        
+        const data = new ArrayBuffer(2);
+        const view = new DataView(data);
+        view.setUint8(0, eventHeader);
+        view.setUint8(1, this.keyCode || 0);
+        return data;
+    }
+}
+
+/**
+ * FastPath mouse move event
+ */
+export class MouseMoveEvent {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+    
+    serialize() {
+        // FastPath mouse event format:
+        // eventHeader (1 byte): eventFlags (5 bits) + eventCode (3 bits)
+        // pointerFlags (2 bytes): PTRFLAGS_MOVE
+        // xPos (2 bytes)
+        // yPos (2 bytes)
+        const PTRFLAGS_MOVE = 0x0800;
+        const eventHeader = 0x01; // FASTPATH_INPUT_EVENT_MOUSE
+        
+        const data = new ArrayBuffer(7);
+        const view = new DataView(data);
+        view.setUint8(0, eventHeader);
+        view.setUint16(1, PTRFLAGS_MOVE, true);
+        view.setUint16(3, Math.max(0, this.x), true);
+        view.setUint16(5, Math.max(0, this.y), true);
+        return data;
+    }
+}
+
+/**
+ * FastPath mouse button down event
+ */
+export class MouseDownEvent {
+    constructor(x, y, button) {
+        this.x = x;
+        this.y = y;
+        this.button = button;
+    }
+    
+    serialize() {
+        const PTRFLAGS_DOWN = 0x8000;
+        const PTRFLAGS_BUTTON1 = 0x1000;
+        const PTRFLAGS_BUTTON2 = 0x2000;
+        const PTRFLAGS_BUTTON3 = 0x4000;
+        
+        let flags = PTRFLAGS_DOWN;
+        switch (this.button) {
+            case 1: flags |= PTRFLAGS_BUTTON1; break;
+            case 2: flags |= PTRFLAGS_BUTTON2; break;
+            case 3: flags |= PTRFLAGS_BUTTON3; break;
+        }
+        
+        const eventHeader = 0x01; // FASTPATH_INPUT_EVENT_MOUSE
+        const data = new ArrayBuffer(7);
+        const view = new DataView(data);
+        view.setUint8(0, eventHeader);
+        view.setUint16(1, flags, true);
+        view.setUint16(3, Math.max(0, this.x), true);
+        view.setUint16(5, Math.max(0, this.y), true);
+        return data;
+    }
+}
+
+/**
+ * FastPath mouse button up event
+ */
+export class MouseUpEvent {
+    constructor(x, y, button) {
+        this.x = x;
+        this.y = y;
+        this.button = button;
+    }
+    
+    serialize() {
+        const PTRFLAGS_BUTTON1 = 0x1000;
+        const PTRFLAGS_BUTTON2 = 0x2000;
+        const PTRFLAGS_BUTTON3 = 0x4000;
+        
+        let flags = 0; // No DOWN flag = button up
+        switch (this.button) {
+            case 1: flags |= PTRFLAGS_BUTTON1; break;
+            case 2: flags |= PTRFLAGS_BUTTON2; break;
+            case 3: flags |= PTRFLAGS_BUTTON3; break;
+        }
+        
+        const eventHeader = 0x01; // FASTPATH_INPUT_EVENT_MOUSE
+        const data = new ArrayBuffer(7);
+        const view = new DataView(data);
+        view.setUint8(0, eventHeader);
+        view.setUint16(1, flags, true);
+        view.setUint16(3, Math.max(0, this.x), true);
+        view.setUint16(5, Math.max(0, this.y), true);
+        return data;
+    }
+}
+
+/**
+ * FastPath mouse wheel event
+ */
+export class MouseWheelEvent {
+    constructor(x, y, delta, isNegative, isHorizontal) {
+        this.x = x;
+        this.y = y;
+        this.delta = delta;
+        this.isNegative = isNegative;
+        this.isHorizontal = isHorizontal;
+    }
+    
+    serialize() {
+        const PTRFLAGS_WHEEL = 0x0200;
+        const PTRFLAGS_WHEEL_NEGATIVE = 0x0100;
+        const PTRFLAGS_HWHEEL = 0x0400;
+        
+        let flags = this.isHorizontal ? PTRFLAGS_HWHEEL : PTRFLAGS_WHEEL;
+        if (this.isNegative) flags |= PTRFLAGS_WHEEL_NEGATIVE;
+        flags |= (this.delta & 0xFF);
+        
+        const eventHeader = 0x01; // FASTPATH_INPUT_EVENT_MOUSE
+        const data = new ArrayBuffer(7);
+        const view = new DataView(data);
+        view.setUint8(0, eventHeader);
+        view.setUint16(1, flags, true);
+        view.setUint16(3, Math.max(0, this.x), true);
+        view.setUint16(5, Math.max(0, this.y), true);
+        return data;
+    }
+}
+
+// ============================================================================
+// FastPath Update Codes
+// ============================================================================
 export const UpdateCode = {
     ORDERS: 0x00,
     BITMAP: 0x01,

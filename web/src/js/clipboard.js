@@ -5,6 +5,7 @@
  */
 
 import { Logger } from './logger.js';
+import { KeyboardEventKeyDown, KeyboardEventKeyUp } from './protocol.js';
 
 /**
  * Clipboard handling mixin - adds clipboard functionality to Client

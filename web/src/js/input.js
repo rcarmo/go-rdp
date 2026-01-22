@@ -5,6 +5,14 @@
  */
 
 import { Logger } from './logger.js';
+import { 
+    KeyboardEventKeyDown, 
+    KeyboardEventKeyUp, 
+    MouseMoveEvent, 
+    MouseDownEvent, 
+    MouseUpEvent, 
+    MouseWheelEvent 
+} from './protocol.js';
 
 /**
  * Calculate element offset from document
