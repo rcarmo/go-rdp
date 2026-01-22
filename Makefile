@@ -81,6 +81,29 @@ test-js: ## Run JavaScript fallback codec tests
 	@echo "Running JavaScript tests..."
 	cd web/src/js && node --test codec-fallback.test.js
 
+.PHONY: test-e2e
+test-e2e: ## Run Playwright browser tests (requires server running on :8080)
+	@echo "Running end-to-end browser tests..."
+	@echo "NOTE: Server must be running on localhost:8080"
+	@echo "      Start with: make run (in another terminal)"
+	cd web/src/js && npx playwright test
+
+.PHONY: test-e2e-firefox
+test-e2e-firefox: ## Run Playwright tests in Firefox only
+	cd web/src/js && npx playwright test --project=firefox
+
+.PHONY: test-e2e-chromium
+test-e2e-chromium: ## Run Playwright tests in Chromium only
+	cd web/src/js && npx playwright test --project=chromium
+
+.PHONY: test-e2e-headed
+test-e2e-headed: ## Run Playwright tests with visible browser
+	cd web/src/js && npx playwright test --headed
+
+.PHONY: test-e2e-debug
+test-e2e-debug: ## Run Playwright tests in debug mode
+	cd web/src/js && npx playwright test --debug
+
 # Building
 .PHONY: build
 build: build-frontend build-backend ## Build frontend (WASM+JS) and backend
