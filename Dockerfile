@@ -88,7 +88,7 @@ EXPOSE 8080
 # TLS_ALLOW_ANY_SERVER_NAME: Allow connecting without enforcing SNI (lab/testing)
 # LOG_LEVEL: debug, info, warn, error
 ENV TLS_SKIP_VERIFY=false \
-    TLS_ALLOW_ANY_SERVER_NAME=true \
+    TLS_ALLOW_ANY_SERVER_NAME=false \
     LOG_LEVEL=info
 
 # Run the binary
