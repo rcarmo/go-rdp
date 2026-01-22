@@ -24,7 +24,7 @@ services:
       - RDP_BUFFER_SIZE=65536
       - RDP_TIMEOUT=10s
     volumes:
-      - ./web:/app/web:ro
+      - ./web/dist:/app/web/dist:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]

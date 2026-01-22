@@ -123,9 +123,9 @@ jobs:
       with:
         name: frontend-assets
         path: |
-          web/js/rle/rle.wasm
-          web/js/rle/wasm_exec.js
-          web/js/client.bundle.min.js
+          web/dist/js/rle/rle.wasm
+          web/dist/js/rle/wasm_exec.js
+          web/dist/js/client.bundle.min.js
 
   docker:
     name: Build Docker Images

@@ -5,13 +5,13 @@ FROM tinygo/tinygo:0.34.0 AS wasm-builder
 WORKDIR /app
 
 # Copy WASM source
-COPY web/wasm ./web/wasm
+COPY web/src/wasm ./web/src/wasm
 COPY go.mod go.sum ./
 
 # Download dependencies and build WASM
 RUN go mod download
-RUN tinygo build -o web/js/rle/rle.wasm -target wasm -opt=z ./web/wasm/
-RUN cp "$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/js/rle/wasm_exec.js
+RUN tinygo build -o web/dist/js/rle/rle.wasm -target wasm -opt=z ./web/src/wasm/
+RUN cp "$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/dist/js/rle/wasm_exec.js
 
 # Stage 2: Build JavaScript bundle
 FROM node:20-alpine AS js-builder
@@ -19,10 +19,10 @@ FROM node:20-alpine AS js-builder
 WORKDIR /app
 
 # Copy JS source and package files
-COPY web/js/src ./web/js/src
+COPY web/src/js ./web/src/js
 
 # Install dependencies and build
-WORKDIR /app/web/js/src
+WORKDIR /app/web/src/js
 RUN npm install --silent
 RUN npm run build:min
 
@@ -44,9 +44,9 @@ RUN go mod download
 COPY . .
 
 # Copy built frontend assets from previous stages
-COPY --from=wasm-builder /app/web/js/rle/rle.wasm ./web/js/rle/rle.wasm
-COPY --from=wasm-builder /app/web/js/rle/wasm_exec.js ./web/js/rle/wasm_exec.js
-COPY --from=js-builder /app/web/js/client.bundle.min.js ./web/js/client.bundle.min.js
+COPY --from=wasm-builder /app/web/dist/js/rle/rle.wasm ./web/dist/js/rle/rle.wasm
+COPY --from=wasm-builder /app/web/dist/js/rle/wasm_exec.js ./web/dist/js/rle/wasm_exec.js
+COPY --from=js-builder /app/web/dist/js/client.bundle.min.js ./web/dist/js/client.bundle.min.js
 
 # Build the binary
 ARG TARGETOS
