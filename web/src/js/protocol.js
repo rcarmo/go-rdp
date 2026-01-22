@@ -516,11 +516,16 @@ function parseBitmapData(r) {
     bitmapData.flags = r.uint16(true);
     bitmapData.bitmapLength = r.uint16(true);
 
+    // Calculate actual data length
+    // bitmapLength includes compression header (8 bytes) when present
+    let dataLength = bitmapData.bitmapLength;
+
     if (bitmapData.isCompressed() && !bitmapData.hasNoBitmapCompressionHDR()) {
         bitmapData.bitmapComprHdr = parseCompressedDataHeader(r);
+        dataLength -= 8; // Compression header is 8 bytes
     }
 
-    bitmapData.bitmapDataStream = r.blob(bitmapData.bitmapLength);
+    bitmapData.bitmapDataStream = r.blob(dataLength);
 
     return bitmapData;
 }
