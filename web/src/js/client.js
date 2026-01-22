@@ -408,7 +408,17 @@ Client.prototype.handleMessage = function(arrayBuffer) {
                 if (message.logLevel) {
                     Logger.setLevel(message.logLevel);
                 }
-                Logger.debug("Capabilities", `Server: codecs=${message.codecs?.join(',') || 'none'}, colorDepth=${message.colorDepth}, desktop=${message.desktopSize}`);
+                // Log server-negotiated session parameters
+                console.info(
+                    '%c[RDP Session] Negotiated',
+                    'color: #2196F3; font-weight: bold',
+                    '\n  NLA:', message.useNLA ? 'enabled' : 'disabled',
+                    '\n  Audio:', message.audioEnabled ? 'enabled' : 'disabled',
+                    '\n  Color:', `${message.colorDepth}bpp`,
+                    '\n  Desktop:', message.desktopSize,
+                    '\n  Codecs:', message.codecs?.join(', ') || 'none',
+                    '\n  Channels:', message.channels?.join(', ') || 'none'
+                );
                 this.serverCapabilities = message;
             } else if (message.type === 'error') {
                 this.showUserError(message.message);

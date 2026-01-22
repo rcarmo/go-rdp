@@ -352,9 +352,8 @@ func sendCapabilitiesInfoWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, rdp
 		return
 	}
 
-	logging.Info("Server Capabilities: codecs=%v surfaceCmds=%v colorDepth=%d desktop=%s multifrag=%d largePtr=%v frameAck=%v",
-		caps.BitmapCodecs, caps.SurfaceCommands, caps.ColorDepth, caps.DesktopSize,
-		caps.MultifragmentSize, caps.LargePointer, caps.FrameAcknowledge)
+	logging.Info("Session: NLA=%v audio=%v channels=%v colorDepth=%d desktop=%s codecs=%v",
+		caps.UseNLA, caps.AudioEnabled, caps.Channels, caps.ColorDepth, caps.DesktopSize, caps.BitmapCodecs)
 
 	msg := buildCapabilitiesMessage(caps)
 
@@ -378,6 +377,9 @@ func buildCapabilitiesMessage(caps *rdp.ServerCapabilityInfo) []byte {
 		"multifragmentSize": caps.MultifragmentSize,
 		"largePointer":      caps.LargePointer,
 		"frameAcknowledge":  caps.FrameAcknowledge,
+		"useNLA":            caps.UseNLA,
+		"audioEnabled":      caps.AudioEnabled,
+		"channels":          caps.Channels,
 		"logLevel":          logLevel,
 	}
 

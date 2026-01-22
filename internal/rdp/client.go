@@ -165,6 +165,10 @@ type ServerCapabilityInfo struct {
 	MultifragmentSize uint32
 	LargePointer      bool
 	FrameAcknowledge  bool
+	// Connection info
+	UseNLA       bool
+	AudioEnabled bool
+	Channels     []string
 }
 
 // Update represents an RDP screen update that can be sent to a client.
@@ -177,6 +181,9 @@ type Update struct {
 func (c *Client) GetServerCapabilities() *ServerCapabilityInfo {
 	info := &ServerCapabilityInfo{
 		BitmapCodecs: []string{},
+		UseNLA:       c.useNLA,
+		AudioEnabled: c.audioHandler != nil,
+		Channels:     c.channels,
 	}
 
 	for _, capSet := range c.serverCapabilitySets {

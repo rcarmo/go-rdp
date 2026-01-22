@@ -31,7 +31,12 @@ const AudioMixin = {
             this.audioGain.gain.value = this.audioVolume;
             this.audioEnabled = true;
             
-            Logger.debug('Audio', `Initialized: ${this.audioContext.sampleRate}Hz`);
+            Logger.debug('Audio', `Initialized: ${this.audioContext.sampleRate}Hz, state=${this.audioContext.state}`);
+            
+            // Firefox and Chrome suspend AudioContext until user interaction
+            if (this.audioContext.state === 'suspended') {
+                Logger.debug('Audio', 'Context suspended - will resume on user interaction');
+            }
         } catch (e) {
             Logger.error('Audio', `Failed to initialize: ${e.message}`);
             this.audioEnabled = false;
