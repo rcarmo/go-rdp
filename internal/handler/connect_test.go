@@ -183,7 +183,7 @@ func TestConnect_ForbiddenOrigin(t *testing.T) {
 	_ = os.Setenv("ALLOWED_ORIGINS", "http://allowed.com")
 	defer func() { _ = os.Unsetenv("ALLOWED_ORIGINS") }()
 
-	req := httptest.NewRequest(http.MethodGet, "/connect?width=800&height=600&host=test&user=test&password=test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/connect?width=800&height=600&host=test&user=test", nil)
 	req.Header.Set("Origin", "http://malicious.com")
 
 	w := httptest.NewRecorder()
@@ -214,7 +214,7 @@ func TestConnect_WebSocketUpgrade(t *testing.T) {
 	defer server.Close()
 
 	// Convert HTTP URL to WS URL
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/connect?width=800&height=600&host=nonexistent&user=test&password=test"
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/connect?width=800&height=600&host=nonexistent&user=test"
 
 	// Try to establish WebSocket connection
 	// This will fail at the RDP connection stage since "nonexistent" isn't a real host
@@ -845,7 +845,7 @@ func TestConnect_WithValidParameters(t *testing.T) {
 	defer server.Close()
 
 	// Connect with all valid parameters (RDP connection will fail but we test the parameter parsing)
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/connect?width=1024&height=768&colorDepth=24&host=127.0.0.1:3389&user=testuser&password=testpass"
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/connect?width=1024&height=768&colorDepth=24&host=127.0.0.1:3389&user=testuser"
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
@@ -1352,7 +1352,7 @@ func TestConnect_FullQueryParameters(t *testing.T) {
 
 	// Full query string with all parameters
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") +
-		"/connect?width=1920&height=1080&colorDepth=32&host=192.168.1.1:3389&user=admin&password=secret123"
+		"/connect?width=1920&height=1080&colorDepth=32&host=192.168.1.1:3389&user=admin"
 
 	ws, err := websocket.Dial(wsURL, "", "http://localhost/")
 	if err == nil {
