@@ -166,10 +166,10 @@ export const GraphicsMixin = {
         if (caps.codecs.fallback) codecList.push('JS-Fallback');
         
         console.info(
-            '%c[RDP Client] Capabilities',
+            '%c[RDP Client] Decoder Capabilities',
             'color: #4CAF50; font-weight: bold',
             '\n  WASM:', wasmReady ? '✓ loaded' : (wasmSupported ? '✗ failed' : '✗ unsupported'),
-            '\n  Codecs:', codecList.join(', '),
+            '\n  Can decode:', codecList.join(', '),
             '\n  Display:', `${caps.display.width}×${caps.display.height}`,
             '\n  Color:', `${caps.display.colorDepth}bpp`,
             wasmError ? `\n  Error: ${wasmError}` : ''

@@ -119,14 +119,18 @@ const AudioMixin = {
         // Convert PCM data to Float32 samples
         const samples = this.pcmToFloat32(pcmData);
         if (!samples || samples.length === 0) {
+            Logger.debug('Audio', 'pcmToFloat32 returned no samples');
             return;
         }
 
         // Create audio buffer
         const frameCount = Math.floor(samples.length / this.audioChannels);
         if (frameCount === 0) {
+            Logger.debug('Audio', 'frameCount is 0');
             return;
         }
+        
+        Logger.debug('Audio', `Queueing ${frameCount} frames, context state: ${this.audioContext?.state}`);
 
         try {
             const audioBuffer = this.audioContext.createBuffer(

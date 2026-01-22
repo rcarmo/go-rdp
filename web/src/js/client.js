@@ -313,7 +313,8 @@ Client.prototype.showCanvas = function() {
         void canvasContainer.offsetHeight;
     }
     
-    this.canvas.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; position: absolute !important; top: 0 !important; left: 0 !important; width: ' + this.canvas.width + 'px !important; height: ' + this.canvas.height + 'px !important;';
+    // Restore canvas to active state (undo disconnect dimming)
+    this.canvas.style.cssText = 'display: block !important; visibility: visible !important; opacity: 1 !important; position: absolute !important; top: 0 !important; left: 0 !important; width: ' + this.canvas.width + 'px !important; height: ' + this.canvas.height + 'px !important; pointer-events: auto !important;';
     
     this.canvas.setAttribute('tabindex', '0');
     this.canvas.style.outline = 'none';
@@ -356,6 +357,11 @@ Client.prototype.deinitialize = function() {
     this.clearBitmapCache();
     this.disableAudio();
 
+    // Dim canvas and restore default cursor to indicate disconnection
+    this.canvas.style.opacity = '0.5';
+    this.canvas.style.cursor = 'default';
+    this.canvas.style.pointerEvents = 'none';
+
     // Clean up pointer cache CSS styles with error handling
     Object.entries(this.pointerCache).forEach(([index, style]) => {
         try {
@@ -368,8 +374,6 @@ Client.prototype.deinitialize = function() {
     });
     this.pointerCache = {};
     this.canvas.classList = [];
-
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 };
 
 /**
@@ -386,6 +390,7 @@ Client.prototype.handleMessage = function(arrayBuffer) {
     
     // Audio data (0xFE marker)
     if (firstByte === 0xFE && this.audioEnabled) {
+        Logger.debug('Audio', `Received audio message: ${arrayBuffer.byteLength} bytes`);
         this.handleAudioMessage(new Uint8Array(arrayBuffer));
         return;
     }
@@ -409,6 +414,8 @@ Client.prototype.handleMessage = function(arrayBuffer) {
                     Logger.setLevel(message.logLevel);
                 }
                 // Log server-negotiated session parameters
+                // Filter out 'Ignore' codec as it's just a placeholder
+                const serverCodecs = (message.codecs || []).filter(c => c !== 'Ignore');
                 console.info(
                     '%c[RDP Session] Negotiated',
                     'color: #2196F3; font-weight: bold',
@@ -416,7 +423,7 @@ Client.prototype.handleMessage = function(arrayBuffer) {
                     '\n  Audio:', message.audioEnabled ? 'enabled' : 'disabled',
                     '\n  Color:', `${message.colorDepth}bpp`,
                     '\n  Desktop:', message.desktopSize,
-                    '\n  Codecs:', message.codecs?.join(', ') || 'none',
+                    '\n  Server codecs:', serverCodecs.join(', ') || 'none',
                     '\n  Channels:', message.channels?.join(', ') || 'none'
                 );
                 this.serverCapabilities = message;

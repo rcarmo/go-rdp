@@ -123,4 +123,5 @@ Thumbs.db
 *.dll
 *.so
 *.dylib
-*.test
+*.test*.out
+coverage.html
