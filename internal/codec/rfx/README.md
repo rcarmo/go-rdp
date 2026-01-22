@@ -85,7 +85,7 @@ quant, err := rfx.ParseQuantValues(quantBytes)
 import { WASMCodec, RFXDecoder } from './wasm.js';
 
 // Initialize WASM module
-await WASMCodec.init('js/rle/rle.wasm');
+await WASMCodec.init('dist/js/rle/rle.wasm');
 
 // High-level API with RFXDecoder class
 const rfx = new RFXDecoder();

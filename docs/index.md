@@ -22,11 +22,11 @@ Each Go package has its own README with implementation details:
 - `internal/logging/` - Leveled logging system
 - `internal/protocol/` - RDP protocol layers
 - `internal/rdp/` - RDP client implementation
-- `web/wasm/` - WebAssembly codecs (RLE, NSCodec, RemoteFX)
+- `web/src/wasm/` - WebAssembly codecs (RLE, NSCodec, RemoteFX)
 
 ## JavaScript Modules
 
-- `web/js/src/` - Browser client modules
+- `web/src/js/` - Browser client modules
   - `wasm.js` - WASM codec wrapper (WASMCodec, RFXDecoder)
   - `codec-fallback.js` - Pure JS fallback codecs
   - `graphics.js` - Canvas rendering

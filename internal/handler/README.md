@@ -80,7 +80,7 @@ Upgrades HTTP to WebSocket and establishes RDP connection.
 
 **Example:**
 ```
-ws://localhost:8080/connect?host=192.168.1.100&user=admin&password=secret&width=1920&height=1080
+ws://localhost:8080/connect?host=192.168.1.100&user=admin&width=1920&height=1080
 ```
 
 ## Message Protocol

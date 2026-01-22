@@ -42,7 +42,7 @@ main()
               │
               └── createServer()
                     │
-                    ├── Route: /           → Static files (./web)
+                    ├── Route: /           → Static files (./web/dist)
                     └── Route: /connect    → WebSocket handler
 ```
 

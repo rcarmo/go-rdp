@@ -238,4 +238,4 @@ go test -cover ./internal/codec/...
 - `internal/codec/rfx` - RemoteFX wavelet codec (64×64 tiles)
 - `internal/rdp` - Uses codecs to process bitmap updates
 - `internal/protocol/fastpath` - Delivers compressed bitmaps
-- `web/wasm` - WASM version of codecs for browser
+- `web/src/wasm` - WASM version of codecs for browser

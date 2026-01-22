@@ -168,7 +168,7 @@ Browser                    Go Server                   RDP Server
 │   WebSocket.Send() → Binary message                                    │
 │       │                                                                 │
 │       ▼                                                                 │
-│   handleMessage() [web/js/src/client.js]                               │
+│   handleMessage() [web/src/js/client.js]                               │
 │       │                                                                 │
 │       ├──▶ parseBitmapUpdate()                                         │
 │       │         │                                                       │
@@ -189,7 +189,7 @@ Browser                    Go Server                   RDP Server
 │   User Input (mouse move, click, keypress)                             │
 │       │                                                                 │
 │       ▼                                                                 │
-│   InputMixin [web/js/src/mixins/input.js]                              │
+│   InputMixin [web/src/js/mixins/input.js]                              │
 │       │                                                                 │
 │       ▼                                                                 │
 │   ┌───────────────────────────────────────────────────────────────┐    │
@@ -499,7 +499,7 @@ class RDPClient {
 The TinyGo WASM module exposes codec functions to JavaScript:
 
 ```go
-// web/wasm/main.go
+// web/src/wasm/main.go
 func main() {
     js.Global().Set("goRLE", map[string]interface{}{
         "decompressRLE16": js.FuncOf(decompressRLE16),
@@ -523,7 +523,7 @@ func main() {
 When WASM is unavailable (older browsers, disabled WebAssembly), the client falls back to pure JavaScript implementations:
 
 ```javascript
-// web/js/src/codec-fallback.js
+// web/src/js/codec-fallback.js
 const FallbackCodec = {
     rgb565ToRGBA(src, dst) { /* ... */ },
     rgb555ToRGBA(src, dst) { /* ... */ },
@@ -720,7 +720,7 @@ RDP Server (RDPSND Virtual Channel)
          │ WebSocket binary message
          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ AudioMixin (web/js/src/mixins/audio.js)                          │
+│ AudioMixin (web/src/js/mixins/audio.js)                          │
 │                                                                  │
 │  initAudio()                                                     │
 │    • Create AudioContext                                         │

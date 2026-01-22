@@ -7,8 +7,8 @@ This document describes the RemoteFX codec implementation in rdp-html5 for brows
 RemoteFX (MS-RDPRFX) is Microsoft's tile-based wavelet codec for RDP, providing high-quality lossy compression. Our implementation:
 
 - **Go package**: `internal/codec/rfx/` - Core codec algorithms
-- **WASM exports**: `web/wasm/main.go` - Browser-callable functions
-- **JS wrapper**: `web/js/src/wasm.js` - High-level `WASMCodec` and `RFXDecoder` APIs
+- **WASM exports**: `web/src/wasm/main.go` - Browser-callable functions
+- **JS wrapper**: `web/src/js/wasm.js` - High-level `WASMCodec` and `RFXDecoder` APIs
 
 ### Key Characteristics
 
@@ -95,8 +95,8 @@ internal/codec/rfx/
 ├── AUDIT.md          # FreeRDP comparison audit
 └── *_test.go         # 69 unit tests
 
-web/wasm/main.go      # WASM exports: decodeRFXTile, setRFXQuant
-web/js/src/wasm.js    # WASMCodec module, RFXDecoder class
+web/src/wasm/main.go      # WASM exports: decodeRFXTile, setRFXQuant
+web/src/js/wasm.js    # WASMCodec module, RFXDecoder class
 ```
 
 ---
@@ -125,7 +125,7 @@ x, y, err := rfx.DecodeTileWithBuffers(
 ```javascript
 import { WASMCodec, RFXDecoder } from './wasm.js';
 
-await WASMCodec.init('js/rle/rle.wasm');
+await WASMCodec.init('dist/js/rle/rle.wasm');
 
 // High-level API
 const rfx = new RFXDecoder();
