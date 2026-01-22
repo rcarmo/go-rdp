@@ -496,17 +496,35 @@ func (s *Security) GssDecrypt(data []byte) []byte {
 	}
 
 	// Parse signature
-	// version := binary.LittleEndian.Uint32(data[0:4])  // Should be 1
-	// checksum := data[4:12]
-	// seqNum := binary.LittleEndian.Uint32(data[12:16])
+	version := binary.LittleEndian.Uint32(data[0:4])
+	if version != 1 {
+		return nil // Invalid version
+	}
+	receivedChecksum := data[4:12]
+	receivedSeqNum := binary.LittleEndian.Uint32(data[12:16])
 	encrypted := data[16:]
 
 	// Decrypt the data
 	decrypted := make([]byte, len(encrypted))
 	s.decryptRC4.XORKeyStream(decrypted, encrypted)
 
-	// Skip checksum verification for now - just return decrypted data
-	// TODO: Verify checksum using verifyKey and sequence number
+	// Verify checksum: compute expected checksum over decrypted plaintext
+	seqBuf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(seqBuf, receivedSeqNum)
+
+	signBuf := &bytes.Buffer{}
+	signBuf.Write(seqBuf)
+	signBuf.Write(decrypted)
+	expectedSig := hmacMD5(s.verifyKey, signBuf.Bytes())[:8]
+
+	// Encrypt the expected signature (RC4 state continues from data decryption)
+	expectedChecksum := make([]byte, 8)
+	s.decryptRC4.XORKeyStream(expectedChecksum, expectedSig)
+
+	// Compare checksums (constant-time comparison to prevent timing attacks)
+	if !hmac.Equal(receivedChecksum, expectedChecksum) {
+		return nil // Checksum verification failed
+	}
 
 	return decrypted
 }

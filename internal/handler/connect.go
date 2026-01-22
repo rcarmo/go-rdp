@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -374,10 +373,20 @@ func codecListToJSON(codecs []string) string {
 	return strings.Join(quoted, ",")
 }
 
+// errorMessage is the JSON structure for WebSocket error responses
+type errorMessage struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
 // sendError sends an error message to the client via WebSocket
 func sendError(wsConn *websocket.Conn, message string) {
-	errMsg := fmt.Sprintf(`{"type":"error","message":"%s"}`, message)
-	if err := websocket.Message.Send(wsConn, errMsg); err != nil {
+	errMsg, err := json.Marshal(errorMessage{Type: "error", Message: message})
+	if err != nil {
+		logging.Error("Failed to marshal error message: %v", err)
+		return
+	}
+	if err := websocket.Message.Send(wsConn, string(errMsg)); err != nil {
 		logging.Error("Failed to send error message: %v", err)
 	}
 }

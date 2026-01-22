@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rcarmo/rdp-html5/internal/config"
+	"github.com/rcarmo/rdp-html5/internal/logging"
 )
 
 func (c *Client) StartTLS() error {
@@ -48,6 +49,7 @@ func (c *Client) StartTLS() error {
 
 	// When explicitly skipping verification, allow legacy TLS for compatibility with older servers
 	if insecureSkipVerify {
+		logging.Warn("TLS certificate validation disabled - connection vulnerable to MITM attacks")
 		minTLSVersion = "1.0"
 	}
 
