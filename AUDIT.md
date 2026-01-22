@@ -254,20 +254,16 @@ Some test files contain `t.Skip()` calls:
 
 ## 6. Code Quality Audit
 
-### 🔴 Large Functions
+### ~~🔴 Large Functions~~ ✅ FIXED
 
-**`internal/handler/connect.go:handleWebSocket()`** - 175+ lines
+**`internal/handler/connect.go:handleWebSocket()`**
 
-This function handles:
-- Credential validation
-- RDP connection setup
-- Goroutine management for bidirectional communication
-- Error handling and cleanup
-
-**Recommendation:** Extract into smaller functions:
-- `validateCredentials()`
-- `setupRDPConnection()`
-- `startBidirectionalRelay()`
+Refactored from 175+ lines into focused functions:
+- `parseConnectionParams()` - validates URL query parameters
+- `receiveCredentials()` - handles WebSocket credential exchange
+- `setupRDPClient()` - creates and configures RDP client
+- `startBidirectionalRelay()` - manages goroutines for data relay
+- `handleWebSocket()` - now 40 lines, orchestrates the above
 
 ---
 
@@ -313,10 +309,10 @@ Deadline setting errors are silently ignored.
 2. ~~**Log warning** when `InsecureSkipVerify` is enabled~~ ✅ Done
 3. ~~**Complete NTLM checksum verification**~~ ✅ Done
 
-### ~~Short-term (Quality)~~ ✅ MOSTLY COMPLETED
+### ~~Short-term (Quality)~~ ✅ COMPLETED
 
 4. ~~**Refactor RLE codecs**~~ ✅ Done (generics, -36% lines, +28% performance)
-5. **Split `handleWebSocket()`** into smaller functions - TODO
+5. ~~**Split `handleWebSocket()`**~~ ✅ Done (175 lines → 5 focused functions)
 6. ~~**Fix global mutable state**~~ ✅ Done (mutex + atomic)
 7. **Add godoc comments** to exported functions - TODO (low priority)
 

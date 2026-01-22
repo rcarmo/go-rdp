@@ -65,24 +65,25 @@ func Connect(w http.ResponseWriter, r *http.Request) {
 	server.ServeHTTP(w, r)
 }
 
-func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
-	defer func() { _ = wsConn.Close() }()
+// connectionParams holds validated connection parameters
+type connectionParams struct {
+	width      int
+	height     int
+	colorDepth int
+	disableNLA bool
+	enableAudio bool
+}
 
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
+// parseConnectionParams extracts and validates connection parameters from the request.
+func parseConnectionParams(r *http.Request) (*connectionParams, error) {
 	width, err := strconv.Atoi(r.URL.Query().Get("width"))
 	if err != nil || width <= 0 || width > 8192 {
-		logging.Error("Invalid width: %v (must be 1-8192)", r.URL.Query().Get("width"))
-		sendError(wsConn, "Invalid width parameter")
-		return
+		return nil, errors.New("invalid width parameter (must be 1-8192)")
 	}
 
 	height, err := strconv.Atoi(r.URL.Query().Get("height"))
 	if err != nil || height <= 0 || height > 8192 {
-		logging.Error("Invalid height: %v (must be 1-8192)", r.URL.Query().Get("height"))
-		sendError(wsConn, "Invalid height parameter")
-		return
+		return nil, errors.New("invalid height parameter (must be 1-8192)")
 	}
 
 	colorDepth := 16 // default to 16-bit
@@ -92,88 +93,74 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 		}
 	}
 
-	// Check if NLA should be disabled for this connection
-	disableNLA := r.URL.Query().Get("disableNLA") == "true"
+	return &connectionParams{
+		width:       width,
+		height:      height,
+		colorDepth:  colorDepth,
+		disableNLA:  r.URL.Query().Get("disableNLA") == "true",
+		enableAudio: r.URL.Query().Get("audio") == "true",
+	}, nil
+}
 
-	// Check if audio should be enabled
-	enableAudio := r.URL.Query().Get("audio") == "true"
-
-	// Wait for credentials via WebSocket message (more secure than URL params)
-	var credentials connectionRequest
-	
+// receiveCredentials waits for and validates credentials sent via WebSocket.
+func receiveCredentials(wsConn *websocket.Conn) (*connectionRequest, error) {
 	// Set read deadline for credentials
 	if err := wsConn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
-		logging.Error("Set read deadline: %v", err)
-		return
-	}
-	
-	var credMsg []byte
-	if err := websocket.Message.Receive(wsConn, &credMsg); err != nil {
-		logging.Error("Receive credentials: %v", err)
-		sendError(wsConn, "Failed to receive credentials")
-		return
-	}
-	
-	// Limit credential message size to prevent DoS (1MB max)
-	if len(credMsg) > 1024*1024 {
-		logging.Error("Credentials message too large: %d bytes", len(credMsg))
-		sendError(wsConn, "Credentials message too large")
-		return
-	}
-	
-	// Clear read deadline
-	if err := wsConn.SetReadDeadline(time.Time{}); err != nil {
-		logging.Error("Clear read deadline: %v", err)
-		return
-	}
-	
-	if err := json.Unmarshal(credMsg, &credentials); err != nil {
-		logging.Error("Parse credentials: %v", err)
-		sendError(wsConn, "Invalid credentials format")
-		return
-	}
-	
-	if credentials.Type != "credentials" {
-		logging.Error("Invalid message type: %s", credentials.Type)
-		sendError(wsConn, "Expected credentials message")
-		return
-	}
-	
-	host := credentials.Host
-	user := credentials.User
-	password := credentials.Password
-	
-	// Validate hostname length (max 253 per DNS spec)
-	if len(host) == 0 || len(host) > 253 {
-		sendError(wsConn, "Invalid hostname")
-		return
-	}
-	
-	// Validate username length (Windows max is 256)
-	if len(user) == 0 || len(user) > 256 {
-		sendError(wsConn, "Invalid username")
-		return
-	}
-	
-	// Validate password length (reasonable max, prevent memory exhaustion)
-	if len(password) > 1024 {
-		sendError(wsConn, "Password too long")
-		return
+		return nil, errors.New("failed to set read deadline")
 	}
 
-	rdpClient, err := rdp.NewClient(host, user, password, width, height, colorDepth)
-	if err != nil {
-		logging.Error("RDP init: %v", err)
-		// Generic error message to avoid information leakage
-		sendError(wsConn, "Connection failed")
-		return
+	var credMsg []byte
+	if err := websocket.Message.Receive(wsConn, &credMsg); err != nil {
+		return nil, errors.New("failed to receive credentials")
 	}
-	defer func() { _ = rdpClient.Close() }()
+
+	// Limit credential message size to prevent DoS (1MB max)
+	if len(credMsg) > 1024*1024 {
+		return nil, errors.New("credentials message too large")
+	}
+
+	// Clear read deadline
+	if err := wsConn.SetReadDeadline(time.Time{}); err != nil {
+		return nil, errors.New("failed to clear read deadline")
+	}
+
+	var credentials connectionRequest
+	if err := json.Unmarshal(credMsg, &credentials); err != nil {
+		return nil, errors.New("invalid credentials format")
+	}
+
+	if credentials.Type != "credentials" {
+		return nil, errors.New("expected credentials message")
+	}
+
+	// Validate hostname length (max 253 per DNS spec)
+	if len(credentials.Host) == 0 || len(credentials.Host) > 253 {
+		return nil, errors.New("invalid hostname")
+	}
+
+	// Validate username length (Windows max is 256)
+	if len(credentials.User) == 0 || len(credentials.User) > 256 {
+		return nil, errors.New("invalid username")
+	}
+
+	// Validate password length (reasonable max, prevent memory exhaustion)
+	if len(credentials.Password) > 1024 {
+		return nil, errors.New("password too long")
+	}
+
+	return &credentials, nil
+}
+
+// setupRDPClient creates and configures an RDP client with the given parameters.
+func setupRDPClient(creds *connectionRequest, params *connectionParams) (*rdp.Client, error) {
+	rdpClient, err := rdp.NewClient(creds.Host, creds.User, creds.Password, params.width, params.height, params.colorDepth)
+	if err != nil {
+		return nil, err
+	}
 
 	// Set TLS configuration from server config
 	cfg := config.GetGlobalConfig()
 	if cfg == nil {
-		var err error
 		cfg, err = config.Load()
 		if err != nil {
 			logging.Debug("Failed to load config for TLS settings: %v", err)
@@ -182,38 +169,34 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	}
 
 	rdpClient.SetTLSConfig(cfg.Security.SkipTLSValidation, cfg.Security.TLSServerName)
-	
+
 	// Use NLA unless explicitly disabled by client or server config
-	useNLA := cfg.Security.UseNLA && !disableNLA
+	useNLA := cfg.Security.UseNLA && !params.disableNLA
 	rdpClient.SetUseNLA(useNLA)
-	if disableNLA {
+	if params.disableNLA {
 		logging.Info("NLA disabled for this connection")
 	}
-	
+
 	// Enable audio if requested
-	if enableAudio {
+	if params.enableAudio {
 		rdpClient.EnableAudio()
 		logging.Info("Audio redirection enabled")
 	}
 
-	if err = rdpClient.Connect(); err != nil {
-		logging.Error("RDP connect: %v", err)
-		sendError(wsConn, "Connection failed")
-		return
-	}
-	
-	// Per-connection mutex for WebSocket writes
-	var wsMu sync.Mutex
-	
+	return rdpClient, nil
+}
+
+// startBidirectionalRelay manages the goroutines that relay data between WebSocket and RDP.
+func startBidirectionalRelay(ctx context.Context, cancel context.CancelFunc, wsConn *websocket.Conn, rdpClient *rdp.Client, wsMu *sync.Mutex, enableAudio bool) {
 	// Set up audio callback to forward audio data to browser
 	if enableAudio && rdpClient.GetAudioHandler() != nil {
 		rdpClient.GetAudioHandler().SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) {
-			sendAudioDataWithMutex(wsConn, &wsMu, data, format, timestamp)
+			sendAudioDataWithMutex(wsConn, wsMu, data, format, timestamp)
 		})
 	}
 
 	// Send server capabilities info to browser
-	sendCapabilitiesInfoWithMutex(wsConn, &wsMu, rdpClient)
+	sendCapabilitiesInfoWithMutex(wsConn, wsMu, rdpClient)
 
 	// Use WaitGroup to ensure clean goroutine shutdown
 	var cancelOnce sync.Once
@@ -224,11 +207,11 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 		defer wg.Done()
 		wsToRdp(ctx, wsConn, rdpClient, safeCancel)
 	}()
-	rdpToWsWithMutex(ctx, rdpClient, wsConn, &wsMu)
-	
+	rdpToWsWithMutex(ctx, rdpClient, wsConn, wsMu)
+
 	// Cancel context to signal wsToRdp to exit
 	safeCancel()
-	
+
 	// Wait for wsToRdp goroutine to finish (with timeout)
 	done := make(chan struct{})
 	go func() {
@@ -240,6 +223,51 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	case <-time.After(5 * time.Second):
 		logging.Warn("Timeout waiting for wsToRdp goroutine to exit")
 	}
+}
+
+func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
+	defer func() { _ = wsConn.Close() }()
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	// Parse and validate connection parameters
+	params, err := parseConnectionParams(r)
+	if err != nil {
+		logging.Error("Invalid params: %v", err)
+		sendError(wsConn, err.Error())
+		return
+	}
+
+	// Receive and validate credentials
+	credentials, err := receiveCredentials(wsConn)
+	if err != nil {
+		logging.Error("Credentials error: %v", err)
+		sendError(wsConn, err.Error())
+		return
+	}
+
+	// Create and configure RDP client
+	rdpClient, err := setupRDPClient(credentials, params)
+	if err != nil {
+		logging.Error("RDP init: %v", err)
+		sendError(wsConn, "Connection failed")
+		return
+	}
+	defer func() { _ = rdpClient.Close() }()
+
+	// Connect to RDP server
+	if err = rdpClient.Connect(); err != nil {
+		logging.Error("RDP connect: %v", err)
+		sendError(wsConn, "Connection failed")
+		return
+	}
+
+	// Per-connection mutex for WebSocket writes
+	var wsMu sync.Mutex
+
+	// Start bidirectional data relay
+	startBidirectionalRelay(ctx, cancel, wsConn, rdpClient, &wsMu, params.enableAudio)
 }
 
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) {
