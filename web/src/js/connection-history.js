@@ -1,5 +1,8 @@
 // Connection History Manager
 // Persists recent connections to localStorage
+
+import { Logger } from './logger.js';
+
 const ConnectionHistory = {
     _storageKey: 'rdp_connection_history',
     _maxHistory: 5,

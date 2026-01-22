@@ -1,5 +1,7 @@
 // Audio module - handles RDP audio output via Web Audio API
 
+import { Logger } from './logger.js';
+
 const AudioMixin = {
     initAudio() {
         this.audioContext = null;
