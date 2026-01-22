@@ -293,7 +293,7 @@ func rdpToWsWithMutex(ctx context.Context, rdpConn rdpConn, wsConn *websocket.Co
 		update, err := rdpConn.GetUpdate()
 		switch {
 		case err == nil:
-		case errors.Is(err, pdu.ErrDeactiateAll):
+		case errors.Is(err, pdu.ErrDeactivateAll):
 			return
 		default:
 			logging.Error("Get update: %v", err)

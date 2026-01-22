@@ -1,5 +1,15 @@
 package rdp
 
+// RAIL (Remote Application Integrated Locally) - NOT SUPPORTED
+//
+// RAIL allows running individual Windows applications remotely while they
+// appear as local windows. This feature is NOT SUPPORTED in the HTML5 client
+// because browsers cannot create native OS windows that integrate with the
+// desktop taskbar and window manager.
+//
+// The code below contains partial PDU structures for protocol compatibility,
+// but the feature is non-functional. Use full desktop sessions instead.
+
 import (
 	"bytes"
 	"encoding/binary"
@@ -464,7 +474,8 @@ func (pdu *RailPDUExecResult) Deserialize(wire io.Reader) error {
 func (c *Client) railReceiveRemoteAppStatus(*RailPDU) error {
 	c.railState = RailStateWaitForData
 
-	// TODO: implement
+	// RAIL (RemoteApp) is not supported in HTML5 client.
+	// Browsers cannot create native OS windows.
 
 	return nil
 }

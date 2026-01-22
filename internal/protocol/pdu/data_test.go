@@ -261,7 +261,7 @@ func TestShareDataHeader_DeserializeDeactivateAll(t *testing.T) {
 
 	var shareDataHeader ShareDataHeader
 	err := shareDataHeader.Deserialize(bytes.NewReader(data))
-	require.ErrorIs(t, err, ErrDeactiateAll)
+	require.ErrorIs(t, err, ErrDeactivateAll)
 }
 
 func TestShareDataHeader_DeserializeErrors(t *testing.T) {

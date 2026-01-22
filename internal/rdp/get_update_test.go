@@ -24,8 +24,8 @@ func TestFastPathUpdateCodeConstants(t *testing.T) {
 
 func TestUpdateCounter(t *testing.T) {
 	// Just verify the variable exists and is accessible
-	initialValue := updateCounter
-	assert.GreaterOrEqual(t, initialValue, 0)
+	initialValue := updateCounter.Load()
+	assert.GreaterOrEqual(t, initialValue, int64(0))
 }
 
 func TestPendingSlowPathUpdate_InitiallyNil(t *testing.T) {

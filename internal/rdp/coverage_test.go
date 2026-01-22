@@ -460,7 +460,7 @@ func TestData_Deserialize_Extended(t *testing.T) {
 // TestErrorDefinitions tests error definitions exist
 func TestErrorDefinitions(t *testing.T) {
 	assert.NotNil(t, ErrUnsupportedRequestedProtocol)
-	assert.NotNil(t, pdu.ErrDeactiateAll)
+	assert.NotNil(t, pdu.ErrDeactivateAll)
 }
 
 // TestConnectionConstants tests connection-related constants

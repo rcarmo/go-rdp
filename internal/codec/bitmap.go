@@ -1,5 +1,7 @@
 package codec
 
+import "sync"
+
 // FlipVertical flips bitmap data vertically (in-place).
 // RDP sends bitmaps bottom-up, this flips them to top-down.
 func FlipVertical(data []byte, width, height, bytesPerPixel int) {
@@ -25,12 +27,19 @@ func FlipVertical(data []byte, width, height, bytesPerPixel int) {
 	}
 }
 
+// paletteMu protects currentPalette from concurrent access
+var paletteMu sync.RWMutex
+
 // currentPalette holds the active 256-color palette (set by server via palette update)
 var currentPalette [256][4]byte // RGBA format
 
 // SetPalette updates the current palette from server data
 // RDP palette format: array of RGB entries (R, G, B - 3 bytes each)
+// Thread-safe: uses mutex for concurrent access.
 func SetPalette(data []byte, numColors int) {
+	paletteMu.Lock()
+	defer paletteMu.Unlock()
+
 	if numColors > 256 {
 		numColors = 256
 	}
@@ -44,7 +53,11 @@ func SetPalette(data []byte, numColors int) {
 }
 
 // Palette8ToRGBA converts 8-bit paletted data to 32-bit RGBA using current palette
+// Thread-safe: uses mutex for concurrent access.
 func Palette8ToRGBA(src []byte, dst []byte) {
+	paletteMu.RLock()
+	defer paletteMu.RUnlock()
+
 	for i := 0; i < len(src) && i*4+3 < len(dst); i++ {
 		idx := src[i]
 		dst[i*4] = currentPalette[idx][0]

@@ -58,7 +58,7 @@ func (m *mockRDPConnection) GetUpdate() (*rdp.Update, error) {
 
 	m.updateCalls++
 	if m.maxUpdates > 0 && m.updateCalls > m.maxUpdates {
-		return nil, pdu.ErrDeactiateAll
+		return nil, pdu.ErrDeactivateAll
 	}
 
 	if m.updateError != nil {
@@ -287,10 +287,10 @@ func TestRdpToWs_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestRdpToWs_DeactivateAllError tests handling of ErrDeactiateAll
+// TestRdpToWs_DeactivateAllError tests handling of ErrDeactivateAll
 func TestRdpToWs_DeactivateAllError(t *testing.T) {
 	mockRDP := &mockRDPConnection{
-		updateError: pdu.ErrDeactiateAll,
+		updateError: pdu.ErrDeactivateAll,
 	}
 
 	ctx := context.Background()
@@ -305,7 +305,7 @@ func TestRdpToWs_DeactivateAllError(t *testing.T) {
 	case <-done:
 		// Success - function returned on deactivate all
 	case <-time.After(time.Second):
-		t.Fatal("rdpToWs did not return on ErrDeactiateAll")
+		t.Fatal("rdpToWs did not return on ErrDeactivateAll")
 	}
 }
 
@@ -954,7 +954,7 @@ func TestRdpToWs_NilUpdate(t *testing.T) {
 	// When updateData is nil but no error, rdpToWs will try to send nil data
 	// which should be handled gracefully. Use deactivate error for clean exit.
 	mockRDP := &mockRDPConnection{
-		updateError: pdu.ErrDeactiateAll,
+		updateError: pdu.ErrDeactivateAll,
 	}
 
 	done := make(chan struct{})

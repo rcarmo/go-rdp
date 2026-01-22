@@ -238,9 +238,9 @@ func TestErrorInfoPDUData_StringUnknown(t *testing.T) {
 
 func TestErrors(t *testing.T) {
 	require.NotNil(t, ErrInvalidCorrelationID)
-	require.NotNil(t, ErrDeactiateAll)
+	require.NotNil(t, ErrDeactivateAll)
 	require.Contains(t, ErrInvalidCorrelationID.Error(), "correlationId")
-	require.Contains(t, ErrDeactiateAll.Error(), "deactivate")
+	require.Contains(t, ErrDeactivateAll.Error(), "deactivate")
 }
 
 func TestErrorInfoPDUData_DeserializeEOF(t *testing.T) {

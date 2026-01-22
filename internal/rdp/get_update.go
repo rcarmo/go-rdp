@@ -6,13 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/rcarmo/rdp-html5/internal/logging"
 	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 )
 
-var updateCounter int
+// updateCounter tracks total updates processed (for debugging/metrics)
+var updateCounter atomic.Int64
 
 func (c *Client) GetUpdate() (*Update, error) {
 	// If we have a pending slow-path update, return it first
@@ -27,7 +29,7 @@ func (c *Client) GetUpdate() (*Update, error) {
 		return nil, err
 	}
 
-	updateCounter++
+	updateCounter.Add(1)
 
 	if protocol.IsX224() {
 		update, err := c.getX224Update()
@@ -39,7 +41,7 @@ func (c *Client) GetUpdate() (*Update, error) {
 			}
 			// Non-bitmap X224 update, try again
 			return c.GetUpdate()
-		case errors.Is(err, pdu.ErrDeactiateAll):
+		case errors.Is(err, pdu.ErrDeactivateAll):
 			return nil, err
 
 		default:
@@ -133,7 +135,7 @@ func (c *Client) getX224Update() (*Update, error) {
 	}
 
 	if shareControlHeader.PDUType.IsDeactivateAll() {
-		return nil, pdu.ErrDeactiateAll
+		return nil, pdu.ErrDeactivateAll
 	}
 
 	// Read ShareDataHeader fields
