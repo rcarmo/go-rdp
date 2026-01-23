@@ -822,9 +822,14 @@ func (c *Connection) sendPacket(packet *rdpeudp.Packet) error {
 	c.mu.Lock()
 	c.stats.PacketsSent++
 	c.stats.BytesSent += uint64(len(data))
+	conn := c.conn
 	c.mu.Unlock()
 
-	_, err = c.conn.Write(data)
+	if conn == nil {
+		return nil // No socket, skip sending
+	}
+
+	_, err = conn.Write(data)
 	return err
 }
 
@@ -1036,9 +1041,10 @@ func (c *Connection) onDelayedAckTimer() {
 	c.mu.Lock()
 	c.delayedAckTimer = nil
 	hasPending := c.pendingAck
+	state := c.state
 	c.mu.Unlock()
 
-	if hasPending {
+	if hasPending && state == StateEstablished {
 		c.sendAck()
 	}
 }
