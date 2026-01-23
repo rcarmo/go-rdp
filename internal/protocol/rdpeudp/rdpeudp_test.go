@@ -2,8 +2,215 @@ package rdpeudp
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 )
+
+// ============================================================================
+// MS-RDPEUDP Specification Validation Tests
+// Reference: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp/
+// ============================================================================
+
+// TestFECHeader_Flags_PerSpec validates flag constants per Section 2.2.1.1
+func TestFECHeader_Flags_PerSpec(t *testing.T) {
+	// Per MS-RDPEUDP Section 2.2.1.1 (ceaae261-e538-40f0-8678-254e31621054)
+	expectedFlags := map[string]uint16{
+		"RDPUDP_FLAG_SYN":            0x0001,
+		"RDPUDP_FLAG_FIN":            0x0002,
+		"RDPUDP_FLAG_ACK":            0x0004,
+		"RDPUDP_FLAG_DATA":           0x0008,
+		"RDPUDP_FLAG_FEC":            0x0010,
+		"RDPUDP_FLAG_CN":             0x0020,
+		"RDPUDP_FLAG_CWR":            0x0040,
+		"RDPUDP_FLAG_SACK_OPTION":    0x0080, // Not used
+		"RDPUDP_FLAG_ACK_OF_ACKS":    0x0100,
+		"RDPUDP_FLAG_SYNLOSSY":       0x0200,
+		"RDPUDP_FLAG_ACKDELAYED":     0x0400,
+		"RDPUDP_FLAG_CORRELATION_ID": 0x0800,
+		"RDPUDP_FLAG_SYNEX":          0x1000,
+	}
+
+	// Verify our constants match spec
+	if FlagSYN != expectedFlags["RDPUDP_FLAG_SYN"] {
+		t.Errorf("FlagSYN = 0x%04X, spec says 0x%04X", FlagSYN, expectedFlags["RDPUDP_FLAG_SYN"])
+	}
+	if FlagFIN != expectedFlags["RDPUDP_FLAG_FIN"] {
+		t.Errorf("FlagFIN = 0x%04X, spec says 0x%04X", FlagFIN, expectedFlags["RDPUDP_FLAG_FIN"])
+	}
+	if FlagACK != expectedFlags["RDPUDP_FLAG_ACK"] {
+		t.Errorf("FlagACK = 0x%04X, spec says 0x%04X", FlagACK, expectedFlags["RDPUDP_FLAG_ACK"])
+	}
+	if FlagDAT != expectedFlags["RDPUDP_FLAG_DATA"] {
+		t.Errorf("FlagDAT = 0x%04X, spec says 0x%04X", FlagDAT, expectedFlags["RDPUDP_FLAG_DATA"])
+	}
+	if FlagFEC != expectedFlags["RDPUDP_FLAG_FEC"] {
+		t.Errorf("FlagFEC = 0x%04X, spec says 0x%04X", FlagFEC, expectedFlags["RDPUDP_FLAG_FEC"])
+	}
+	if FlagCN != expectedFlags["RDPUDP_FLAG_CN"] {
+		t.Errorf("FlagCN = 0x%04X, spec says 0x%04X", FlagCN, expectedFlags["RDPUDP_FLAG_CN"])
+	}
+	if FlagCWR != expectedFlags["RDPUDP_FLAG_CWR"] {
+		t.Errorf("FlagCWR = 0x%04X, spec says 0x%04X", FlagCWR, expectedFlags["RDPUDP_FLAG_CWR"])
+	}
+	if FlagAOA != expectedFlags["RDPUDP_FLAG_ACK_OF_ACKS"] {
+		t.Errorf("FlagAOA = 0x%04X, spec says 0x%04X", FlagAOA, expectedFlags["RDPUDP_FLAG_ACK_OF_ACKS"])
+	}
+	if FlagSYNLOSSY != expectedFlags["RDPUDP_FLAG_SYNLOSSY"] {
+		t.Errorf("FlagSYNLOSSY = 0x%04X, spec says 0x%04X", FlagSYNLOSSY, expectedFlags["RDPUDP_FLAG_SYNLOSSY"])
+	}
+	if FlagACKDelayed != expectedFlags["RDPUDP_FLAG_ACKDELAYED"] {
+		t.Errorf("FlagACKDelayed = 0x%04X, spec says 0x%04X", FlagACKDelayed, expectedFlags["RDPUDP_FLAG_ACKDELAYED"])
+	}
+	if FlagCorrelationID != expectedFlags["RDPUDP_FLAG_CORRELATION_ID"] {
+		t.Errorf("FlagCorrelationID = 0x%04X, spec says 0x%04X", FlagCorrelationID, expectedFlags["RDPUDP_FLAG_CORRELATION_ID"])
+	}
+	if FlagSYNEX != expectedFlags["RDPUDP_FLAG_SYNEX"] {
+		t.Errorf("FlagSYNEX = 0x%04X, spec says 0x%04X", FlagSYNEX, expectedFlags["RDPUDP_FLAG_SYNEX"])
+	}
+}
+
+// TestSourcePayloadHeader_FieldOrder validates field order per Section 2.2.2.4
+// Per spec: snCoded (4 bytes) FIRST, snSourceStart (4 bytes) SECOND
+func TestSourcePayloadHeader_FieldOrder(t *testing.T) {
+	h := &SourcePayloadHeader{
+		SnCoded:       0x11111111,
+		SnSourceStart: 0x22222222,
+	}
+
+	data := h.Serialize()
+
+	// Per spec (d98c71ec-945b-4d1c-8a03-c16818ae3f20):
+	// snCoded is FIRST (bytes 0-3)
+	// snSourceStart is SECOND (bytes 4-7)
+	snCoded := binary.LittleEndian.Uint32(data[0:4])
+	snSourceStart := binary.LittleEndian.Uint32(data[4:8])
+
+	if snCoded != 0x11111111 {
+		t.Errorf("snCoded at wrong position: got 0x%08X at bytes 0-3, want 0x11111111", snCoded)
+	}
+	if snSourceStart != 0x22222222 {
+		t.Errorf("snSourceStart at wrong position: got 0x%08X at bytes 4-7, want 0x22222222", snSourceStart)
+	}
+}
+
+// TestAckVector_MaxSize validates max ACK vector size per Section 2.2.2.7
+// Per spec: "The maximum size of the ACK Vector is 2048 bytes"
+func TestAckVector_MaxSize(t *testing.T) {
+	// Create ACK vector at max size
+	maxVector := make([]uint8, 2048)
+	av := &AckVector{
+		AckVectorSize:     2048,
+		AckVectorElements: maxVector,
+	}
+
+	data := av.Serialize()
+
+	// Should succeed at max size
+	av2 := &AckVector{}
+	if err := av2.Deserialize(data); err != nil {
+		t.Errorf("Deserialize at max size failed: %v", err)
+	}
+
+	// Should fail if exceeding max
+	oversizeData := make([]byte, 2+2049)
+	binary.LittleEndian.PutUint16(oversizeData[0:2], 2049)
+
+	av3 := &AckVector{}
+	if err := av3.Deserialize(oversizeData); err == nil {
+		t.Error("Should reject ACK vector > 2048 bytes")
+	}
+}
+
+// TestAckVector_DWORDPadding validates DWORD padding per Section 2.2.2.7
+// Per spec: "Padding (variable): such that this structure ends on a DWORD boundary"
+func TestAckVector_DWORDPadding(t *testing.T) {
+	tests := []struct {
+		vectorSize   int
+		expectedSize int // Total size including header and padding
+	}{
+		{1, 4},  // 2 + 1 = 3, padded to 4
+		{2, 4},  // 2 + 2 = 4, no padding needed
+		{3, 8},  // 2 + 3 = 5, padded to 8
+		{4, 8},  // 2 + 4 = 6, padded to 8
+		{5, 8},  // 2 + 5 = 7, padded to 8
+		{6, 8},  // 2 + 6 = 8, no padding needed
+		{7, 12}, // 2 + 7 = 9, padded to 12
+	}
+
+	for _, tc := range tests {
+		av := &AckVector{
+			AckVectorSize:     uint16(tc.vectorSize),
+			AckVectorElements: make([]uint8, tc.vectorSize),
+		}
+
+		if av.Size() != tc.expectedSize {
+			t.Errorf("AckVector size %d: Size() = %d, want %d (DWORD aligned)",
+				tc.vectorSize, av.Size(), tc.expectedSize)
+		}
+
+		// Verify serialized data is actually padded
+		data := av.Serialize()
+		if len(data) != tc.expectedSize {
+			t.Errorf("AckVector size %d: serialized = %d bytes, want %d",
+				tc.vectorSize, len(data), tc.expectedSize)
+		}
+	}
+}
+
+// TestSynData_MTURange validates MTU range per Section 2.2.2.5
+// Per spec: "This value MUST be >= 1132 and <= 1232"
+func TestSynData_MTURange(t *testing.T) {
+	validMTUs := []uint16{1132, 1150, 1200, 1232}
+	for _, mtu := range validMTUs {
+		s := &SynData{
+			SnInitialSequenceNumber: 1,
+			UpstreamMTU:             mtu,
+			DownstreamMTU:           mtu,
+		}
+		data := s.Serialize()
+		s2 := &SynData{}
+		if err := s2.Deserialize(data); err != nil {
+			t.Errorf("MTU %d should be valid: %v", mtu, err)
+		}
+	}
+}
+
+// TestSYNPacket_NoACKVector validates that SYN packets don't include ACK vector
+// Per spec: During SYN phase, ACK_VECTOR_HEADER is NOT present
+func TestSYNPacket_NoACKVector(t *testing.T) {
+	// Create SYN+ACK packet (has ACK flag but is SYN phase)
+	p := NewSYNACKPacket(100, 50, DefaultMTU, DefaultMTU)
+
+	// Should have both SYN and ACK flags
+	if !p.Header.HasFlag(FlagSYN) || !p.Header.HasFlag(FlagACK) {
+		t.Error("SYN+ACK should have both flags")
+	}
+
+	// But should NOT have AckVector (SYN phase exemption)
+	if p.AckVector != nil {
+		t.Error("SYN+ACK should NOT include ACK_VECTOR (SYN phase)")
+	}
+
+	// Serialize and deserialize
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
+
+	p2 := &Packet{}
+	if err := p2.Deserialize(data); err != nil {
+		t.Fatalf("Deserialize failed: %v", err)
+	}
+
+	// Should still not have AckVector after round-trip
+	if p2.AckVector != nil {
+		t.Error("Deserialized SYN+ACK should NOT have ACK_VECTOR")
+	}
+}
+
+// ============================================================================
+// Original Tests
+// ============================================================================
 
 func TestFECHeader_RoundTrip(t *testing.T) {
 	h := &FECHeader{

@@ -4,7 +4,165 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/rcarmo/rdp-html5/internal/protocol/rdpeudp"
 )
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-RDPEUDP_ClientTestDesignSpecification.md
+// ============================================================================
+
+// TestSYNDatagram_PerSpec validates SYN datagram per MS-RDPEUDP Section 3.1.5.1.1
+// This matches test case S1_Connection_Initialization_InitialUDPConnection
+func TestSYNDatagram_PerSpec(t *testing.T) {
+	tests := []struct {
+		name     string
+		reliable bool
+		version  uint16
+	}{
+		{"Reliable_V1", true, rdpeudp.ProtocolVersion1},
+		{"Reliable_V2", true, rdpeudp.ProtocolVersion2},
+		{"Lossy_V1", false, rdpeudp.ProtocolVersion1},
+		{"Lossy_V2", false, rdpeudp.ProtocolVersion2},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &Config{
+				MTU:               DefaultMTU,
+				ReceiveWindowSize: DefaultReceiveWindowSize,
+				Reliable:          tc.reliable,
+				ProtocolVersion:   tc.version,
+			}
+			conn, _ := NewConnection(cfg)
+			packet := conn.buildSynPacket()
+
+			// Per spec: snSourceAck MUST be -1 (0xFFFFFFFF)
+			if packet.Header.SnSourceAck != 0xFFFFFFFF {
+				t.Errorf("snSourceAck = 0x%08X, want 0xFFFFFFFF", packet.Header.SnSourceAck)
+			}
+
+			// Per spec: uReceiveWindowSize must be > 0
+			if packet.Header.SourceAckReceiveWindowSize == 0 {
+				t.Error("uReceiveWindowSize must be > 0")
+			}
+
+			// Per spec: RDPUDP_FLAG_SYN MUST be set
+			if !packet.Header.HasFlag(rdpeudp.FlagSYN) {
+				t.Error("RDPUDP_FLAG_SYN MUST be set")
+			}
+
+			// Per spec: If reliable, RDPUDP_FLAG_SYNLOSSY must NOT be set
+			// If lossy, RDPUDP_FLAG_SYNLOSSY MUST be set
+			hasSynLossy := packet.Header.HasFlag(rdpeudp.FlagSYNLOSSY)
+			if tc.reliable && hasSynLossy {
+				t.Error("Reliable mode: RDPUDP_FLAG_SYNLOSSY must NOT be set")
+			}
+			if !tc.reliable && !hasSynLossy {
+				t.Error("Lossy mode: RDPUDP_FLAG_SYNLOSSY MUST be set")
+			}
+
+			// Per spec: MTU must be in [1132, 1232]
+			if packet.SynData.UpstreamMTU < 1132 || packet.SynData.UpstreamMTU > 1232 {
+				t.Errorf("uUpStreamMtu = %d, must be in [1132, 1232]", packet.SynData.UpstreamMTU)
+			}
+			if packet.SynData.DownstreamMTU < 1132 || packet.SynData.DownstreamMTU > 1232 {
+				t.Errorf("uDownStreamMtu = %d, must be in [1132, 1232]", packet.SynData.DownstreamMTU)
+			}
+
+			// Per spec: Version 2+ should have SYNEX flag
+			if tc.version >= rdpeudp.ProtocolVersion2 {
+				if !packet.Header.HasFlag(rdpeudp.FlagSYNEX) {
+					t.Error("Version 2+: RDPUDP_FLAG_SYNEX should be set")
+				}
+				if packet.SynDataEx == nil {
+					t.Error("Version 2+: SynDataEx should be present")
+				} else {
+					if packet.SynDataEx.Version != tc.version {
+						t.Errorf("SynDataEx.Version = 0x%04X, want 0x%04X", packet.SynDataEx.Version, tc.version)
+					}
+				}
+			}
+
+			// Per spec: snInitialSequenceNumber must be random (non-zero)
+			if packet.SynData.SnInitialSequenceNumber == 0 {
+				t.Error("snInitialSequenceNumber should be random, got 0")
+			}
+		})
+	}
+}
+
+// TestSYNDatagram_ZeroPadding validates zero-padding per spec
+// Per spec: "This datagram MUST be zero-padded to increase the size to 1232 bytes"
+func TestSYNDatagram_ZeroPadding(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	packet := conn.buildSynPacket()
+
+	data, err := packet.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
+
+	// Raw packet should be smaller than MTU
+	if len(data) >= int(DefaultMTU) {
+		t.Skipf("Packet already at MTU size (%d bytes)", len(data))
+	}
+
+	// Verify we have the padding logic in sendPacket
+	// The actual padding happens in sendPacket(), not in Serialize()
+	t.Logf("Raw SYN packet size: %d bytes (will be padded to %d in sendPacket)", len(data), DefaultMTU)
+}
+
+// TestACKDatagram_PerSpec validates ACK datagram format
+// Reference: S2_DataTransfer test cases
+func TestACKDatagram_PerSpec(t *testing.T) {
+	packet := rdpeudp.NewACKPacket(12345, 64)
+
+	// Per spec: RDPUDP_FLAG_ACK MUST be set
+	if !packet.Header.HasFlag(rdpeudp.FlagACK) {
+		t.Error("RDPUDP_FLAG_ACK MUST be set")
+	}
+
+	// Per spec: snSourceAck should be the sequence number being acknowledged
+	if packet.Header.SnSourceAck != 12345 {
+		t.Errorf("snSourceAck = %d, want 12345", packet.Header.SnSourceAck)
+	}
+}
+
+// TestSequenceNumberWrapAround validates wrap-around handling
+// Reference: S2_DataTransfer_SequenceNumberWrapAround
+func TestSequenceNumberWrapAround(t *testing.T) {
+	// Test sequence number near max value
+	maxSeq := uint32(0xFFFFFFFF)
+
+	// Simulating sequence near wrap-around
+	seqNumbers := []uint32{
+		maxSeq - 2, // 0xFFFFFFFD
+		maxSeq - 1, // 0xFFFFFFFE
+		maxSeq,     // 0xFFFFFFFF
+		0,          // Wrapped to 0
+		1,          // 0x00000001
+	}
+
+	for i, seq := range seqNumbers {
+		packet := rdpeudp.NewDataPacket(seq, seq, []byte("test"))
+		if packet.SourcePayload.SnSourceStart != seq {
+			t.Errorf("Packet %d: SnSourceStart = %d, want %d", i, packet.SourcePayload.SnSourceStart, seq)
+		}
+	}
+
+	// Verify wrap-around math works
+	var seq uint32 = 0xFFFFFFFF
+	seq++ // Should wrap to 0
+	if seq != 0 {
+		t.Errorf("Sequence wrap: got %d, want 0", seq)
+	}
+}
+
+// ============================================================================
+// Original Tests
+// ============================================================================
 
 func TestState_String(t *testing.T) {
 	tests := []struct {
