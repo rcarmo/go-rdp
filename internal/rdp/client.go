@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
@@ -27,6 +28,8 @@ type RemoteApp struct {
 
 // Client represents an RDP client connection to a remote desktop server.
 type Client struct {
+	mu sync.RWMutex
+
 	conn       net.Conn
 	buffReader *bufio.Reader
 	tpktLayer  *tpkt.Protocol
@@ -319,11 +322,31 @@ func (c *Client) HandleMultitransportRequest(data []byte) error {
 	return c.multitransport.HandleRequest(data)
 }
 
-// sendMultitransportResponse sends a multitransport response via the message channel.
-// The response is sent as SEC_TRANSPORT_RSP security header type.
+// sendMultitransportResponse sends a multitransport response via the MCS I/O channel.
+// Per MS-RDPBCGR Section 2.2.4.17.1, the Initiate Multitransport Response PDU
+// is sent as a slow-path data PDU on the I/O channel.
 func (c *Client) sendMultitransportResponse(data []byte) error {
-	// TODO: Implement sending via security layer with SEC_TRANSPORT_RSP flag
-	// For now, this is a placeholder - the actual implementation requires
-	// integration with the security/encryption layer
+	// Get the global (I/O) channel ID
+	c.mu.RLock()
+	globalChannelID, ok := c.channelIDMap["global"]
+	userID := c.userID
+	mcsLayer := c.mcsLayer
+	c.mu.RUnlock()
+
+	if !ok || globalChannelID == 0 {
+		return fmt.Errorf("global channel not established")
+	}
+
+	if mcsLayer == nil {
+		return fmt.Errorf("MCS layer not initialized")
+	}
+
+	// Per MS-RDPBCGR 2.2.4.17.1: The response is sent as SEC_TRANSPORT_RSP
+	// For now, we send the raw response data - the MultitransportResponse
+	// already contains the proper structure
+	if err := mcsLayer.Send(userID, globalChannelID, data); err != nil {
+		return fmt.Errorf("send multitransport response: %w", err)
+	}
+
 	return nil
 }
