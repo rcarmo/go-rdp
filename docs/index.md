@@ -9,6 +9,7 @@ This folder contains the long-form documentation for the project.
 - [Debugging](debugging.md) - Logging, capabilities, and troubleshooting guide
 - [NSCodec](NSCODEC.md) - Bitmap codec implementation details
 - [RemoteFX](REMOTEFX.md) - RemoteFX wavelet codec implementation
+- [UDP Transport](UDP.md) - UDP transport extension (MS-RDPEUDP/MS-RDPEMT)
 - [WebGL](webgl.md) - WebGL rendering implementation
 
 ## Package Documentation

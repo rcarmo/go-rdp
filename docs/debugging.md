@@ -127,3 +127,47 @@ Logger.getLevel();     // Returns current level string
 1. Check network latency between browser → backend → RDP server
 2. Try reducing color depth (16-bit instead of 32-bit)
 3. Check for excessive debug logging (set to `info` or `warn`)
+
+### UDP Transport Issues
+
+1. **UDP not working**: Ensure `RDP_ENABLE_UDP=true` or `-udp` flag is set
+2. **Firewall blocking**: UDP uses the same port as TCP (3389), verify UDP traffic is allowed
+3. **Server doesn't support**: Check that RDP server supports multitransport (Windows Server 2012+)
+4. **Connection timeout**: Check for NAT traversal issues; UDP may not work behind certain NATs
+
+Debug UDP negotiation:
+```bash
+LOG_LEVEL=debug ./rdp-html5 -udp
+```
+
+Look for these log messages:
+```
+[DEBUG] Multitransport request received: ID=1, Protocol=FECR
+[DEBUG] UDP handshake: SYN sent
+[DEBUG] UDP handshake: SYN+ACK received
+[DEBUG] UDP tunnel established
+[DEBUG] Declining multitransport request ID=1  # When UDP disabled
+```
+
+## Protocol Debugging
+
+### Capture Protocol Traffic
+
+For deep protocol analysis, capture traffic between backend and RDP server:
+
+```bash
+# Capture RDP traffic (requires root/admin)
+tcpdump -i eth0 -w rdp.pcap port 3389
+
+# View in Wireshark with RDP dissector
+wireshark rdp.pcap
+```
+
+### Hex Dump Protocol Messages
+
+Enable debug logging to see hex dumps of protocol messages:
+
+```
+[DEBUG] X.224 recv: 03 00 00 13 0e e0 00 00 00 00 00 01 00 08 00 03 00 00 00
+[DEBUG] MCS recv: 30 1a 02 01 22 30 15 04 01 01 04 01 01 01 01 ff ...
+```

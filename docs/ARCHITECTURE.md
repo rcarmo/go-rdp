@@ -10,13 +10,14 @@
 3. [Data Flow](#data-flow)
 4. [Backend Components](#backend-components)
 5. [Protocol Stack](#protocol-stack)
-6. [Frontend Components](#frontend-components)
-7. [Authentication System](#authentication-system)
-8. [Audio Subsystem](#audio-subsystem)
-9. [Configuration Management](#configuration-management)
-10. [Security Considerations](#security-considerations)
-11. [Performance Optimizations](#performance-optimizations)
-12. [Deployment](#deployment)
+6. [UDP Transport](#udp-transport)
+7. [Frontend Components](#frontend-components)
+8. [Authentication System](#authentication-system)
+9. [Audio Subsystem](#audio-subsystem)
+10. [Configuration Management](#configuration-management)
+11. [Security Considerations](#security-considerations)
+12. [Performance Optimizations](#performance-optimizations)
+13. [Deployment](#deployment)
 
 ---
 
@@ -40,6 +41,7 @@ This project implements a browser-based Remote Desktop Protocol (RDP) client usi
 | Codecs | ✅ | RLE, NSCodec, Planar |
 | Audio | ✅ | RDPSND channel with PCM output |
 | Clipboard | ✅ | Text copy/paste |
+| UDP Transport | 🔧 | Experimental, MS-RDPEUDP/MS-RDPEMT |
 
 ---
 
@@ -434,6 +436,67 @@ FastPath Update PDU:
 │ updateData (variable)                                    │
 └─────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## UDP Transport
+
+The client supports optional UDP transport for improved performance over high-latency networks. UDP transport is implemented per MS-RDPEUDP and MS-RDPEMT specifications.
+
+> **See also**: [UDP Transport Documentation](UDP.md) for detailed protocol information.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          RDP Client                                      │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │                  MultitransportHandler                             │  │
+│  │  - Handles Initiate Multitransport Request/Response               │  │
+│  │  - Manages TunnelManager for UDP connections                       │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│  ┌───────────────────────────────▼───────────────────────────────────┐  │
+│  │                     TunnelManager                                  │  │
+│  │  - Creates Tunnel instances per server request                    │  │
+│  │  - Handles tunnel lifecycle and data routing                      │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│  ┌───────────────────────────────▼───────────────────────────────────┐  │
+│  │              SecureConnection (TLS/DTLS)                          │  │
+│  │                         │                                          │  │
+│  │              Connection (MS-RDPEUDP)                               │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| Reliable Transport | TLS-secured, sequenced delivery with retransmission |
+| Lossy Transport | DTLS-secured, best-effort delivery for bulk data |
+| Multitransport Negotiation | Server-initiated, client can accept or decline |
+| Automatic Fallback | Declines UDP requests when disabled (E_ABORT) |
+
+### Enabling UDP
+
+```bash
+# Environment variable
+export RDP_ENABLE_UDP=true
+
+# Command-line flag
+./rdp-html5 -udp
+```
+
+### Connection Flow
+
+1. Server sends Initiate Multitransport Request PDU (via MCS I/O channel)
+2. Client attempts UDP connection to server:3389
+3. MS-RDPEUDP 3-way handshake (SYN → SYN+ACK → ACK)
+4. TLS/DTLS handshake over UDP
+5. Tunnel Create Request/Response PDU exchange
+6. Client sends Initiate Multitransport Response PDU (success or decline)
 
 ---
 
