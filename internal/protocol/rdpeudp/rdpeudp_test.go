@@ -228,7 +228,7 @@ func TestSourcePayloadHeader_Deserialize_TooShort(t *testing.T) {
 }
 
 func TestPacket_SYN(t *testing.T) {
-	p := NewSYNPacket(12345, DefaultMTU, DefaultMTU)
+	p := NewSYNPacket(12345, DefaultMTU, DefaultMTU, DefaultReceiveWindow)
 
 	if !p.Header.IsSYN() {
 		t.Error("Expected SYN flag")
@@ -244,7 +244,10 @@ func TestPacket_SYN(t *testing.T) {
 	}
 
 	// Test round-trip
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -272,7 +275,10 @@ func TestPacket_SYNACK(t *testing.T) {
 	}
 
 	// Test round-trip
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -300,7 +306,10 @@ func TestPacket_ACK(t *testing.T) {
 	}
 
 	// Test round-trip
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -313,8 +322,8 @@ func TestPacket_ACK(t *testing.T) {
 
 func TestPacket_Data(t *testing.T) {
 	payload := []byte("Hello, RDPEUDP!")
-	// NewDataPacket(codedSeq, sourceSeq, ackSeq, data, receiveWindow)
-	p := NewDataPacket(100, 100, 50, payload, 64)
+	// NewDataPacket(codedSeq, sourceSeq, data)
+	p := NewDataPacket(100, 100, payload)
 
 	if !p.Header.IsData() {
 		t.Error("Expected DAT flag")
@@ -323,21 +332,24 @@ func TestPacket_Data(t *testing.T) {
 	if p.Header.IsACK() {
 		t.Error("Unexpected ACK flag on data-only packet")
 	}
-	if p.DataHeader == nil {
-		t.Fatal("Expected DataHeader")
+	if p.SourcePayload == nil {
+		t.Fatal("Expected SourcePayload")
 	}
-	if p.DataHeader.SnSourceStart != 100 {
+	if p.SourcePayload.SnSourceStart != 100 {
 		t.Error("Wrong source sequence number")
 	}
-	if p.DataHeader.SnCoded != 100 {
+	if p.SourcePayload.SnCoded != 100 {
 		t.Error("Wrong coded sequence number")
 	}
-	if !bytes.Equal(p.Payload, payload) {
+	if !bytes.Equal(p.Data, payload) {
 		t.Error("Payload mismatch")
 	}
 
 	// Test round-trip
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -346,7 +358,7 @@ func TestPacket_Data(t *testing.T) {
 	if !p2.Header.IsData() {
 		t.Error("Lost DAT flag in round-trip")
 	}
-	if !bytes.Equal(p2.Payload, payload) {
+	if !bytes.Equal(p2.Data, payload) {
 		t.Error("Lost payload in round-trip")
 	}
 }
@@ -366,7 +378,10 @@ func TestPacket_FIN(t *testing.T) {
 	}
 
 	// Test round-trip
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -388,9 +403,9 @@ func TestPacket_Deserialize_HeaderTooShort(t *testing.T) {
 func TestPacket_WithAckVector(t *testing.T) {
 	p := &Packet{
 		Header: FECHeader{
-			SnSourceAck:              100,
+			SnSourceAck:                100,
 			SourceAckReceiveWindowSize: 64,
-			Flags:                    FlagACK, // FlagACK means ACK_VECTOR_HEADER is present
+			Flags:                      FlagACK, // FlagACK means ACK_VECTOR_HEADER is present
 		},
 		AckVector: &AckVector{
 			AckVectorSize:     3,
@@ -398,7 +413,10 @@ func TestPacket_WithAckVector(t *testing.T) {
 		},
 	}
 
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -435,7 +453,10 @@ func TestNewDataPacketWithACK(t *testing.T) {
 	}
 
 	// Test round-trip
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -444,7 +465,7 @@ func TestNewDataPacketWithACK(t *testing.T) {
 	if p2.AckVector == nil {
 		t.Fatal("Lost AckVector in round-trip")
 	}
-	if !bytes.Equal(p2.Payload, payload) {
+	if !bytes.Equal(p2.Data, payload) {
 		t.Error("Lost payload in round-trip")
 	}
 }
@@ -476,22 +497,26 @@ func TestPacket_ComplexScenario(t *testing.T) {
 	// Create a complex packet with SYN data and data payload (unusual but valid)
 	p := &Packet{
 		Header: FECHeader{
-			SnSourceAck:              50,
+			SnSourceAck:                50,
 			SourceAckReceiveWindowSize: 64,
-			Flags:                    FlagSYN | FlagACK | FlagDAT,
+			Flags:                      FlagSYN | FlagACK | FlagDAT,
 		},
 		SynData: &SynData{
 			SnInitialSequenceNumber: 100,
 			UpstreamMTU:             1232,
 			DownstreamMTU:           1232,
 		},
-		DataHeader: &SourcePayloadHeader{
+		SourcePayload: &SourcePayloadHeader{
+			SnCoded:       100,
 			SnSourceStart: 100,
 		},
-		Payload: []byte("Initial data with SYN"),
+		Data: []byte("Initial data with SYN"),
 	}
 
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
@@ -504,26 +529,28 @@ func TestPacket_ComplexScenario(t *testing.T) {
 	if p2.SynData == nil {
 		t.Fatal("Lost SynData")
 	}
-	if p2.DataHeader == nil {
-		t.Fatal("Lost DataHeader")
+	if p2.SourcePayload == nil {
+		t.Fatal("Lost SourcePayload")
 	}
-	if !bytes.Equal(p2.Payload, p.Payload) {
+	if !bytes.Equal(p2.Data, p.Data) {
 		t.Error("Payload mismatch")
 	}
 }
 
 func TestPacket_EmptyPayload(t *testing.T) {
 	// Data packet with no payload (valid for ACK-only with DAT flag)
-	// NewDataPacket(codedSeq, sourceSeq, ackSeq, data, receiveWindow)
-	p := NewDataPacket(100, 100, 50, nil, 64)
+	p := NewDataPacket(100, 100, nil)
 
-	data := p.Serialize()
+	data, err := p.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
 	p2 := &Packet{}
 	if err := p2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
 	}
 
-	if len(p2.Payload) != 0 {
-		t.Errorf("Expected empty payload, got %d bytes", len(p2.Payload))
+	if len(p2.Data) != 0 {
+		t.Errorf("Expected empty payload, got %d bytes", len(p2.Data))
 	}
 }

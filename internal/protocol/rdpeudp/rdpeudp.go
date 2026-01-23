@@ -15,6 +15,11 @@ const (
 	Version1 uint8 = 0x01 // Original RDPEUDP
 	Version2 uint8 = 0x02 // RDPEUDP2 with enhancements
 
+	// Protocol version numbers (uint16 format for SYNEX)
+	ProtocolVersion1 uint16 = 0x0001 // Original RDPEUDP
+	ProtocolVersion2 uint16 = 0x0002 // RDPEUDP2
+	ProtocolVersion3 uint16 = 0x0101 // Version 3 (with cookie hash)
+
 	// RDPUDP_FLAG values from [MS-RDPEUDP] Section 2.2.1.1
 	FlagSYN           uint16 = 0x0001 // Synchronization packet
 	FlagFIN           uint16 = 0x0002 // Finish (currently unused per spec)
@@ -25,10 +30,16 @@ const (
 	FlagCWR           uint16 = 0x0040 // Congestion Window Reset
 	FlagSACKOption    uint16 = 0x0080 // Not used
 	FlagAOA           uint16 = 0x0100 // Ack of Acks (ACK_OF_ACKVECTOR present)
-	FlagSYNLossy      uint16 = 0x0200 // Connection does not require persistent retransmits
+	FlagSYNLOSSY      uint16 = 0x0200 // Connection does not require persistent retransmits
 	FlagACKDelayed    uint16 = 0x0400 // ACK was delayed, don't use for RTT
 	FlagCorrelationID uint16 = 0x0800 // CORRELATION_ID_PAYLOAD present
 	FlagSYNEX         uint16 = 0x1000 // SYNDATAEX_PAYLOAD present
+
+	// Aliases for compatibility
+	FlagSYNLossy = FlagSYNLOSSY
+
+	// SYNEX flags from [MS-RDPEUDP] Section 2.2.2.9
+	SynExFlagVersionInfoValid uint16 = 0x0001 // uUdpVer field is valid
 
 	// Default values
 	DefaultSnSourceAck    uint32 = 0xFFFFFFFF // Initial ack sequence number
@@ -232,13 +243,57 @@ func (h *SourcePayloadHeader) Serialize() []byte {
 	return buf
 }
 
+// SynDataEx represents the RDPUDP_SYNDATAEX_PAYLOAD structure.
+// [MS-RDPEUDP] Section 2.2.2.9
+type SynDataEx struct {
+	Flags      uint16   // SYNEX flags
+	Version    uint16   // Protocol version (uUdpVer)
+	CookieHash [32]byte // SHA-256 hash of security cookie (only for version 3)
+}
+
+// Size returns the serialized size of SynDataEx.
+func (s *SynDataEx) Size() int {
+	if s.Version == ProtocolVersion3 {
+		return 4 + 32 // Flags + Version + CookieHash
+	}
+	return 4 // Flags + Version only
+}
+
+// Deserialize parses SynDataEx from bytes.
+func (s *SynDataEx) Deserialize(data []byte) error {
+	if len(data) < 4 {
+		return fmt.Errorf("%w: SYNEX data too short", ErrInvalidPacket)
+	}
+
+	s.Flags = binary.LittleEndian.Uint16(data[0:2])
+	s.Version = binary.LittleEndian.Uint16(data[2:4])
+
+	// Cookie hash is only present for version 3
+	if s.Version == ProtocolVersion3 && len(data) >= 36 {
+		copy(s.CookieHash[:], data[4:36])
+	}
+	return nil
+}
+
+// Serialize encodes SynDataEx to bytes.
+func (s *SynDataEx) Serialize() []byte {
+	buf := make([]byte, s.Size())
+	binary.LittleEndian.PutUint16(buf[0:2], s.Flags)
+	binary.LittleEndian.PutUint16(buf[2:4], s.Version)
+	if s.Version == ProtocolVersion3 {
+		copy(buf[4:36], s.CookieHash[:])
+	}
+	return buf
+}
+
 // Packet represents a complete RDPEUDP packet.
 type Packet struct {
-	Header     FECHeader
-	SynData    *SynData
-	AckVector  *AckVector
-	DataHeader *SourcePayloadHeader
-	Payload    []byte
+	Header        FECHeader
+	SynData       *SynData
+	SynDataEx     *SynDataEx           // SYNEX payload (if FlagSYNEX set)
+	AckVector     *AckVector
+	SourcePayload *SourcePayloadHeader // Data packet header
+	Data          []byte               // Payload data
 }
 
 // Deserialize parses a complete RDPEUDP packet.
@@ -256,6 +311,15 @@ func (p *Packet) Deserialize(data []byte) error {
 			return err
 		}
 		offset += p.SynData.Size()
+
+		// Parse SYNEX data if present
+		if p.Header.HasFlag(FlagSYNEX) && offset < len(data) {
+			p.SynDataEx = &SynDataEx{}
+			if err := p.SynDataEx.Deserialize(data[offset:]); err != nil {
+				return err
+			}
+			offset += p.SynDataEx.Size()
+		}
 	}
 
 	// Parse ACK vector if present
@@ -274,16 +338,16 @@ func (p *Packet) Deserialize(data []byte) error {
 
 	// Parse data header and payload if present
 	if p.Header.HasFlag(FlagDAT) {
-		p.DataHeader = &SourcePayloadHeader{}
-		if err := p.DataHeader.Deserialize(data[offset:]); err != nil {
+		p.SourcePayload = &SourcePayloadHeader{}
+		if err := p.SourcePayload.Deserialize(data[offset:]); err != nil {
 			return err
 		}
-		offset += p.DataHeader.Size()
+		offset += p.SourcePayload.Size()
 
 		// Remaining bytes are payload
 		if offset < len(data) {
-			p.Payload = make([]byte, len(data)-offset)
-			copy(p.Payload, data[offset:])
+			p.Data = make([]byte, len(data)-offset)
+			copy(p.Data, data[offset:])
 		}
 	}
 
@@ -291,7 +355,7 @@ func (p *Packet) Deserialize(data []byte) error {
 }
 
 // Serialize encodes a complete RDPEUDP packet.
-func (p *Packet) Serialize() []byte {
+func (p *Packet) Serialize() ([]byte, error) {
 	var buf bytes.Buffer
 
 	// Write FEC header
@@ -300,31 +364,36 @@ func (p *Packet) Serialize() []byte {
 	// Write SYN data if present
 	if p.SynData != nil && p.Header.HasFlag(FlagSYN) {
 		buf.Write(p.SynData.Serialize())
+
+		// Write SYNEX data if present
+		if p.SynDataEx != nil && p.Header.HasFlag(FlagSYNEX) {
+			buf.Write(p.SynDataEx.Serialize())
+		}
 	}
 
-	// Write ACK vector if present
-	if p.AckVector != nil && p.Header.HasFlag(FlagACK) {
+	// Write ACK vector if present (but not during SYN phase)
+	if p.AckVector != nil && p.Header.HasFlag(FlagACK) && !p.Header.HasFlag(FlagSYN) {
 		buf.Write(p.AckVector.Serialize())
 	}
 
 	// Write data header and payload if present
-	if p.DataHeader != nil && p.Header.HasFlag(FlagDAT) {
-		buf.Write(p.DataHeader.Serialize())
-		if len(p.Payload) > 0 {
-			buf.Write(p.Payload)
+	if p.SourcePayload != nil && p.Header.HasFlag(FlagDAT) {
+		buf.Write(p.SourcePayload.Serialize())
+		if len(p.Data) > 0 {
+			buf.Write(p.Data)
 		}
 	}
 
-	return buf.Bytes()
+	return buf.Bytes(), nil
 }
 
 // NewSYNPacket creates a SYN packet for connection initiation.
-func NewSYNPacket(initialSeq uint32, upstreamMTU, downstreamMTU uint16) *Packet {
+func NewSYNPacket(initialSeq uint32, upstreamMTU, downstreamMTU, receiveWindow uint16) *Packet {
 	return &Packet{
 		Header: FECHeader{
-			SnSourceAck:              DefaultSnSourceAck,
-			SourceAckReceiveWindowSize: DefaultReceiveWindow,
-			Flags:                    FlagSYN,
+			SnSourceAck:                DefaultSnSourceAck,
+			SourceAckReceiveWindowSize: receiveWindow,
+			Flags:                      FlagSYN,
 		},
 		SynData: &SynData{
 			SnInitialSequenceNumber: initialSeq,
@@ -364,18 +433,18 @@ func NewACKPacket(ackSeq uint32, receiveWindow uint16) *Packet {
 // NewDataPacket creates a data packet without ACK vector.
 // codedSeq is the coded packet sequence number, sourceSeq is the source packet sequence number.
 // Use NewDataPacketWithACK if you need to include an ACK vector.
-func NewDataPacket(codedSeq, sourceSeq uint32, ackSeq uint32, data []byte, receiveWindow uint16) *Packet {
+func NewDataPacket(codedSeq, sourceSeq uint32, data []byte) *Packet {
 	return &Packet{
 		Header: FECHeader{
-			SnSourceAck:                ackSeq,
-			SourceAckReceiveWindowSize: receiveWindow,
+			SnSourceAck:                DefaultSnSourceAck,
+			SourceAckReceiveWindowSize: DefaultReceiveWindow,
 			Flags:                      FlagDAT, // Only DATA flag, no ACK_VECTOR
 		},
-		DataHeader: &SourcePayloadHeader{
+		SourcePayload: &SourcePayloadHeader{
 			SnCoded:       codedSeq,
 			SnSourceStart: sourceSeq,
 		},
-		Payload: data,
+		Data: data,
 	}
 }
 
@@ -387,12 +456,12 @@ func NewDataPacketWithACK(codedSeq, sourceSeq uint32, ackSeq uint32, data []byte
 			SourceAckReceiveWindowSize: receiveWindow,
 			Flags:                      FlagDAT | FlagACK,
 		},
-		DataHeader: &SourcePayloadHeader{
+		SourcePayload: &SourcePayloadHeader{
 			SnCoded:       codedSeq,
 			SnSourceStart: sourceSeq,
 		},
 		AckVector: ackVector,
-		Payload:   data,
+		Data:      data,
 	}
 }
 
