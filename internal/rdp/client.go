@@ -66,6 +66,9 @@ type Client struct {
 	// Display control handler for dynamic resize
 	displayControl *DisplayControlHandler
 
+	// Multitransport handler for UDP negotiation
+	multitransport *MultitransportHandler
+
 	// Pending slow-path update (per-client, not global)
 	pendingSlowPathUpdate *Update
 }
@@ -281,4 +284,46 @@ func (c *Client) GetDisplayControlCapabilities() (maxMonitors uint32, maxArea ui
 		return 0, 0
 	}
 	return caps.MaxNumMonitors, caps.MaxMonitorAreaSize
+}
+
+// EnableMultitransport enables UDP transport negotiation.
+// When enabled, the client will respond to server multitransport requests.
+// Note: UDP transport requires additional setup (DTLS, UDP listener).
+func (c *Client) EnableMultitransport(enabled bool) {
+	if c.multitransport == nil {
+		c.multitransport = NewMultitransportHandler(func(data []byte) error {
+			return c.sendMultitransportResponse(data)
+		})
+	}
+	c.multitransport.EnableUDP(enabled)
+}
+
+// SetMultitransportCallback sets a callback for when UDP transport is ready.
+func (c *Client) SetMultitransportCallback(cb func(requestID uint32, cookie [16]byte, reliable bool)) {
+	if c.multitransport == nil {
+		c.multitransport = NewMultitransportHandler(func(data []byte) error {
+			return c.sendMultitransportResponse(data)
+		})
+	}
+	c.multitransport.SetUDPReadyCallback(cb)
+}
+
+// HandleMultitransportRequest processes a multitransport request from the server.
+func (c *Client) HandleMultitransportRequest(data []byte) error {
+	if c.multitransport == nil {
+		// Not configured - auto-decline
+		c.multitransport = NewMultitransportHandler(func(data []byte) error {
+			return c.sendMultitransportResponse(data)
+		})
+	}
+	return c.multitransport.HandleRequest(data)
+}
+
+// sendMultitransportResponse sends a multitransport response via the message channel.
+// The response is sent as SEC_TRANSPORT_RSP security header type.
+func (c *Client) sendMultitransportResponse(data []byte) error {
+	// TODO: Implement sending via security layer with SEC_TRANSPORT_RSP flag
+	// For now, this is a placeholder - the actual implementation requires
+	// integration with the security/encryption layer
+	return nil
 }
