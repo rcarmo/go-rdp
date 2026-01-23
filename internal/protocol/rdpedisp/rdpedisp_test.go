@@ -455,3 +455,246 @@ func TestMonitorLayoutPDU_Serialize_WithMinimum(t *testing.T) {
 	assert.Equal(t, uint32(200), decoded.Monitors[0].Width)
 	assert.Equal(t, uint32(200), decoded.Monitors[0].Height)
 }
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-RDPEDISP_ClientTestDesignSpecification.md
+// ============================================================================
+
+// TestMonitorLayoutValidation_NoOverlap validates per MS test spec:
+// "None of the specified monitors overlap"
+func TestMonitorLayoutValidation_NoOverlap(t *testing.T) {
+	tests := []struct {
+		name     string
+		monitors []MonitorDef
+		valid    bool
+	}{
+		{
+			name: "non-overlapping side by side",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 1920, Top: 0, Width: 1920, Height: 1080},
+			},
+			valid: true,
+		},
+		{
+			name: "non-overlapping stacked",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 0, Top: 1080, Width: 1920, Height: 1080},
+			},
+			valid: true,
+		},
+		{
+			name: "overlapping monitors",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 1000, Top: 0, Width: 1920, Height: 1080}, // Overlaps first by 920 pixels
+			},
+			valid: false,
+		},
+		{
+			name: "contained monitor",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 100, Top: 100, Width: 800, Height: 600}, // Fully inside first
+			},
+			valid: false,
+		},
+		{
+			name: "single monitor always valid",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+			},
+			valid: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ValidateNoOverlap(tc.monitors)
+			assert.Equal(t, tc.valid, result, "ValidateNoOverlap mismatch for %s", tc.name)
+		})
+	}
+}
+
+// TestMonitorLayoutValidation_Adjacent validates per MS test spec:
+// "Each monitor is adjacent to at least one other monitor (even if only at a single point)"
+func TestMonitorLayoutValidation_Adjacent(t *testing.T) {
+	tests := []struct {
+		name     string
+		monitors []MonitorDef
+		valid    bool
+	}{
+		{
+			name: "adjacent side by side",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 1920, Top: 0, Width: 1920, Height: 1080},
+			},
+			valid: true,
+		},
+		{
+			name: "adjacent at corner only",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 1920, Top: 1080, Width: 1920, Height: 1080}, // Touches at single point
+			},
+			valid: true,
+		},
+		{
+			name: "not adjacent - gap between monitors",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 2000, Top: 0, Width: 1920, Height: 1080}, // 80 pixel gap
+			},
+			valid: false,
+		},
+		{
+			name: "single monitor always valid",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+			},
+			valid: true,
+		},
+		{
+			name: "three monitors L-shape",
+			monitors: []MonitorDef{
+				{Left: 0, Top: 0, Width: 1920, Height: 1080},
+				{Left: 1920, Top: 0, Width: 1920, Height: 1080},
+				{Left: 0, Top: 1080, Width: 1920, Height: 1080},
+			},
+			valid: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ValidateAdjacent(tc.monitors)
+			assert.Equal(t, tc.valid, result, "ValidateAdjacent mismatch for %s", tc.name)
+		})
+	}
+}
+
+// TestS1_ResolutionChange_FieldsValid validates per MS test spec S1:
+// "All of the fields specified in the DISPLAYCONTROL_MONITOR_LAYOUT_PDU message are valid,
+// consistent and within range"
+func TestS1_ResolutionChange_FieldsValid(t *testing.T) {
+	// Per MS-RDPEDISP 2.2.2.2.1:
+	// - Width: 200 to 8192, must be even
+	// - Height: 200 to 8192
+	// - DesktopScaleFactor: 100 to 500
+	// - DeviceScaleFactor: 100 to 500
+	// - Orientation: 0, 90, 180, 270
+
+	tests := []struct {
+		name    string
+		monitor MonitorDef
+		valid   bool
+	}{
+		{
+			name: "valid 1080p",
+			monitor: MonitorDef{
+				Width: 1920, Height: 1080,
+				DesktopScaleFactor: 100, DeviceScaleFactor: 100,
+				Orientation: OrientationLandscape,
+			},
+			valid: true,
+		},
+		{
+			name: "valid 4K with scaling",
+			monitor: MonitorDef{
+				Width: 3840, Height: 2160,
+				DesktopScaleFactor: 150, DeviceScaleFactor: 100,
+				Orientation: OrientationLandscape,
+			},
+			valid: true,
+		},
+		{
+			name: "valid portrait",
+			monitor: MonitorDef{
+				Width: 1080, Height: 1920,
+				DesktopScaleFactor: 100, DeviceScaleFactor: 100,
+				Orientation: OrientationPortrait,
+			},
+			valid: true,
+		},
+		{
+			name: "width too small",
+			monitor: MonitorDef{
+				Width: 100, Height: 1080,
+				DesktopScaleFactor: 100, DeviceScaleFactor: 100,
+			},
+			valid: false,
+		},
+		{
+			name: "width too large",
+			monitor: MonitorDef{
+				Width: 10000, Height: 1080,
+				DesktopScaleFactor: 100, DeviceScaleFactor: 100,
+			},
+			valid: false,
+		},
+		{
+			name: "odd width invalid",
+			monitor: MonitorDef{
+				Width: 1921, Height: 1080,
+				DesktopScaleFactor: 100, DeviceScaleFactor: 100,
+			},
+			valid: false,
+		},
+		{
+			name: "scale factor too high",
+			monitor: MonitorDef{
+				Width: 1920, Height: 1080,
+				DesktopScaleFactor: 600, DeviceScaleFactor: 100,
+			},
+			valid: false,
+		},
+		{
+			name: "invalid orientation",
+			monitor: MonitorDef{
+				Width: 1920, Height: 1080,
+				DesktopScaleFactor: 100, DeviceScaleFactor: 100,
+				Orientation: 45, // Invalid
+			},
+			valid: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ValidateMonitorDef(&tc.monitor)
+			assert.Equal(t, tc.valid, result, "ValidateMonitorDef mismatch for %s", tc.name)
+		})
+	}
+}
+
+// TestS2_OrientationChange_AllOrientations validates per MS test spec S2:
+// "Trigger client to change screen orientation from Landscape to Portrait"
+func TestS2_OrientationChange_AllOrientations(t *testing.T) {
+	orientations := []uint32{
+		OrientationLandscape,        // 0
+		OrientationPortrait,         // 90
+		OrientationLandscapeFlipped, // 180
+		OrientationPortraitFlipped,  // 270
+	}
+
+	for _, orientation := range orientations {
+		monitor := MonitorDef{
+			Flags:              MonitorFlagPrimary,
+			Width:              1920,
+			Height:             1080,
+			Orientation:        orientation,
+			DesktopScaleFactor: 100,
+			DeviceScaleFactor:  100,
+		}
+
+		// Verify serialization preserves orientation
+		data := monitor.Serialize()
+		var decoded MonitorDef
+		err := decoded.Deserialize(bytes.NewReader(data))
+		require.NoError(t, err)
+		assert.Equal(t, orientation, decoded.Orientation, "Orientation %d not preserved", orientation)
+	}
+}

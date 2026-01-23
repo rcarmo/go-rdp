@@ -256,3 +256,148 @@ func ParsePDUType(data []byte) (uint32, error) {
 	}
 	return binary.LittleEndian.Uint32(data[:4]), nil
 }
+
+// ============================================================================
+// Validation functions per MS-RDPEDISP specification
+// Reference: MS-RDPEDISP_ClientTestDesignSpecification.md
+// ============================================================================
+
+// ValidateNoOverlap checks that no monitors overlap.
+// Per MS test spec: "None of the specified monitors overlap"
+func ValidateNoOverlap(monitors []MonitorDef) bool {
+	for i := 0; i < len(monitors); i++ {
+		for j := i + 1; j < len(monitors); j++ {
+			if monitorsOverlap(&monitors[i], &monitors[j]) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// monitorsOverlap checks if two monitors overlap
+func monitorsOverlap(a, b *MonitorDef) bool {
+	aRight := a.Left + int32(a.Width)
+	aBottom := a.Top + int32(a.Height)
+	bRight := b.Left + int32(b.Width)
+	bBottom := b.Top + int32(b.Height)
+
+	// No overlap if one is completely to the left/right/above/below the other
+	if aRight <= b.Left || bRight <= a.Left {
+		return false
+	}
+	if aBottom <= b.Top || bBottom <= a.Top {
+		return false
+	}
+	return true
+}
+
+// ValidateAdjacent checks that each monitor is adjacent to at least one other.
+// Per MS test spec: "Each monitor is adjacent to at least one other monitor
+// (even if only at a single point)"
+func ValidateAdjacent(monitors []MonitorDef) bool {
+	if len(monitors) <= 1 {
+		return true
+	}
+
+	// Use union-find to check connectivity
+	parent := make([]int, len(monitors))
+	for i := range parent {
+		parent[i] = i
+	}
+
+	var find func(int) int
+	find = func(x int) int {
+		if parent[x] != x {
+			parent[x] = find(parent[x])
+		}
+		return parent[x]
+	}
+
+	union := func(x, y int) {
+		px, py := find(x), find(y)
+		if px != py {
+			parent[px] = py
+		}
+	}
+
+	// Check adjacency for each pair
+	for i := 0; i < len(monitors); i++ {
+		for j := i + 1; j < len(monitors); j++ {
+			if monitorsAdjacent(&monitors[i], &monitors[j]) {
+				union(i, j)
+			}
+		}
+	}
+
+	// All monitors must be in the same connected component
+	root := find(0)
+	for i := 1; i < len(monitors); i++ {
+		if find(i) != root {
+			return false
+		}
+	}
+	return true
+}
+
+// monitorsAdjacent checks if two monitors touch (share edge or corner)
+func monitorsAdjacent(a, b *MonitorDef) bool {
+	aRight := a.Left + int32(a.Width)
+	aBottom := a.Top + int32(a.Height)
+	bRight := b.Left + int32(b.Width)
+	bBottom := b.Top + int32(b.Height)
+
+	// Check for touching edges or corners
+	// Adjacent means edges touch or corners touch (no gap)
+	horizontalTouch := (aRight == b.Left || bRight == a.Left)
+	verticalTouch := (aBottom == b.Top || bBottom == a.Top)
+	horizontalOverlap := (aRight >= b.Left && bRight >= a.Left)
+	verticalOverlap := (aBottom >= b.Top && bBottom >= a.Top)
+
+	// Side-by-side (touching on left/right edge)
+	if horizontalTouch && verticalOverlap {
+		return true
+	}
+	// Stacked (touching on top/bottom edge)
+	if verticalTouch && horizontalOverlap {
+		return true
+	}
+	return false
+}
+
+// ValidateMonitorDef validates a single monitor definition per MS-RDPEDISP 2.2.2.2.1
+func ValidateMonitorDef(m *MonitorDef) bool {
+	// Width: 200 to 8192, must be even
+	if m.Width < 200 || m.Width > 8192 {
+		return false
+	}
+	if m.Width%2 != 0 {
+		return false
+	}
+
+	// Height: 200 to 8192
+	if m.Height < 200 || m.Height > 8192 {
+		return false
+	}
+
+	// DesktopScaleFactor: 100 to 500
+	if m.DesktopScaleFactor < 100 || m.DesktopScaleFactor > 500 {
+		return false
+	}
+
+	// DeviceScaleFactor: 100 to 500
+	if m.DeviceScaleFactor < 100 || m.DeviceScaleFactor > 500 {
+		return false
+	}
+
+	// Orientation: 0, 90, 180, 270
+	switch m.Orientation {
+	case OrientationLandscape, OrientationPortrait,
+		OrientationLandscapeFlipped, OrientationPortraitFlipped:
+		// Valid
+	default:
+		return false
+	}
+
+	return true
+}
