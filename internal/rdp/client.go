@@ -63,6 +63,9 @@ type Client struct {
 	// Audio handler
 	audioHandler *AudioHandler
 
+	// Display control handler for dynamic resize
+	displayControl *DisplayControlHandler
+
 	// Pending slow-path update (per-client, not global)
 	pendingSlowPathUpdate *Update
 }
@@ -236,4 +239,46 @@ func (c *Client) GetServerCapabilities() *ServerCapabilityInfo {
 	}
 
 	return info
+}
+
+// EnableDisplayControl enables dynamic display resize support.
+// This adds the DRDYNVC channel which is required for display control.
+func (c *Client) EnableDisplayControl() {
+	// Add drdynvc to channels if not already present
+	for _, ch := range c.channels {
+		if ch == "drdynvc" {
+			return
+		}
+	}
+	c.channels = append(c.channels, "drdynvc")
+	c.displayControl = NewDisplayControlHandler(c)
+}
+
+// IsDisplayControlReady returns true if display control is available
+func (c *Client) IsDisplayControlReady() bool {
+	if c.displayControl == nil {
+		return false
+	}
+	return c.displayControl.IsReady()
+}
+
+// RequestResize requests a display resize via the display control channel.
+// Returns an error if display control is not available.
+func (c *Client) RequestResize(width, height int) error {
+	if c.displayControl == nil {
+		return fmt.Errorf("display control not enabled")
+	}
+	return c.displayControl.RequestResize(uint32(width), uint32(height))
+}
+
+// GetDisplayControlCapabilities returns the server's display control capabilities
+func (c *Client) GetDisplayControlCapabilities() (maxMonitors uint32, maxArea uint32) {
+	if c.displayControl == nil {
+		return 0, 0
+	}
+	caps := c.displayControl.GetCapabilities()
+	if caps == nil {
+		return 0, 0
+	}
+	return caps.MaxNumMonitors, caps.MaxMonitorAreaSize
 }

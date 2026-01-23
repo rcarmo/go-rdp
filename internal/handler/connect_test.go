@@ -1560,11 +1560,16 @@ func TestWsToRdp_RapidInputs(t *testing.T) {
 
 // mockCapabilitiesGetter implements capabilitiesGetter interface
 type mockCapabilitiesGetter struct {
-	caps *rdp.ServerCapabilityInfo
+	caps                *rdp.ServerCapabilityInfo
+	displayControlReady bool
 }
 
 func (m *mockCapabilitiesGetter) GetServerCapabilities() *rdp.ServerCapabilityInfo {
 	return m.caps
+}
+
+func (m *mockCapabilitiesGetter) IsDisplayControlReady() bool {
+	return m.displayControlReady
 }
 
 // TestBuildCapabilitiesMessage tests the JSON message building
@@ -1630,7 +1635,7 @@ func TestBuildCapabilitiesMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg := buildCapabilitiesMessage(tt.caps)
+			msg := buildCapabilitiesMessage(tt.caps, false)
 
 			// First byte should be 0xFF marker
 			assert.Equal(t, byte(0xFF), msg[0], "first byte should be capabilities marker")
@@ -1840,4 +1845,254 @@ t.Run("handles empty data", func(t *testing.T) {
 // Should return early without sending anything
 sendAudioData(nil, []byte{}, nil, 0)
 })
+}
+
+// mockRDPConnectionWithResize implements both rdpConn and resizer interfaces
+type mockRDPConnectionWithResize struct {
+	updateData          *rdp.Update
+	updateError         error
+	sendError           error
+	receivedInputs      [][]byte
+	mu                  sync.Mutex
+	updateCalls         int
+	maxUpdates          int
+	resizeRequests      []struct{ width, height int }
+	displayControlReady bool
+	resizeError         error
+}
+
+func (m *mockRDPConnectionWithResize) GetUpdate() (*rdp.Update, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.updateCalls++
+	if m.maxUpdates > 0 && m.updateCalls > m.maxUpdates {
+		return nil, pdu.ErrDeactivateAll
+	}
+
+	if m.updateError != nil {
+		return nil, m.updateError
+	}
+	return m.updateData, nil
+}
+
+func (m *mockRDPConnectionWithResize) SendInputEvent(data []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.receivedInputs = append(m.receivedInputs, data)
+	return m.sendError
+}
+
+func (m *mockRDPConnectionWithResize) IsDisplayControlReady() bool {
+	return m.displayControlReady
+}
+
+func (m *mockRDPConnectionWithResize) RequestResize(width, height int) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.resizeRequests = append(m.resizeRequests, struct{ width, height int }{width, height})
+	return m.resizeError
+}
+
+// TestWsToRdpResizeHandling tests resize message handling in wsToRdp
+func TestWsToRdpResizeHandling(t *testing.T) {
+	t.Run("handles resize when display control ready", func(t *testing.T) {
+		mock := &mockRDPConnectionWithResize{
+			displayControlReady: true,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+			defer close(done)
+			wsToRdp(ctx, ws, mock, cancel)
+		}))
+		defer server.Close()
+
+		wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
+		ws, err := websocket.Dial(wsURL, "", "http://localhost/")
+		require.NoError(t, err)
+		defer func() { _ = ws.Close() }()
+
+		// Send a resize request
+		resizeMsg := `{"type":"resize","width":1920,"height":1080}`
+		err = websocket.Message.Send(ws, []byte(resizeMsg))
+		require.NoError(t, err)
+
+		// Give time for processing then close
+		time.Sleep(50 * time.Millisecond)
+		ws.Close()
+		
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for handler")
+		}
+
+		mock.mu.Lock()
+		defer mock.mu.Unlock()
+		require.Len(t, mock.resizeRequests, 1)
+		assert.Equal(t, 1920, mock.resizeRequests[0].width)
+		assert.Equal(t, 1080, mock.resizeRequests[0].height)
+	})
+
+	t.Run("ignores resize when display control not ready", func(t *testing.T) {
+		mock := &mockRDPConnectionWithResize{
+			displayControlReady: false,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+			defer close(done)
+			wsToRdp(ctx, ws, mock, cancel)
+		}))
+		defer server.Close()
+
+		wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
+		ws, err := websocket.Dial(wsURL, "", "http://localhost/")
+		require.NoError(t, err)
+		defer func() { _ = ws.Close() }()
+
+		// Send a resize request
+		resizeMsg := `{"type":"resize","width":1920,"height":1080}`
+		err = websocket.Message.Send(ws, []byte(resizeMsg))
+		require.NoError(t, err)
+
+		time.Sleep(50 * time.Millisecond)
+		ws.Close()
+
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for handler")
+		}
+
+		mock.mu.Lock()
+		defer mock.mu.Unlock()
+		assert.Len(t, mock.resizeRequests, 0, "should not resize when display control not ready")
+	})
+
+	t.Run("continues processing after resize error", func(t *testing.T) {
+		mock := &mockRDPConnectionWithResize{
+			displayControlReady: true,
+			resizeError:         errors.New("resize failed"),
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+			defer close(done)
+			wsToRdp(ctx, ws, mock, cancel)
+		}))
+		defer server.Close()
+
+		wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
+		ws, err := websocket.Dial(wsURL, "", "http://localhost/")
+		require.NoError(t, err)
+		defer func() { _ = ws.Close() }()
+
+		// Send a resize request (will fail)
+		resizeMsg := `{"type":"resize","width":1920,"height":1080}`
+		err = websocket.Message.Send(ws, []byte(resizeMsg))
+		require.NoError(t, err)
+
+		// Send a regular input event after
+		time.Sleep(50 * time.Millisecond)
+		inputData := []byte{0x01, 0x02, 0x03}
+		err = websocket.Message.Send(ws, inputData)
+		require.NoError(t, err)
+
+		time.Sleep(50 * time.Millisecond)
+		ws.Close()
+
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for handler")
+		}
+
+		mock.mu.Lock()
+		defer mock.mu.Unlock()
+		// Resize should have been attempted
+		assert.Len(t, mock.resizeRequests, 1)
+		// Input should have been received
+		assert.Len(t, mock.receivedInputs, 1)
+	})
+
+	t.Run("does not send resize as input event", func(t *testing.T) {
+		mock := &mockRDPConnectionWithResize{
+			displayControlReady: true,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {
+			defer close(done)
+			wsToRdp(ctx, ws, mock, cancel)
+		}))
+		defer server.Close()
+
+		wsURL := strings.Replace(server.URL, "http://", "ws://", 1)
+		ws, err := websocket.Dial(wsURL, "", "http://localhost/")
+		require.NoError(t, err)
+		defer func() { _ = ws.Close() }()
+
+		// Send a resize request
+		resizeMsg := `{"type":"resize","width":800,"height":600}`
+		err = websocket.Message.Send(ws, []byte(resizeMsg))
+		require.NoError(t, err)
+
+		time.Sleep(50 * time.Millisecond)
+		ws.Close()
+
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for handler")
+		}
+
+		mock.mu.Lock()
+		defer mock.mu.Unlock()
+		// Resize should have been called
+		assert.Len(t, mock.resizeRequests, 1)
+		// But JSON should NOT be sent as input event
+		assert.Len(t, mock.receivedInputs, 0, "resize JSON should not be sent as input")
+	})
+}
+
+// TestBuildCapabilitiesMessageWithDisplayControl tests displayControlReady in capabilities
+func TestBuildCapabilitiesMessageWithDisplayControl(t *testing.T) {
+	t.Run("includes displayControlReady true", func(t *testing.T) {
+		caps := &rdp.ServerCapabilityInfo{
+			BitmapCodecs: []string{"RFX"},
+			DesktopSize:  "1920x1080",
+		}
+		msg := buildCapabilitiesMessage(caps, true)
+		require.NotNil(t, msg)
+		
+		jsonStr := string(msg[1:]) // Skip 0xFF marker
+		assert.Contains(t, jsonStr, `"displayControlReady":true`)
+	})
+
+	t.Run("includes displayControlReady false", func(t *testing.T) {
+		caps := &rdp.ServerCapabilityInfo{
+			BitmapCodecs: []string{"NSCodec"},
+			DesktopSize:  "1024x768",
+		}
+		msg := buildCapabilitiesMessage(caps, false)
+		require.NotNil(t, msg)
+		
+		jsonStr := string(msg[1:]) // Skip 0xFF marker
+		assert.Contains(t, jsonStr, `"displayControlReady":false`)
+	})
 }

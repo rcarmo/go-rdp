@@ -72,8 +72,25 @@ export const GraphicsMixin = {
         if (webglRenderer.init()) {
             this.renderer = webglRenderer;
             this._activeRenderer = `WebGL${webglRenderer.webglVersion}`;
+            // Set up context loss fallback
+            webglRenderer.onContextLostCallback = () => {
+                Logger.warn('Graphics', 'WebGL context lost, switching to Canvas fallback');
+                this._switchToCanvasRenderer();
+            };
+            console.info(
+                '%c[RDP Client] Active renderer',
+                'color: #FF9800; font-weight: bold',
+                this._activeRenderer
+            );
             return;
         }
+        this._initCanvasRenderer();
+    },
+
+    /**
+     * Initialize canvas renderer as fallback
+     */
+    _initCanvasRenderer() {
         const canvasRenderer = new CanvasRenderer(this.canvas);
         canvasRenderer.init();
         this.renderer = canvasRenderer;
@@ -83,6 +100,16 @@ export const GraphicsMixin = {
             'color: #FF9800; font-weight: bold',
             this._activeRenderer
         );
+    },
+
+    /**
+     * Switch to canvas renderer (e.g., after WebGL context loss)
+     */
+    _switchToCanvasRenderer() {
+        if (this.renderer) {
+            this.renderer.destroy();
+        }
+        this._initCanvasRenderer();
     },
     
     /**
@@ -97,6 +124,11 @@ export const GraphicsMixin = {
         this._frameCount = 0;
         this._lastFpsTime = performance.now();
         this._bytesReceived = 0;
+
+        // Enable WebGL renderer metrics in debug mode
+        if (this.renderer && typeof this.renderer.setMetricsEnabled === 'function') {
+            this.renderer.setMetricsEnabled(true);
+        }
         
         // Log stats every 10 seconds
         this._statsInterval = setInterval(() => {
@@ -304,9 +336,22 @@ export const GraphicsMixin = {
             this.multiMonitorMessageShown = true;
         }
 
+        // Use batching for multiple rectangles (reduces draw calls)
+        const useBatching = bitmap.rectangles.length > 1 && 
+                           this.renderer && 
+                           typeof this.renderer.beginBatch === 'function';
+
+        if (useBatching) {
+            this.renderer.beginBatch();
+        }
+
         bitmap.rectangles.forEach((bitmapData) => {
             this.processBitmapData(bitmapData);
         });
+
+        if (useBatching) {
+            this.renderer.flush();
+        }
     },
     
     /**
@@ -576,11 +621,59 @@ export const GraphicsMixin = {
             const newHeight = window.innerHeight;
             
             if (newWidth !== this.originalWidth || newHeight !== this.originalHeight) {
-                Logger.debug("Resize", `${newWidth}x${newHeight}, reconnecting...`);
-                this.showUserInfo('Resizing desktop...');
-                this.reconnectWithNewSize(newWidth, newHeight);
+                Logger.debug("Resize", `${newWidth}x${newHeight}`);
+                
+                // Try dynamic resize first, fall back to reconnect
+                if (this.serverCapabilities?.displayControlReady) {
+                    this.sendResizeRequest(newWidth, newHeight);
+                } else {
+                    this.showUserInfo('Resizing desktop...');
+                    this.reconnectWithNewSize(newWidth, newHeight);
+                }
             }
         }, 500);
+    },
+    
+    /**
+     * Send dynamic resize request to server
+     * @param {number} width
+     * @param {number} height
+     */
+    sendResizeRequest(width, height) {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            Logger.warn("Resize", "Cannot resize: not connected");
+            return false;
+        }
+        
+        const msg = JSON.stringify({
+            type: 'resize',
+            width: width,
+            height: height
+        });
+        
+        try {
+            this.socket.send(msg);
+            Logger.debug("Resize", `Sent resize request: ${width}x${height}`);
+            
+            // Update canvas size locally
+            this.canvas.width = width;
+            this.canvas.height = height;
+            this.originalWidth = width;
+            this.originalHeight = height;
+            
+            // Resize renderer texture
+            if (this.renderer && typeof this.renderer.resize === 'function') {
+                this.renderer.resize(width, height);
+            }
+            
+            return true;
+        } catch (e) {
+            Logger.error("Resize", `Failed to send resize: ${e.message}`);
+            // Fall back to reconnect
+            this.showUserInfo('Resizing desktop...');
+            this.reconnectWithNewSize(width, height);
+            return false;
+        }
     },
     
     /**
@@ -665,8 +758,7 @@ export const GraphicsMixin = {
      * @returns {boolean}
      */
     decodeRFXTile(tileData) {
-        const ctx = this.renderer?.getContext ? this.renderer.getContext() : this.ctx;
-        return this.rfxDecoder.decodeTileToCanvas(tileData, ctx);
+        return this.rfxDecoder.decodeTileToCanvas(tileData, this.renderer);
     },
     
     /**
@@ -678,8 +770,7 @@ export const GraphicsMixin = {
         let failed = 0;
         
         for (const tileData of tiles) {
-            const ctx = this.renderer?.getContext ? this.renderer.getContext() : this.ctx;
-            if (this.rfxDecoder.decodeTileToCanvas(tileData, ctx)) {
+            if (this.rfxDecoder.decodeTileToCanvas(tileData, this.renderer)) {
                 decoded++;
             } else {
                 failed++;

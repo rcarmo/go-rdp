@@ -58,6 +58,19 @@ func (c *Client) Connect() error {
 	}
 	timings["finalization"] = time.Since(phaseStart)
 
+	// Initialize display control if enabled
+	if c.displayControl != nil {
+		if channelID, ok := c.channelIDMap["drdynvc"]; ok {
+			c.displayControl.Initialize(channelID)
+			// Request display control channel creation (non-blocking)
+			go func() {
+				if err := c.displayControl.RequestDisplayControlChannel(); err != nil {
+					logging.Debug("Display control channel request failed: %v", err)
+				}
+			}()
+		}
+	}
+
 	// Request a full screen refresh from the server
 	if err = c.sendRefreshRect(); err != nil {
 		logging.Warn("RDP: Failed to send refresh rect: %v", err)

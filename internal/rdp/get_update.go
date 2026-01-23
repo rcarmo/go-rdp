@@ -10,6 +10,7 @@ import (
 
 	"github.com/rcarmo/rdp-html5/internal/logging"
 	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
+	"github.com/rcarmo/rdp-html5/internal/protocol/drdynvc"
 	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
 )
 
@@ -105,6 +106,25 @@ func (c *Client) getX224Update() (*Update, error) {
 			}
 			if err := c.audioHandler.HandleChannelData(buf.Bytes()); err != nil {
 				logging.Debug("Audio: Error handling channel data: %v", err)
+			}
+		}
+		return nil, nil
+	}
+
+	// Handle DRDYNVC (dynamic virtual channel) for display control
+	if channelID == c.channelIDMap[drdynvc.ChannelName] {
+		if c.displayControl != nil {
+			var buf bytes.Buffer
+			if _, err := io.Copy(&buf, wire); err != nil {
+				logging.Debug("DRDYNVC: Error reading channel data: %v", err)
+				return nil, nil
+			}
+			// Skip the static channel PDU header (8 bytes)
+			data := buf.Bytes()
+			if len(data) > 8 {
+				if err := c.displayControl.HandleDRDYNVC(data[8:]); err != nil {
+					logging.Debug("DRDYNVC: Error handling data: %v", err)
+				}
 			}
 		}
 		return nil, nil

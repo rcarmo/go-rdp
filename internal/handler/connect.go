@@ -32,6 +32,7 @@ type rdpConn interface {
 // capabilitiesGetter interface for testing
 type capabilitiesGetter interface {
 	GetServerCapabilities() *rdp.ServerCapabilityInfo
+	IsDisplayControlReady() bool
 }
 
 // connectionRequest represents credentials sent via WebSocket
@@ -186,6 +187,10 @@ func setupRDPClient(creds *connectionRequest, params *connectionParams) (*rdp.Cl
 		logging.Info("Audio redirection enabled")
 	}
 
+	// Enable display control for dynamic resize
+	rdpClient.EnableDisplayControl()
+	logging.Debug("Display control enabled")
+
 	return rdpClient, nil
 }
 
@@ -273,12 +278,28 @@ func handleWebSocket(wsConn *websocket.Conn, r *http.Request) {
 	startBidirectionalRelay(ctx, cancel, wsConn, rdpClient, &wsMu, params.enableAudio)
 }
 
+// resizeRequest represents a display resize request from the browser
+type resizeRequest struct {
+	Type   string `json:"type"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+// resizer interface for display control
+type resizer interface {
+	RequestResize(width, height int) error
+	IsDisplayControlReady() bool
+}
+
 func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cancel context.CancelFunc) {
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Error("Panic in wsToRdp: %v", r)
 		}
 	}()
+
+	// Check if rdpConn supports resize
+	resizerConn, supportsResize := rdpConn.(resizer)
 
 	for {
 		select {
@@ -298,6 +319,30 @@ func wsToRdp(ctx context.Context, wsConn *websocket.Conn, rdpConn rdpConn, cance
 			logging.Error("Error reading message from WS: %v", err)
 			cancel()
 			return
+		}
+
+		// Check if this is a JSON message (starts with '{')
+		if len(data) > 0 && data[0] == '{' {
+			var msg map[string]interface{}
+			if err := json.Unmarshal(data, &msg); err == nil {
+				if msgType, ok := msg["type"].(string); ok && msgType == "resize" {
+					if supportsResize {
+						var req resizeRequest
+						if err := json.Unmarshal(data, &req); err == nil {
+							if resizerConn.IsDisplayControlReady() {
+								if err := resizerConn.RequestResize(req.Width, req.Height); err != nil {
+									logging.Debug("Resize request failed: %v", err)
+								} else {
+									logging.Info("Resize requested: %dx%d", req.Width, req.Height)
+								}
+							} else {
+								logging.Debug("Display control not ready, resize ignored")
+							}
+						}
+					}
+					continue // Don't send resize as input event
+				}
+			}
 		}
 
 		if err := rdpConn.SendInputEvent(data); err != nil {
@@ -352,10 +397,12 @@ func sendCapabilitiesInfoWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, rdp
 		return
 	}
 
-	logging.Info("Session: NLA=%v audio=%v channels=%v colorDepth=%d desktop=%s codecs=%v",
-		caps.UseNLA, caps.AudioEnabled, caps.Channels, caps.ColorDepth, caps.DesktopSize, caps.BitmapCodecs)
+	displayControlReady := rdpClient.IsDisplayControlReady()
 
-	msg := buildCapabilitiesMessage(caps)
+	logging.Info("Session: NLA=%v audio=%v channels=%v colorDepth=%d desktop=%s codecs=%v displayControl=%v",
+		caps.UseNLA, caps.AudioEnabled, caps.Channels, caps.ColorDepth, caps.DesktopSize, caps.BitmapCodecs, displayControlReady)
+
+	msg := buildCapabilitiesMessage(caps, displayControlReady)
 
 	wsMu.Lock()
 	defer wsMu.Unlock()
@@ -365,22 +412,23 @@ func sendCapabilitiesInfoWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, rdp
 }
 
 // buildCapabilitiesMessage creates the capabilities JSON message
-func buildCapabilitiesMessage(caps *rdp.ServerCapabilityInfo) []byte {
+func buildCapabilitiesMessage(caps *rdp.ServerCapabilityInfo, displayControlReady bool) []byte {
 	logLevel := strings.ToLower(logging.GetLevelString())
 	
 	payload := map[string]any{
-		"type":              "capabilities",
-		"codecs":            caps.BitmapCodecs,
-		"surfaceCommands":   caps.SurfaceCommands,
-		"colorDepth":        caps.ColorDepth,
-		"desktopSize":       caps.DesktopSize,
-		"multifragmentSize": caps.MultifragmentSize,
-		"largePointer":      caps.LargePointer,
-		"frameAcknowledge":  caps.FrameAcknowledge,
-		"useNLA":            caps.UseNLA,
-		"audioEnabled":      caps.AudioEnabled,
-		"channels":          caps.Channels,
-		"logLevel":          logLevel,
+		"type":                "capabilities",
+		"codecs":              caps.BitmapCodecs,
+		"surfaceCommands":     caps.SurfaceCommands,
+		"colorDepth":          caps.ColorDepth,
+		"desktopSize":         caps.DesktopSize,
+		"multifragmentSize":   caps.MultifragmentSize,
+		"largePointer":        caps.LargePointer,
+		"frameAcknowledge":    caps.FrameAcknowledge,
+		"useNLA":              caps.UseNLA,
+		"audioEnabled":        caps.AudioEnabled,
+		"channels":            caps.Channels,
+		"logLevel":            logLevel,
+		"displayControlReady": displayControlReady,
 	}
 
 	jsonData, err := json.Marshal(payload)
