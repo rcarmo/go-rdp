@@ -36,8 +36,12 @@ const (
 	MinRequestSize  = 24 // 4 + 2 + 2 + 16
 	MinResponseSize = 8  // 4 + 4
 
-	// Tunnel header size
-	TunnelHeaderSize = 4 // Action(1) + Flags(1) + PayloadLength(2)
+	// Tunnel header sizes
+	// Per [MS-RDPEMT] Section 2.2.1.1:
+	// - Byte 0: Action (4 bits) + Flags (4 bits) combined
+	// - Bytes 1-2: PayloadLength (16-bit)
+	// - Byte 3: HeaderLength (8-bit)
+	TunnelHeaderMinSize = 4 // ActionFlags(1) + PayloadLength(2) + HeaderLength(1)
 )
 
 // Errors
@@ -140,31 +144,79 @@ func NewSuccessResponse(requestID uint32) *MultitransportResponse {
 }
 
 // TunnelHeader represents the RDP_TUNNEL_HEADER structure.
-// [MS-RDPEMT] Section 2.2.2.1
+// [MS-RDPEMT] Section 2.2.1.1
+//
+// Wire format:
+//
+//	Byte 0:   | Action (4 bits) | Flags (4 bits) |
+//	Bytes 1-2: PayloadLength (16-bit little-endian)
+//	Byte 3:    HeaderLength (8-bit, min 4)
+//	Bytes 4+:  SubHeaders (variable, if HeaderLength > 4)
 type TunnelHeader struct {
-	Action        uint8  // ActionCreateRequest, ActionCreateResponse, or ActionData
-	Flags         uint8  // Reserved flags
-	PayloadLength uint16 // Length of payload following header
+	Action        uint8  // Lower 4 bits: ActionCreateRequest, ActionCreateResponse, or ActionData
+	Flags         uint8  // Upper 4 bits: Reserved, must be 0
+	PayloadLength uint16 // Length of payload following header (not including header)
+	HeaderLength  uint8  // Total header length (min 4, includes SubHeaders if present)
+	SubHeaders    []byte // Optional sub-headers (present if HeaderLength > 4)
+}
+
+// Size returns the actual wire size of this header.
+func (h *TunnelHeader) Size() int {
+	if h.HeaderLength < TunnelHeaderMinSize {
+		return TunnelHeaderMinSize
+	}
+	return int(h.HeaderLength)
 }
 
 // Deserialize parses a TunnelHeader from bytes.
 func (h *TunnelHeader) Deserialize(data []byte) error {
-	if len(data) < TunnelHeaderSize {
-		return fmt.Errorf("%w: need %d bytes, got %d", ErrInvalidLength, TunnelHeaderSize, len(data))
+	if len(data) < TunnelHeaderMinSize {
+		return fmt.Errorf("%w: need %d bytes, got %d", ErrInvalidLength, TunnelHeaderMinSize, len(data))
 	}
 
-	h.Action = data[0]
-	h.Flags = data[1]
-	h.PayloadLength = binary.LittleEndian.Uint16(data[2:4])
+	// Byte 0: Action (low nibble) + Flags (high nibble)
+	h.Action = data[0] & 0x0F
+	h.Flags = (data[0] >> 4) & 0x0F
+	h.PayloadLength = binary.LittleEndian.Uint16(data[1:3])
+	h.HeaderLength = data[3]
+
+	// Validate HeaderLength
+	if h.HeaderLength < TunnelHeaderMinSize {
+		h.HeaderLength = TunnelHeaderMinSize // Treat invalid as minimum
+	}
+
+	// Read SubHeaders if present
+	if h.HeaderLength > TunnelHeaderMinSize {
+		subHeaderLen := int(h.HeaderLength) - TunnelHeaderMinSize
+		if len(data) < int(h.HeaderLength) {
+			return fmt.Errorf("%w: header truncated, need %d bytes, got %d", ErrInvalidLength, h.HeaderLength, len(data))
+		}
+		h.SubHeaders = make([]byte, subHeaderLen)
+		copy(h.SubHeaders, data[TunnelHeaderMinSize:h.HeaderLength])
+	}
+
 	return nil
 }
 
 // Serialize encodes a TunnelHeader to bytes.
 func (h *TunnelHeader) Serialize() ([]byte, error) {
-	buf := make([]byte, TunnelHeaderSize)
-	buf[0] = h.Action
-	buf[1] = h.Flags
-	binary.LittleEndian.PutUint16(buf[2:4], h.PayloadLength)
+	// Calculate header length
+	headerLen := TunnelHeaderMinSize + len(h.SubHeaders)
+	if headerLen > 255 {
+		return nil, fmt.Errorf("header too large: %d bytes", headerLen)
+	}
+
+	buf := make([]byte, headerLen)
+	// Byte 0: Action (low nibble) + Flags (high nibble)
+	buf[0] = (h.Flags << 4) | (h.Action & 0x0F)
+	binary.LittleEndian.PutUint16(buf[1:3], h.PayloadLength)
+	buf[3] = uint8(headerLen)
+
+	// Copy SubHeaders if present
+	if len(h.SubHeaders) > 0 {
+		copy(buf[TunnelHeaderMinSize:], h.SubHeaders)
+	}
+
 	return buf, nil
 }
 
@@ -232,10 +284,10 @@ func (r *TunnelCreateResponse) Serialize() ([]byte, error) {
 }
 
 // TunnelDataPDU wraps data sent over the tunnel.
-// [MS-RDPEMT] Section 2.2.2.4
+// [MS-RDPEMT] Section 2.2.2.3
 type TunnelDataPDU struct {
 	Header TunnelHeader
-	Data   []byte // Wrapped RDP data
+	Data   []byte // Wrapped RDP data (HigherLayerData)
 }
 
 // Deserialize parses a TunnelDataPDU from bytes.
@@ -248,7 +300,7 @@ func (p *TunnelDataPDU) Deserialize(data []byte) error {
 		return fmt.Errorf("%w: expected Data action, got %d", ErrUnknownAction, p.Header.Action)
 	}
 
-	payloadStart := TunnelHeaderSize
+	payloadStart := p.Header.Size()
 	payloadEnd := payloadStart + int(p.Header.PayloadLength)
 
 	if len(data) < payloadEnd {
@@ -263,9 +315,14 @@ func (p *TunnelDataPDU) Deserialize(data []byte) error {
 // Serialize encodes a TunnelDataPDU to bytes.
 func (p *TunnelDataPDU) Serialize() ([]byte, error) {
 	p.Header.Action = ActionData
+	p.Header.Flags = 0 // Must be zero per spec
 	p.Header.PayloadLength = uint16(len(p.Data))
 
-	headerBytes, _ := p.Header.Serialize()
+	headerBytes, err := p.Header.Serialize()
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]byte, 0, len(headerBytes)+len(p.Data))
 	result = append(result, headerBytes...)
 	result = append(result, p.Data...)
@@ -279,7 +336,7 @@ func ParseTunnelPDU(data []byte) (action uint8, payload []byte, err error) {
 		return 0, nil, err
 	}
 
-	payloadStart := TunnelHeaderSize
+	payloadStart := header.Size()
 	payloadEnd := payloadStart + int(header.PayloadLength)
 
 	if len(data) < payloadEnd {

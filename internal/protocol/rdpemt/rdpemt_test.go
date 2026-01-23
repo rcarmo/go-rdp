@@ -164,8 +164,8 @@ func TestTunnelHeader_Serialize(t *testing.T) {
 		t.Fatalf("Serialize failed: %v", err)
 	}
 
-	if len(data) != TunnelHeaderSize {
-		t.Errorf("Expected %d bytes, got %d", TunnelHeaderSize, len(data))
+	if len(data) != TunnelHeaderMinSize {
+		t.Errorf("Expected %d bytes, got %d", TunnelHeaderMinSize, len(data))
 	}
 
 	// Verify deserialization
@@ -176,6 +176,96 @@ func TestTunnelHeader_Serialize(t *testing.T) {
 
 	if h2.Action != h.Action || h2.Flags != h.Flags || h2.PayloadLength != h.PayloadLength {
 		t.Error("Header mismatch after round-trip")
+	}
+	if h2.HeaderLength != TunnelHeaderMinSize {
+		t.Errorf("Expected HeaderLength %d, got %d", TunnelHeaderMinSize, h2.HeaderLength)
+	}
+}
+
+func TestTunnelHeader_ActionFlagsEncoding(t *testing.T) {
+	// Test that Action and Flags are correctly encoded in a single byte
+	// Per MS-RDPEMT Section 2.2.1.1:
+	// - Action is lower 4 bits (nibble)
+	// - Flags is upper 4 bits (nibble)
+	tests := []struct {
+		name   string
+		action uint8
+		flags  uint8
+	}{
+		{"CreateRequest", ActionCreateRequest, 0},
+		{"CreateResponse", ActionCreateResponse, 0},
+		{"Data", ActionData, 0},
+		{"DataWithFlags", ActionData, 0x0F}, // Max flags value (though spec says must be 0)
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &TunnelHeader{
+				Action:        tc.action,
+				Flags:         tc.flags,
+				PayloadLength: 0,
+			}
+
+			data, err := h.Serialize()
+			if err != nil {
+				t.Fatalf("Serialize failed: %v", err)
+			}
+
+			// Verify byte 0 encoding: (Flags << 4) | Action
+			expectedByte0 := (tc.flags << 4) | tc.action
+			if data[0] != expectedByte0 {
+				t.Errorf("Byte 0: expected 0x%02X, got 0x%02X", expectedByte0, data[0])
+			}
+
+			// Verify deserialization
+			h2 := &TunnelHeader{}
+			if err := h2.Deserialize(data); err != nil {
+				t.Fatalf("Deserialize failed: %v", err)
+			}
+
+			if h2.Action != tc.action {
+				t.Errorf("Action: expected %d, got %d", tc.action, h2.Action)
+			}
+			if h2.Flags != tc.flags {
+				t.Errorf("Flags: expected %d, got %d", tc.flags, h2.Flags)
+			}
+		})
+	}
+}
+
+func TestTunnelHeader_WithSubHeaders(t *testing.T) {
+	// Test header with SubHeaders (HeaderLength > 4)
+	subHeaders := []byte{0xAA, 0xBB, 0xCC, 0xDD}
+	h := &TunnelHeader{
+		Action:        ActionData,
+		Flags:         0,
+		PayloadLength: 100,
+		SubHeaders:    subHeaders,
+	}
+
+	data, err := h.Serialize()
+	if err != nil {
+		t.Fatalf("Serialize failed: %v", err)
+	}
+
+	expectedLen := TunnelHeaderMinSize + len(subHeaders)
+	if len(data) != expectedLen {
+		t.Errorf("Expected %d bytes, got %d", expectedLen, len(data))
+	}
+
+	// Verify HeaderLength field
+	if data[3] != byte(expectedLen) {
+		t.Errorf("HeaderLength: expected %d, got %d", expectedLen, data[3])
+	}
+
+	// Verify deserialization
+	h2 := &TunnelHeader{}
+	if err := h2.Deserialize(data); err != nil {
+		t.Fatalf("Deserialize failed: %v", err)
+	}
+
+	if !bytes.Equal(h2.SubHeaders, subHeaders) {
+		t.Errorf("SubHeaders mismatch: expected %v, got %v", subHeaders, h2.SubHeaders)
 	}
 }
 
