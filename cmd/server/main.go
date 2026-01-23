@@ -44,6 +44,7 @@ type parsedArgs struct {
 	tlsServerName string
 	useNLA        bool
 	enableRFX     *bool // nil = use default, non-nil = override
+	enableUDP     *bool // nil = use default, non-nil = override
 }
 
 // parseFlags parses command line flags and returns the parsed args.
@@ -64,6 +65,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 	tlsServerName := fs.String("tls-server-name", "", "override TLS server name")
 	useNLA := fs.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
 	noRFX := fs.Bool("no-rfx", false, "disable RemoteFX codec support")
+	enableUDP := fs.Bool("udp", false, "enable UDP transport (experimental)")
 	helpFlag := fs.Bool("help", false, "show help")
 	versionFlag := fs.Bool("version", false, "show version")
 
@@ -80,10 +82,17 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 	}
 
 	// Handle RFX flag - only set if explicitly disabled
-	var enableRFX *bool
+	var enableRFXPtr *bool
 	if *noRFX {
 		rfxValue := false
-		enableRFX = &rfxValue
+		enableRFXPtr = &rfxValue
+	}
+
+	// Handle UDP flag - only set if explicitly enabled
+	var enableUDPPtr *bool
+	if *enableUDP {
+		udpValue := true
+		enableUDPPtr = &udpValue
 	}
 
 	return parsedArgs{
@@ -94,7 +103,8 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 		allowAnyTLS:   *allowAnyTLS,
 		tlsServerName: strings.TrimSpace(*tlsServerName),
 		useNLA:        *useNLA,
-		enableRFX:     enableRFX,
+		enableRFX:     enableRFXPtr,
+		enableUDP:     enableUDPPtr,
 	}, ""
 }
 
@@ -109,6 +119,7 @@ func run(args parsedArgs) error {
 		TLSServerName:     args.tlsServerName,
 		UseNLA:            args.useNLA,
 		EnableRFX:         args.enableRFX,
+		EnableUDP:         args.enableUDP,
 	}
 
 	cfg, err := config.LoadWithOverrides(opts)
@@ -277,9 +288,10 @@ func showHelp() {
 	fmt.Println("  -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)")
 	fmt.Println("  -nla                Enable Network Level Authentication")
 	fmt.Println("  -no-rfx             Disable RemoteFX codec support")
+	fmt.Println("  -udp                Enable UDP transport (experimental)")
 	fmt.Println("  -version            Show version information")
 	fmt.Println("  -help               Show this help message")
-	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, TLS_SKIP_VERIFY, TLS_SERVER_NAME, TLS_ALLOW_ANY_SERVER_NAME, RDP_ENABLE_RFX")
+	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, TLS_SKIP_VERIFY, TLS_SERVER_NAME, TLS_ALLOW_ANY_SERVER_NAME, RDP_ENABLE_RFX, RDP_ENABLE_UDP")
 	fmt.Println("EXAMPLES: rdp-html5 -host 0.0.0.0 -port 8080")
 }
 

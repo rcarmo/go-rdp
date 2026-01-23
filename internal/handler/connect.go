@@ -191,6 +191,12 @@ func setupRDPClient(creds *connectionRequest, params *connectionParams) (*rdp.Cl
 	rdpClient.EnableDisplayControl()
 	logging.Debug("Display control enabled")
 
+	// Enable UDP transport if configured (experimental)
+	if cfg.RDP.EnableUDP {
+		rdpClient.EnableMultitransport(true)
+		logging.Info("UDP transport enabled (experimental)")
+	}
+
 	return rdpClient, nil
 }
 

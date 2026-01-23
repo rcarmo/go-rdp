@@ -729,6 +729,23 @@ func TestParseFlagsWithArgs(t *testing.T) {
 			},
 		},
 		{
+			name:           "udp flag enables UDP transport",
+			args:           []string{"-udp"},
+			expectedAction: "",
+			checkArgs: func(t *testing.T, args parsedArgs) {
+				require.NotNil(t, args.enableUDP)
+				assert.True(t, *args.enableUDP)
+			},
+		},
+		{
+			name:           "udp flag not set by default",
+			args:           []string{},
+			expectedAction: "",
+			checkArgs: func(t *testing.T, args parsedArgs) {
+				assert.Nil(t, args.enableUDP)
+			},
+		},
+		{
 			name:           "help flag returns help action",
 			args:           []string{"-help"},
 			expectedAction: "help",

@@ -514,3 +514,28 @@ func TestGetGlobalConfig(t *testing.T) {
 	// Initially may be nil or have a default value
 	_ = cfg
 }
+
+func TestLoadWithOverrides_UDPFlag(t *testing.T) {
+	// Clean environment
+	_ = os.Unsetenv("RDP_ENABLE_UDP")
+
+	// Test default (UDP disabled)
+	cfg, err := LoadWithOverrides(LoadOptions{})
+	require.NoError(t, err)
+	assert.False(t, cfg.RDP.EnableUDP, "UDP should be disabled by default")
+
+	// Test with environment variable
+	_ = os.Setenv("RDP_ENABLE_UDP", "true")
+	cfg, err = LoadWithOverrides(LoadOptions{})
+	require.NoError(t, err)
+	assert.True(t, cfg.RDP.EnableUDP, "UDP should be enabled via env var")
+	_ = os.Unsetenv("RDP_ENABLE_UDP")
+
+	// Test with CLI override (takes precedence)
+	_ = os.Setenv("RDP_ENABLE_UDP", "false")
+	udpTrue := true
+	cfg, err = LoadWithOverrides(LoadOptions{EnableUDP: &udpTrue})
+	require.NoError(t, err)
+	assert.True(t, cfg.RDP.EnableUDP, "CLI flag should override env var")
+	_ = os.Unsetenv("RDP_ENABLE_UDP")
+}

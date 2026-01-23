@@ -37,6 +37,7 @@ type LoadOptions struct {
 	AllowAnyTLSServer bool
 	UseNLA            bool
 	EnableRFX         *bool // nil = use env/default, non-nil = override
+	EnableUDP         *bool // nil = use env/default, non-nil = override
 }
 
 // ServerConfig holds server-specific configuration
@@ -57,6 +58,7 @@ type RDPConfig struct {
 	BufferSize    int           `json:"bufferSize" env:"RDP_BUFFER_SIZE" default:"65536"`
 	Timeout       time.Duration `json:"timeout" env:"RDP_TIMEOUT" default:"10s"`
 	EnableRFX     bool          `json:"enableRFX" env:"RDP_ENABLE_RFX" default:"true"`
+	EnableUDP     bool          `json:"enableUDP" env:"RDP_ENABLE_UDP" default:"false"`
 }
 
 // SecurityConfig holds security-related configuration
@@ -111,6 +113,12 @@ func LoadWithOverrides(opts LoadOptions) (*Config, error) {
 		config.RDP.EnableRFX = *opts.EnableRFX
 	} else {
 		config.RDP.EnableRFX = getBoolWithDefault("RDP_ENABLE_RFX", true)
+	}
+	// UDP disabled by default (experimental); use --udp or RDP_ENABLE_UDP=true to enable
+	if opts.EnableUDP != nil {
+		config.RDP.EnableUDP = *opts.EnableUDP
+	} else {
+		config.RDP.EnableUDP = getBoolWithDefault("RDP_ENABLE_UDP", false)
 	}
 
 	// Security config
