@@ -2,6 +2,12 @@
 
 ITU T.124 Generic Conference Control (GCC) implementation.
 
+## Specification References
+
+- [MS-RDPBCGR Section 2.2.1.3](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/db6713ee-1c0e-4064-a3b3-0fac30b4037b) - Client MCS Connect Initial PDU with GCC Conference Create Request
+- [MS-RDPBCGR Section 2.2.1.4](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/927de44c-7fe8-4206-a14f-e5517dc24b1c) - Server MCS Connect Response PDU with GCC Conference Create Response
+- [ITU-T T.124](https://www.itu.int/rec/T-REC-T.124) - Generic Conference Control
+
 ## Overview
 
 This package implements the GCC protocol layer used during RDP connection establishment. GCC provides a standardized mechanism for exchanging user data during MCS connection setup.

@@ -2,6 +2,11 @@
 
 RDP audio virtual channel implementation.
 
+## Specification References
+
+- [MS-RDPEA](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpea/) - Remote Desktop Protocol: Audio Output Virtual Channel Extension
+- [MS-RDPEAI](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeai/) - Remote Desktop Protocol: Audio Input Redirection Virtual Channel Extension
+
 ## Overview
 
 This package implements the audio redirection virtual channel for RDP, supporting both:

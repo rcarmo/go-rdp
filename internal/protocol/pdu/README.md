@@ -2,6 +2,12 @@
 
 RDP Protocol Data Unit definitions.
 
+## Specification References
+
+- [MS-RDPBCGR](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/) - Remote Desktop Protocol: Basic Connectivity and Graphics Remoting
+- [MS-RDPBCGR Section 2.2](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/5073f4ed-1e93-45e1-b039-6e30c385867c) - Message Syntax
+- [MS-RDPBCGR Section 2.2.7](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/4e9722c3-ad83-43f5-af5a-529f73d88b48) - Capability Sets
+
 ## Overview
 
 This package contains all RDP PDU (Protocol Data Unit) definitions used throughout the connection lifecycle. It implements structures and serialization for:

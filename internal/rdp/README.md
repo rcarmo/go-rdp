@@ -2,6 +2,12 @@
 
 Core RDP (Remote Desktop Protocol) client implementation.
 
+## Specification References
+
+- [MS-RDPBCGR](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/) - Remote Desktop Protocol: Basic Connectivity and Graphics Remoting
+- [MS-RDPBCGR Section 1.3](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/023f1e69-cfe8-4ee6-9ee0-7e759fb4e4ee) - Connection Sequence Overview
+- [MS-RDPBCGR Section 3](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/89d1f7b5-ad39-480d-8a1f-f66a92aee5fb) - Protocol Details
+
 ## Overview
 
 This package implements the MS-RDPBCGR (Remote Desktop Protocol: Basic Connectivity and Graphics Remoting) specification. It handles:

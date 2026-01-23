@@ -2,6 +2,12 @@
 
 ISO 8073 X.224 connection-oriented transport layer.
 
+## Specification References
+
+- [MS-RDPBCGR Section 2.2.1.1](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/18a27ef9-6f9a-4501-b000-94b1fe3c2c10) - Client X.224 Connection Request PDU
+- [MS-RDPBCGR Section 2.2.1.2](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/13757f8f-66db-4273-9d2c-385c33b1e483) - Server X.224 Connection Confirm PDU
+- [ISO 8073](https://www.iso.org/standard/15059.html) - Connection-oriented Transport Protocol (Class 0)
+
 ## Overview
 
 This package implements the X.224 (ISO 8073 Class 0) protocol layer for RDP connection negotiation. X.224 provides:

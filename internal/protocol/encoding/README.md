@@ -2,6 +2,12 @@
 
 ASN.1 encoding utilities for RDP protocol layers.
 
+## Specification References
+
+- [ITU-T X.690](https://www.itu.int/rec/T-REC-X.690) - ASN.1 BER/DER Encoding Rules
+- [ITU-T X.691](https://www.itu.int/rec/T-REC-X.691) - ASN.1 PER Encoding Rules
+- [MS-RDPBCGR Section 2.2.1.3](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/db6713ee-1c0e-4064-a3b3-0fac30b4037b) - PER-encoded GCC data
+
 ## Overview
 
 This package implements BER (Basic Encoding Rules) and PER (Packed Encoding Rules) encoding as specified in ITU X.690 and X.691. These encodings are used by various RDP protocol layers:

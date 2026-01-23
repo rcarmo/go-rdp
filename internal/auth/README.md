@@ -2,6 +2,12 @@
 
 RDP authentication implementation supporting NTLMv2 and CredSSP/NLA.
 
+## Specification References
+
+- [MS-NLMP](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-nlmp/) - NT LAN Manager (NTLM) Authentication Protocol
+- [MS-CSSP](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cssp/) - Credential Security Support Provider (CredSSP) Protocol
+- [MS-RDPBCGR Section 5.4.2](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/ceda8f0e-1d1c-42a8-bd0e-89d1e0f4ae72) - NLA/CredSSP in RDP
+
 ## Overview
 
 This package implements the complete authentication stack for RDP connections:

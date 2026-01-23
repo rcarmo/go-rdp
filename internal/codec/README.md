@@ -2,6 +2,12 @@
 
 Bitmap codec implementation for RDP graphics decompression.
 
+## Specification References
+
+- [MS-RDPNSC](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpnsc/) - Remote Desktop Protocol: NSCodec Extension
+- [MS-RDPEGDI Section 2.2.2.5](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegdi/8bb25532-9dcd-418f-8b5f-9a01f57d86cb) - Bitmap Compression
+- [MS-RDPBCGR Section 2.2.9.1.1.3.1.2.2](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/a0674162-3ba7-486f-9c69-05e27e8d0197) - Fast-Path Bitmap Update
+
 ## Overview
 
 This package implements RDP bitmap decompression and color conversion utilities. It supports multiple compression formats used by RDP servers:

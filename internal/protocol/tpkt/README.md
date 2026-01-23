@@ -2,6 +2,11 @@
 
 TPKT framing layer for RDP over TCP.
 
+## Specification References
+
+- [RFC 1006](https://www.rfc-editor.org/rfc/rfc1006) - ISO Transport Service on top of the TCP
+- [MS-RDPBCGR Section 2.2.1.1](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/18a27ef9-6f9a-4501-b000-94b1fe3c2c10) - Connection Initiation using TPKT
+
 ## Overview
 
 This package implements TPKT (RFC 1006), which provides framing for ISO 8073 X.224 PDUs over TCP/IP. TPKT adds a simple 4-byte header to each PDU for length-delimited message boundaries.

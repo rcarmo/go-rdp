@@ -2,6 +2,12 @@
 
 ITU T.125 Multi-Channel Service (MCS) implementation.
 
+## Specification References
+
+- [MS-RDPBCGR Section 2.2.1](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/023f1e69-cfe8-4ee6-9ee0-7e759fb4e4ee) - Connection Sequence using MCS
+- [MS-RDPBCGR Section 3.2.5.3](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/1d4d8385-73ef-4e48-b03f-e62e18c904aa) - MCS Connect Processing
+- [ITU-T T.125](https://www.itu.int/rec/T-REC-T.125) - Multipoint Communication Service Protocol Specification
+
 ## Overview
 
 This package implements the MCS protocol layer, which provides:

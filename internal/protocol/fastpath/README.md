@@ -2,6 +2,12 @@
 
 RDP FastPath protocol for optimized screen updates and input events.
 
+## Specification References
+
+- [MS-RDPBCGR Section 2.2.9](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/68b5ee54-d0d5-4d65-8d81-e1c4025f7597) - Server Fast-Path Update PDU
+- [MS-RDPBCGR Section 2.2.8](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/d364d31f-6b6a-4105-a9d0-5e48047a9a68) - Client Fast-Path Input Event PDU
+- [MS-RDPBCGR Section 5.3.8](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/0cb7d420-ea0d-4e4b-8a87-b8fb79de99ce) - Fast-Path PDU Security
+
 ## Overview
 
 FastPath is an optimized data path in RDP that bypasses the full protocol stack for performance-critical operations:
