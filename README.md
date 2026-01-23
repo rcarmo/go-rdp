@@ -79,11 +79,30 @@ See [docs/configuration.md](docs/configuration.md) for full configuration option
 
 ## Documentation
 
+### User Documentation
+
 - [Architecture](docs/ARCHITECTURE.md) - System design and data flow
 - [Configuration](docs/configuration.md) - Configuration options (env vars + flags)
 - [Debugging](docs/debugging.md) - Troubleshooting guide
+
+### Implementation Documentation
+
 - [NSCodec](docs/NSCODEC.md) - Bitmap codec implementation
 - [RemoteFX](docs/REMOTEFX.md) - RemoteFX wavelet codec implementation
+- [WebGL](docs/webgl.md) - WebGL rendering implementation
+
+### Protocol Specifications
+
+This implementation follows Microsoft's open protocol specifications:
+
+| Protocol | Description | Specification |
+|----------|-------------|---------------|
+| MS-RDPBCGR | Basic Connectivity | [Link](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/) |
+| MS-RDPEA | Audio Output | [Link](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpea/) |
+| MS-RDPEDYC | Dynamic Channels | [Link](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/) |
+| MS-RDPEDISP | Display Control | [Link](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedisp/) |
+| MS-RDPEMT | Multitransport | [Link](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpemt/) |
+| MS-RDPEUDP | UDP Transport | [Link](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp/) |
 
 ## Features
 

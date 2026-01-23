@@ -67,12 +67,16 @@ This directory contains the layered protocol stack for RDP communication. Each s
 
 | Directory | Protocol | Specification | Purpose |
 |-----------|----------|---------------|---------|
-| `audio/` | RDPEA/RDPEAI | MS-RDPEA | Audio virtual channel |
+| `audio/` | RDPEA/RDPEAI | [MS-RDPEA] | Audio virtual channel |
+| `drdynvc/` | DRDYNVC | [MS-RDPEDYC] | Dynamic virtual channels |
 | `encoding/` | BER/PER | ITU X.690/X.691 | ASN.1 serialization |
-| `fastpath/` | FastPath | MS-RDPBCGR | Optimized data path |
+| `fastpath/` | FastPath | [MS-RDPBCGR] | Optimized data path |
 | `gcc/` | T.124 GCC | ITU T.124 | Conference control |
 | `mcs/` | T.125 MCS | ITU T.125 | Channel multiplexing |
-| `pdu/` | RDP PDUs | MS-RDPBCGR | All RDP message types |
+| `pdu/` | RDP PDUs | [MS-RDPBCGR] | All RDP message types |
+| `rdpedisp/` | RDPEDISP | [MS-RDPEDISP] | Display resolution control |
+| `rdpemt/` | RDPEMT | [MS-RDPEMT] | Multitransport extension |
+| `rdpeudp/` | RDPEUDP | [MS-RDPEUDP] | UDP transport packets |
 | `tpkt/` | TPKT | RFC 1006 | TCP framing |
 | `x224/` | X.224 | ISO 8073 | Connection layer |
 
@@ -118,9 +122,29 @@ The `encoding/` package provides:
 
 ## References
 
-- **MS-RDPBCGR** - RDP Basic Connectivity and Graphics Remoting
-- **MS-RDPEA** - Audio Output Virtual Channel Extension
+### Microsoft Protocol Specifications
+
+- **[MS-RDPBCGR]** - RDP Basic Connectivity and Graphics Remoting
+  - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/
+- **[MS-RDPEA]** - Audio Output Virtual Channel Extension
+  - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpea/
+- **[MS-RDPEDYC]** - Dynamic Channel Virtual Channel Extension
+  - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/
+- **[MS-RDPEDISP]** - Display Control Virtual Channel Extension
+  - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedisp/
+- **[MS-RDPEMT]** - Multitransport Extension
+  - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpemt/
+- **[MS-RDPEUDP]** - UDP Transport Extension
+  - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp/
+- **[MS-RDPEUDP2]** - UDP Transport Extension Version 2
+  - https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/
+
+### ITU Standards
+
 - **ITU T.124** - Generic Conference Control
 - **ITU T.125** - Multi-Channel Service
-- **ISO 8073** - Connection-Oriented Transport Protocol
-- **RFC 1006** - ISO Transport over TCP
+
+### ISO/RFC Standards
+
+- **ISO 8073** - Connection-Oriented Transport Protocol (X.224)
+- **RFC 1006** - ISO Transport over TCP (TPKT)

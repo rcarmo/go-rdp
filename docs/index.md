@@ -9,10 +9,13 @@ This folder contains the long-form documentation for the project.
 - [Debugging](debugging.md) - Logging, capabilities, and troubleshooting guide
 - [NSCodec](NSCODEC.md) - Bitmap codec implementation details
 - [RemoteFX](REMOTEFX.md) - RemoteFX wavelet codec implementation
+- [WebGL](webgl.md) - WebGL rendering implementation
 
 ## Package Documentation
 
 Each Go package has its own README with implementation details:
+
+### Core Packages
 
 - `internal/auth/` - NTLM/CredSSP authentication
 - `internal/codec/` - Bitmap compression (RLE, NSCodec)
@@ -20,9 +23,27 @@ Each Go package has its own README with implementation details:
 - `internal/config/` - Configuration management
 - `internal/handler/` - WebSocket connection handling
 - `internal/logging/` - Leveled logging system
-- `internal/protocol/` - RDP protocol layers
 - `internal/rdp/` - RDP client implementation
-- `web/src/wasm/` - WebAssembly codecs (RLE, NSCodec, RemoteFX)
+
+### Protocol Packages
+
+- `internal/protocol/` - Protocol layer overview
+- `internal/protocol/audio/` - Audio virtual channel (MS-RDPEA)
+- `internal/protocol/drdynvc/` - Dynamic virtual channels (MS-RDPEDYC)
+- `internal/protocol/encoding/` - BER/PER ASN.1 encoding
+- `internal/protocol/fastpath/` - FastPath optimization
+- `internal/protocol/gcc/` - Generic Conference Control (T.124)
+- `internal/protocol/mcs/` - Multi-Channel Service (T.125)
+- `internal/protocol/pdu/` - RDP Protocol Data Units
+- `internal/protocol/rdpedisp/` - Display control (MS-RDPEDISP)
+- `internal/protocol/rdpemt/` - Multitransport (MS-RDPEMT)
+- `internal/protocol/rdpeudp/` - UDP transport packets (MS-RDPEUDP)
+- `internal/protocol/tpkt/` - TPKT framing (RFC 1006)
+- `internal/protocol/x224/` - Connection layer (ISO 8073)
+
+### Transport Packages
+
+- `internal/transport/udp/` - UDP transport layer
 
 ## JavaScript Modules
 
@@ -32,3 +53,24 @@ Each Go package has its own README with implementation details:
   - `graphics.js` - Canvas rendering
   - `audio.js` - Audio redirection
   - `session.js` - Connection management
+
+## Protocol References
+
+Microsoft Open Specifications:
+
+| Protocol | Description | Link |
+|----------|-------------|------|
+| MS-RDPBCGR | Basic Connectivity and Graphics Remoting | [Spec](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/) |
+| MS-RDPEA | Audio Output Virtual Channel Extension | [Spec](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpea/) |
+| MS-RDPEDYC | Dynamic Channel Virtual Channel Extension | [Spec](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/) |
+| MS-RDPEDISP | Display Control Virtual Channel Extension | [Spec](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedisp/) |
+| MS-RDPEMT | Multitransport Extension | [Spec](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpemt/) |
+| MS-RDPEUDP | UDP Transport Extension | [Spec](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp/) |
+| MS-RDPEUDP2 | UDP Transport Extension Version 2 | [Spec](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/) |
+
+Other Standards:
+
+- **ITU T.124** - Generic Conference Control
+- **ITU T.125** - Multi-Channel Service Protocol
+- **ISO 8073** - Connection-Oriented Transport Protocol (X.224)
+- **RFC 1006** - ISO Transport Service on top of TCP
