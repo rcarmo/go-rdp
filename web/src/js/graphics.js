@@ -48,6 +48,7 @@ export const GraphicsMixin = {
         this._bytesReceived = 0;
         this._statsInterval = null;
         this._activeDecoder = null;
+        this._imageEncodingLogged = false;
         
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
@@ -291,6 +292,7 @@ export const GraphicsMixin = {
         const bytesPerPixel = bpp / 8;
         const rowDelta = width * bytesPerPixel;
         const isCompressed = bitmapData.isCompressed();
+        const encoding = isCompressed ? 'RLE/Planar' : 'Raw Bitmap';
         
         let rgba = new Uint8ClampedArray(size * 4);
         const srcData = new Uint8Array(bitmapData.bitmapDataStream);
@@ -300,6 +302,14 @@ export const GraphicsMixin = {
             const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
             
             if (result) {
+                if (!this._imageEncodingLogged) {
+                    this._imageEncodingLogged = true;
+                    console.info(
+                        '%c[RDP Session] Image encoding',
+                        'color: #03A9F4; font-weight: bold',
+                        `${encoding} (${bpp}bpp)`
+                    );
+                }
                 this.setActiveDecoder('WASM');
                 this.ctx.putImageData(
                     new ImageData(rgba, width, height),
@@ -325,6 +335,14 @@ export const GraphicsMixin = {
         const fallbackResult = FallbackCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba);
         
         if (fallbackResult) {
+            if (!this._imageEncodingLogged) {
+                this._imageEncodingLogged = true;
+                console.info(
+                    '%c[RDP Session] Image encoding',
+                    'color: #03A9F4; font-weight: bold',
+                    `${encoding} (${bpp}bpp)`
+                );
+            }
             this.setActiveDecoder('JS-Fallback');
             this.ctx.putImageData(
                 new ImageData(rgba, width, height),

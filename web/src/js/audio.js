@@ -11,6 +11,7 @@ const AudioMixin = {
         this.audioPlaying = false;
         this.audioGain = null;
         this.audioVolume = 1.0;
+        this._audioEncodingLogged = false;
         
         // Audio buffer settings
         this.audioBufferSize = 4096;
@@ -102,7 +103,16 @@ const AudioMixin = {
             this.audioBitsPerSample = bitsPerSample;
             offset = 12;
             
-            Logger.debug('Audio', `Format: ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`);
+            const encoding = `PCM ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`;
+            Logger.debug('Audio', `Format: ${encoding}`);
+            if (!this._audioEncodingLogged) {
+                this._audioEncodingLogged = true;
+                console.info(
+                    '%c[RDP Session] Audio encoding',
+                    'color: #03A9F4; font-weight: bold',
+                    encoding
+                );
+            }
         }
 
         // Get PCM data
