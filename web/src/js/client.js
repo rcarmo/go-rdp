@@ -48,6 +48,7 @@ function Client(websocketURL, canvasID, hostID, userID, passwordID) {
     this.pointerCacheCanvasCtx = this.pointerCacheCanvas.getContext("2d");
     this.connected = false;
     this.socket = null;
+    this.renderer = null;
     
     // Initialize all mixins
     this.initSession();
@@ -356,6 +357,9 @@ Client.prototype.deinitialize = function() {
     this.clearAllTimeouts();
     this.clearBitmapCache();
     this.disableAudio();
+    if (this.renderer && typeof this.renderer.destroy === 'function') {
+        this.renderer.destroy();
+    }
 
     // Dim canvas and restore default cursor to indicate disconnection
     this.canvas.style.opacity = '0.5';

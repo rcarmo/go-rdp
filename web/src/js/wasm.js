@@ -332,9 +332,9 @@ export class RFXDecoder {
     }
     
     /**
-     * Decode a tile and render directly to canvas context
+     * Decode a tile and render directly to a Canvas 2D or WebGL renderer context.
      * @param {Uint8Array} tileData - CBT_TILE block data
-     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {Object} ctx - CanvasRenderingContext2D or WebGLRenderer
      * @returns {boolean}
      */
     decodeTileToCanvas(tileData, ctx) {
@@ -342,13 +342,18 @@ export class RFXDecoder {
         if (!result) {
             return false;
         }
-        
+
+        const rgba = new Uint8ClampedArray(this.tileBuffer);
+        if (ctx && typeof ctx.drawRGBA === 'function') {
+            return ctx.drawRGBA(result.x, result.y, result.width, result.height, rgba);
+        }
+
+        if (!ctx || typeof ctx.putImageData !== 'function') {
+            return false;
+        }
+
         // Copy buffer to avoid data corruption if called again before render
-        const imageData = new ImageData(
-            new Uint8ClampedArray(this.tileBuffer),  // Creates a copy
-            result.width,
-            result.height
-        );
+        const imageData = new ImageData(rgba, result.width, result.height);
         ctx.putImageData(imageData, result.x, result.y);
         return true;
     }

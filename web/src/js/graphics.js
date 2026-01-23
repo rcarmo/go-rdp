@@ -8,6 +8,8 @@ import { Logger } from './logger.js';
 import { WASMCodec, RFXDecoder } from './wasm.js';
 import { FallbackCodec } from './codec-fallback.js';
 import { parseNewPointerUpdate, parseCachedPointerUpdate, parsePointerPositionUpdate, parseBitmapUpdate } from './protocol.js';
+import { CanvasRenderer } from './renderer.js';
+import { WebGLRenderer } from './webgl-renderer.js';
 
 /**
  * Graphics handling mixin - adds graphics functionality to Client
@@ -49,6 +51,7 @@ export const GraphicsMixin = {
         this._statsInterval = null;
         this._activeDecoder = null;
         this._imageEncodingLogged = false;
+        this._activeRenderer = null;
         
         // Bind resize handler
         this.handleResize = this.handleResize.bind(this);
@@ -57,6 +60,29 @@ export const GraphicsMixin = {
         if (!WASMCodec.isSupported()) {
             Logger.debug('Graphics', 'WebAssembly not available - using JS fallback');
         }
+
+        this.initRenderer();
+    },
+
+    /**
+     * Initialize renderer (WebGL preferred, Canvas fallback)
+     */
+    initRenderer() {
+        const webglRenderer = new WebGLRenderer(this.canvas);
+        if (webglRenderer.init()) {
+            this.renderer = webglRenderer;
+            this._activeRenderer = `WebGL${webglRenderer.webglVersion}`;
+            return;
+        }
+        const canvasRenderer = new CanvasRenderer(this.canvas);
+        canvasRenderer.init();
+        this.renderer = canvasRenderer;
+        this._activeRenderer = 'Canvas2D';
+        console.info(
+            '%c[RDP Client] Active renderer',
+            'color: #FF9800; font-weight: bold',
+            this._activeRenderer
+        );
     },
     
     /**
@@ -268,6 +294,9 @@ export const GraphicsMixin = {
             this.showCanvas();
             this.canvasShown = true;
             this.startPerfStats();
+            if (this.renderer && typeof this.renderer.resize === 'function') {
+                this.renderer.resize(this.canvas.width, this.canvas.height);
+            }
         }
         
         if (this.multiMonitorMode && !this.multiMonitorMessageShown) {
@@ -311,10 +340,12 @@ export const GraphicsMixin = {
                     );
                 }
                 this.setActiveDecoder('WASM');
-                this.ctx.putImageData(
-                    new ImageData(rgba, width, height),
+                this.renderer.drawRGBA(
                     bitmapData.destLeft,
-                    bitmapData.destTop
+                    bitmapData.destTop,
+                    width,
+                    height,
+                    rgba
                 );
                 
                 if (this.bitmapCacheEnabled) {
@@ -344,10 +375,12 @@ export const GraphicsMixin = {
                 );
             }
             this.setActiveDecoder('JS-Fallback');
-            this.ctx.putImageData(
-                new ImageData(rgba, width, height),
+            this.renderer.drawRGBA(
                 bitmapData.destLeft,
-                bitmapData.destTop
+                bitmapData.destTop,
+                width,
+                height,
+                rgba
             );
             
             if (this.bitmapCacheEnabled) {
@@ -589,7 +622,11 @@ export const GraphicsMixin = {
      * Clear the canvas
      */
     clearCanvas() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.renderer) {
+            this.renderer.clear();
+        } else {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
         this.canvas.className = '';
     },
     
@@ -628,7 +665,8 @@ export const GraphicsMixin = {
      * @returns {boolean}
      */
     decodeRFXTile(tileData) {
-        return this.rfxDecoder.decodeTileToCanvas(tileData, this.ctx);
+        const ctx = this.renderer?.getContext ? this.renderer.getContext() : this.ctx;
+        return this.rfxDecoder.decodeTileToCanvas(tileData, ctx);
     },
     
     /**
@@ -640,7 +678,8 @@ export const GraphicsMixin = {
         let failed = 0;
         
         for (const tileData of tiles) {
-            if (this.rfxDecoder.decodeTileToCanvas(tileData, this.ctx)) {
+            const ctx = this.renderer?.getContext ? this.renderer.getContext() : this.ctx;
+            if (this.rfxDecoder.decodeTileToCanvas(tileData, ctx)) {
                 decoded++;
             } else {
                 failed++;
