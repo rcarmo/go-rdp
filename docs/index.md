@@ -74,3 +74,19 @@ Other Standards:
 - **ITU T.125** - Multi-Channel Service Protocol
 - **ISO 8073** - Connection-Oriented Transport Protocol (X.224)
 - **RFC 1006** - ISO Transport Service on top of TCP
+
+## Testing & Spec Compliance
+
+The test suite includes Microsoft Protocol Test Suite validation tests based on:
+- [WindowsProtocolTestSuites](https://github.com/microsoft/WindowsProtocolTestSuites/tree/main/TestSuites/RDP/Client/docs)
+
+| Test Suite | Coverage |
+|------------|----------|
+| MS-RDPBCGR | S1_Connection, S4_SlowPathInput, S5_FastPathInput, S7_VirtualChannel, S10_FastPathOutput |
+| MS-RDPEDISP | Monitor layout validation, orientation, resolution |
+| MS-RDPRFX | Frame structures, tile encoding, RLGR modes |
+| MS-RDPEUDP | SYN, ACK, MTU, retransmission |
+| MS-RDPEMT | Tunnel header, request/response |
+| MS-NLMP | NTLM message types, negotiate flags |
+
+Run tests with: `make test`
