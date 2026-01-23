@@ -70,14 +70,44 @@ const (
 	// MaxRetransmitCount is the max SYN/SYN+ACK retransmit attempts (3-5 per spec)
 	MaxRetransmitCount = 3
 
-	// RetransmitTimeout is the initial retransmit timeout
-	RetransmitTimeout = 200 * time.Millisecond
+	// MaxDataRetransmitCount is max data packet retransmit attempts before close
+	// Per MS-RDPEUDP Section 3.1.6.1: "at least three and no more than five times"
+	MaxDataRetransmitCount = 5
 
-	// KeepaliveTimeout is the timeout before sending keepalive
+	// RetransmitTimeoutV1 is the minimum retransmit timeout for protocol version 1
+	// Per MS-RDPEUDP Section 3.1.6.1: "500 ms"
+	RetransmitTimeoutV1 = 500 * time.Millisecond
+
+	// RetransmitTimeoutV2 is the minimum retransmit timeout for protocol version 2+
+	// Per MS-RDPEUDP Section 3.1.6.1: "300 ms"
+	RetransmitTimeoutV2 = 300 * time.Millisecond
+
+	// KeepaliveTimeout is the timeout before connection is considered dead
+	// Per MS-RDPEUDP Section 3.1.1.9: "65 seconds"
 	KeepaliveTimeout = 65 * time.Second
+
+	// KeepaliveInterval is how often to send keepalive ACKs
+	// Should be less than KeepaliveTimeout to keep NAT mappings alive
+	KeepaliveInterval = 30 * time.Second
+
+	// DelayedACKTimeout is the max delay before sending a pending ACK
+	// Per MS-RDPEUDP Section 3.1.6.3
+	DelayedACKTimeout = 200 * time.Millisecond
 
 	// ConnectionTimeout is the max time to wait for connection establishment
 	ConnectionTimeout = 10 * time.Second
+
+	// LostPacketThreshold is number of later packets received before marking lost
+	// Per MS-RDPEUDP Section 3.1.1.4.1: "three other datagrams"
+	LostPacketThreshold = 3
+)
+
+// ACK vector element states per MS-RDPEUDP Section 2.2.1.1
+const (
+	AckStateReceived   uint8 = 0 // DATAGRAM_RECEIVED
+	AckStateReserved1  uint8 = 1 // Not used
+	AckStateReserved2  uint8 = 2 // Not used
+	AckStateNotReceived uint8 = 3 // DATAGRAM_NOT_YET_RECEIVED
 )
 
 // Errors
@@ -146,7 +176,9 @@ type Connection struct {
 	nextExpectSeq uint32 // Next sequence number we expect to receive
 
 	// Acknowledgment tracking
-	lastAckedSeq uint32 // Last sequence number acknowledged by peer
+	lastAckedSeq   uint32 // Last sequence number acknowledged by peer
+	highestRecvSeq uint32 // Highest sequence number received (for ACK vector)
+	pendingAck     bool   // Whether we have a pending ACK to send
 
 	// MTU negotiation results
 	upstreamMTU   uint16
@@ -158,6 +190,12 @@ type Connection struct {
 	// Retransmission state
 	synRetryCount int
 	lastSendTime  time.Time
+	lastRecvTime  time.Time // For keepalive tracking
+	rtt           time.Duration // Round-trip time estimate
+
+	// Congestion control
+	congestionWindow int      // Current congestion window size
+	congestionNotify bool     // Need to send CN flag
 
 	// Receive buffer for out-of-order packets
 	recvBuffer map[uint32][]byte
@@ -171,6 +209,11 @@ type Connection struct {
 	closedOnce  sync.Once
 	established chan struct{}
 
+	// Timers
+	keepaliveTimer    *time.Timer
+	retransmitTimer   *time.Timer
+	delayedAckTimer   *time.Timer
+
 	// Statistics
 	stats ConnectionStats
 }
@@ -181,16 +224,19 @@ type sentPacket struct {
 	seqNum     uint32
 	sentTime   time.Time
 	retryCount int
+	nextRetry  time.Time // When to next retry
 }
 
 // ConnectionStats holds connection statistics
 type ConnectionStats struct {
-	PacketsSent     uint64
-	PacketsReceived uint64
-	BytesSent       uint64
-	BytesReceived   uint64
-	Retransmits     uint64
-	PacketsLost     uint64
+	PacketsSent       uint64
+	PacketsReceived   uint64
+	BytesSent         uint64
+	BytesReceived     uint64
+	Retransmits       uint64
+	PacketsLost       uint64
+	RTT               time.Duration // Current RTT estimate
+	CongestionEvents  uint64
 }
 
 // NewConnection creates a new RDPEUDP connection
@@ -205,13 +251,15 @@ func NewConnection(config *Config) (*Connection, error) {
 	}
 
 	c := &Connection{
-		config:      config,
-		state:       StateClosed,
-		recvBuffer:  make(map[uint32][]byte),
-		sendBuffer:  make(map[uint32]*sentPacket),
-		recvChan:    make(chan []byte, 256),
-		closeChan:   make(chan struct{}),
-		established: make(chan struct{}),
+		config:           config,
+		state:            StateClosed,
+		recvBuffer:       make(map[uint32][]byte),
+		sendBuffer:       make(map[uint32]*sentPacket),
+		recvChan:         make(chan []byte, 256),
+		closeChan:        make(chan struct{}),
+		established:      make(chan struct{}),
+		rtt:              RetransmitTimeoutV2, // Initial estimate
+		congestionWindow: 16, // Initial cwnd
 	}
 
 	// Generate random initial sequence number per spec Section 3.1.5.1.1
@@ -299,6 +347,9 @@ func (c *Connection) Connect(ctx context.Context) error {
 func (c *Connection) sendSyn(ctx context.Context) error {
 	synPacket := c.buildSynPacket()
 
+	// Get version-appropriate timeout
+	baseTimeout := c.getRetransmitTimeout()
+
 	for c.synRetryCount < MaxRetransmitCount {
 		c.mu.Lock()
 		if c.state != StateSynSent {
@@ -317,8 +368,9 @@ func (c *Connection) sendSyn(ctx context.Context) error {
 		c.lastSendTime = time.Now()
 		c.mu.Unlock()
 
-		// Wait for SYN+ACK or timeout
-		timer := time.NewTimer(RetransmitTimeout * time.Duration(1<<c.synRetryCount))
+		// Wait for SYN+ACK or timeout with exponential backoff
+		timeout := baseTimeout * time.Duration(1<<uint(c.synRetryCount-1))
+		timer := time.NewTimer(timeout)
 		select {
 		case <-c.established:
 			timer.Stop()
@@ -336,6 +388,29 @@ func (c *Connection) sendSyn(ctx context.Context) error {
 	}
 
 	return ErrConnectionFailed
+}
+
+// getRetransmitTimeout returns the minimum retransmit timeout based on protocol version
+// Per MS-RDPEUDP Section 3.1.6.1
+func (c *Connection) getRetransmitTimeout() time.Duration {
+	c.mu.RLock()
+	version := c.config.ProtocolVersion
+	rtt := c.rtt
+	c.mu.RUnlock()
+
+	var minTimeout time.Duration
+	if version >= rdpeudp.ProtocolVersion2 {
+		minTimeout = RetransmitTimeoutV2
+	} else {
+		minTimeout = RetransmitTimeoutV1
+	}
+
+	// Per spec: "minimum retransmit time-out or twice the RTT, whichever is longer"
+	rttTimeout := 2 * rtt
+	if rttTimeout > minTimeout {
+		return rttTimeout
+	}
+	return minTimeout
 }
 
 // buildSynPacket constructs a SYN packet per MS-RDPEUDP Section 3.1.5.1.1
@@ -382,6 +457,10 @@ func (c *Connection) handleReceivedPacket(data []byte) {
 
 	c.stats.PacketsReceived++
 	c.stats.BytesReceived += uint64(len(data))
+	c.lastRecvTime = time.Now() // Update keepalive timestamp
+
+	// Reset keepalive timer
+	c.resetKeepaliveTimer()
 
 	switch c.state {
 	case StateSynSent:
@@ -405,10 +484,17 @@ func (c *Connection) handleSynSentState(packet *rdpeudp.Packet) {
 		return
 	}
 
+	// Calculate initial RTT estimate from SYN-SYN/ACK timing
+	if !c.lastSendTime.IsZero() {
+		c.rtt = time.Since(c.lastSendTime)
+		c.stats.RTT = c.rtt
+	}
+
 	// Store remote sequence number
 	if packet.SynData != nil {
 		c.remoteSeqNum = packet.SynData.SnInitialSequenceNumber
 		c.nextExpectSeq = c.remoteSeqNum + 1
+		c.highestRecvSeq = c.remoteSeqNum
 
 		// Negotiate MTU (minimum of both)
 		c.upstreamMTU = minUint16(c.config.MTU, packet.SynData.UpstreamMTU)
@@ -429,12 +515,27 @@ func (c *Connection) handleSynSentState(packet *rdpeudp.Packet) {
 	// Signal established
 	close(c.established)
 
+	// Start keepalive timer
+	c.startKeepaliveTimer()
+
 	// Send ACK packet
 	go c.sendAck()
 }
 
 // handleEstablishedState handles packets in ESTABLISHED state
 func (c *Connection) handleEstablishedState(packet *rdpeudp.Packet) {
+	// Process congestion notification
+	if packet.Header.HasFlag(rdpeudp.FlagCN) {
+		// Peer detected congestion - reduce our send rate
+		c.handleCongestionNotification()
+	}
+
+	// Process congestion window reset acknowledgment
+	if packet.Header.HasFlag(rdpeudp.FlagCWR) {
+		// Peer acknowledged our CN, stop sending CN flags
+		c.congestionNotify = false
+	}
+
 	// Process ACK
 	if packet.Header.HasFlag(rdpeudp.FlagACK) {
 		c.processAck(packet)
@@ -450,6 +551,17 @@ func (c *Connection) handleEstablishedState(packet *rdpeudp.Packet) {
 		c.state = StateClosed
 		c.closedOnce.Do(func() { close(c.closeChan) })
 	}
+}
+
+// handleCongestionNotification handles CN flag from peer
+// Per MS-RDPEUDP Section 3.1.1.6
+func (c *Connection) handleCongestionNotification() {
+	// Reduce congestion window (multiplicative decrease)
+	c.congestionWindow = c.congestionWindow / 2
+	if c.congestionWindow < 1 {
+		c.congestionWindow = 1
+	}
+	c.stats.CongestionEvents++
 }
 
 // processAck processes acknowledgment in received packet
@@ -473,9 +585,67 @@ func (c *Connection) processAck(packet *rdpeudp.Packet) {
 }
 
 // processAckVector processes selective ACK information
+// Per MS-RDPEUDP Section 2.2.2.7 and 3.1.1.4.1
 func (c *Connection) processAckVector(ackVector *rdpeudp.AckVector) {
-	// TODO: Implement selective ACK processing
-	// Parse RLE-encoded ACK vector to determine which packets need retransmission
+	if ackVector == nil || len(ackVector.AckVectorElements) == 0 {
+		return
+	}
+
+	// ACK vector is RLE-encoded starting from snSourceAck and going backwards
+	// Each element: 2 bits state, 6 bits length
+	currentSeq := c.lastAckedSeq
+	lostPackets := make([]uint32, 0)
+
+	for _, element := range ackVector.AckVectorElements {
+		state := (element >> 6) & 0x03  // Top 2 bits
+		length := int(element & 0x3F)   // Bottom 6 bits (0-63)
+
+		// Process 'length + 1' packets with this state
+		for i := 0; i <= length; i++ {
+			switch state {
+			case AckStateReceived:
+				// Packet received, remove from send buffer
+				delete(c.sendBuffer, currentSeq)
+			case AckStateNotReceived:
+				// Packet not received, schedule retransmission
+				if pkt, ok := c.sendBuffer[currentSeq]; ok {
+					lostPackets = append(lostPackets, pkt.seqNum)
+				}
+			}
+			currentSeq-- // ACK vector goes backwards
+		}
+	}
+
+	// Retransmit lost packets
+	for _, seqNum := range lostPackets {
+		c.retransmitPacket(seqNum)
+	}
+}
+
+// retransmitPacket retransmits a packet by sequence number
+func (c *Connection) retransmitPacket(seqNum uint32) {
+	pkt, ok := c.sendBuffer[seqNum]
+	if !ok {
+		return
+	}
+
+	// Check retry count per MS-RDPEUDP Section 3.1.6.1
+	if pkt.retryCount >= MaxDataRetransmitCount {
+		// Connection should be terminated
+		c.state = StateClosed
+		c.closedOnce.Do(func() { close(c.closeChan) })
+		return
+	}
+
+	pkt.retryCount++
+	pkt.sentTime = time.Now()
+	pkt.nextRetry = time.Now().Add(c.getRetransmitTimeout())
+	c.stats.Retransmits++
+
+	// Re-send the packet data
+	if c.conn != nil && len(pkt.data) > 0 {
+		c.conn.Write(pkt.data)
+	}
 }
 
 // processData processes incoming data payload
@@ -485,6 +655,19 @@ func (c *Connection) processData(packet *rdpeudp.Packet) {
 	}
 
 	seqNum := packet.SourcePayload.SnSourceStart
+
+	// Track highest received for ACK vector generation
+	if seqNum > c.highestRecvSeq {
+		// Detect gaps (potential packet loss)
+		if seqNum > c.highestRecvSeq+1 {
+			// We missed some packets - set congestion notify flag
+			c.congestionNotify = true
+		}
+		c.highestRecvSeq = seqNum
+	}
+
+	// Mark that we have data to acknowledge
+	c.pendingAck = true
 
 	// Check if this is the next expected packet
 	if seqNum == c.nextExpectSeq {
@@ -516,18 +699,106 @@ func (c *Connection) processData(packet *rdpeudp.Packet) {
 		c.recvBuffer[seqNum] = packet.Data
 	}
 	// If seqNum < nextExpectSeq, it's a duplicate, ignore
+
+	// Start delayed ACK timer if not already running
+	c.startDelayedAckTimer()
 }
 
 // sendAck sends an ACK packet
+// Per MS-RDPEUDP Section 3.1.5.2.1
 func (c *Connection) sendAck() error {
-	c.mu.RLock()
-	ackPacket := rdpeudp.NewACKPacket(
-		c.nextExpectSeq-1, // ACK the last received sequence
-		c.config.ReceiveWindowSize,
-	)
-	c.mu.RUnlock()
+	c.mu.Lock()
+	ackPacket := c.buildAckPacket()
+	c.pendingAck = false
+	c.mu.Unlock()
 
 	return c.sendPacket(ackPacket)
+}
+
+// buildAckPacket constructs an ACK packet with current state
+func (c *Connection) buildAckPacket() *rdpeudp.Packet {
+	packet := rdpeudp.NewACKPacket(
+		c.highestRecvSeq, // ACK the highest received sequence
+		c.config.ReceiveWindowSize,
+	)
+
+	// Add congestion notification if we detected loss
+	// Per MS-RDPEUDP Section 2.2.2.1
+	if c.congestionNotify {
+		packet.Header.Flags |= rdpeudp.FlagCN
+	}
+
+	// Build ACK vector for selective acknowledgment
+	packet.AckVector = c.buildAckVector()
+
+	return packet
+}
+
+// buildAckVector builds an RLE-encoded ACK vector
+// Per MS-RDPEUDP Section 3.1.1.4.1
+func (c *Connection) buildAckVector() *rdpeudp.AckVector {
+	if c.highestRecvSeq == 0 || c.nextExpectSeq == 0 {
+		return nil
+	}
+
+	// Calculate how many packets to represent
+	// From highestRecvSeq going backwards to nextExpectSeq
+	if c.highestRecvSeq < c.nextExpectSeq {
+		return nil
+	}
+
+	elements := make([]uint8, 0)
+	currentState := AckStateReceived
+	runLength := 0
+
+	// Go backwards from highestRecvSeq
+	for seq := c.highestRecvSeq; seq >= c.nextExpectSeq && len(elements) < 2048; seq-- {
+		var state uint8
+		if seq < c.nextExpectSeq {
+			// Already received and delivered
+			state = AckStateReceived
+		} else if _, ok := c.recvBuffer[seq]; ok {
+			// Buffered (received out of order)
+			state = AckStateReceived
+		} else if seq == c.highestRecvSeq || seq < c.nextExpectSeq {
+			state = AckStateReceived
+		} else {
+			// Not received
+			state = AckStateNotReceived
+		}
+
+		if state == currentState && runLength < 63 {
+			runLength++
+		} else {
+			// Flush current run
+			if runLength > 0 {
+				element := (currentState << 6) | uint8(runLength-1)
+				elements = append(elements, element)
+			}
+			currentState = state
+			runLength = 1
+		}
+
+		// Prevent underflow
+		if seq == 0 {
+			break
+		}
+	}
+
+	// Flush final run
+	if runLength > 0 {
+		element := (currentState << 6) | uint8(runLength-1)
+		elements = append(elements, element)
+	}
+
+	if len(elements) == 0 {
+		return nil
+	}
+
+	return &rdpeudp.AckVector{
+		AckVectorSize:     uint16(len(elements)),
+		AckVectorElements: elements,
+	}
 }
 
 // sendPacket serializes and sends a packet
@@ -617,12 +888,23 @@ func (c *Connection) Write(b []byte) (int, error) {
 
 	packet := rdpeudp.NewDataPacket(seqNum, seqNum, b)
 
+	// Serialize the packet for potential retransmission
+	data, err := packet.Serialize()
+	if err != nil {
+		return 0, err
+	}
+
 	// Add to send buffer for potential retransmission
+	now := time.Now()
 	c.mu.Lock()
 	c.sendBuffer[seqNum] = &sentPacket{
-		seqNum:   seqNum,
-		sentTime: time.Now(),
+		data:      data,
+		seqNum:    seqNum,
+		sentTime:  now,
+		nextRetry: now.Add(c.getRetransmitTimeout()),
 	}
+	// Start retransmit timer if not running
+	c.startRetransmitTimer()
 	c.mu.Unlock()
 
 	if err := c.sendPacket(packet); err != nil {
@@ -640,6 +922,9 @@ func (c *Connection) Close() error {
 	if c.state == StateClosed {
 		return nil
 	}
+
+	// Stop all timers
+	c.stopTimers()
 
 	// Send FIN if established
 	if c.state == StateEstablished {
@@ -684,4 +969,150 @@ func minUint16(a, b uint16) uint16 {
 // ReadUint32LE reads a little-endian uint32 from bytes
 func ReadUint32LE(b []byte) uint32 {
 	return binary.LittleEndian.Uint32(b)
+}
+
+// Timer management functions
+
+// startKeepaliveTimer starts the keepalive timer
+// Per MS-RDPEUDP Section 3.1.1.9 and 3.1.6.2
+func (c *Connection) startKeepaliveTimer() {
+	if c.keepaliveTimer != nil {
+		c.keepaliveTimer.Stop()
+	}
+	c.keepaliveTimer = time.AfterFunc(KeepaliveInterval, func() {
+		c.onKeepaliveTimer()
+	})
+}
+
+// resetKeepaliveTimer resets the keepalive timer after receiving data
+func (c *Connection) resetKeepaliveTimer() {
+	if c.keepaliveTimer != nil {
+		c.keepaliveTimer.Stop()
+		c.keepaliveTimer.Reset(KeepaliveInterval)
+	}
+}
+
+// onKeepaliveTimer handles keepalive timer expiration
+// Per MS-RDPEUDP Section 3.1.6.2: send ACK to keep connection alive
+func (c *Connection) onKeepaliveTimer() {
+	c.mu.RLock()
+	state := c.state
+	lastRecv := c.lastRecvTime
+	c.mu.RUnlock()
+
+	if state != StateEstablished {
+		return
+	}
+
+	// Check if we've exceeded the 65-second timeout without receiving anything
+	if !lastRecv.IsZero() && time.Since(lastRecv) > KeepaliveTimeout {
+		// Connection dead - close it
+		c.Close()
+		return
+	}
+
+	// Send keepalive ACK
+	c.sendAck()
+
+	// Restart timer
+	c.mu.Lock()
+	c.startKeepaliveTimer()
+	c.mu.Unlock()
+}
+
+// startDelayedAckTimer starts the delayed ACK timer
+// Per MS-RDPEUDP Section 3.1.6.3
+func (c *Connection) startDelayedAckTimer() {
+	if c.delayedAckTimer != nil {
+		return // Already running
+	}
+	c.delayedAckTimer = time.AfterFunc(DelayedACKTimeout, func() {
+		c.onDelayedAckTimer()
+	})
+}
+
+// onDelayedAckTimer handles delayed ACK timer expiration
+func (c *Connection) onDelayedAckTimer() {
+	c.mu.Lock()
+	c.delayedAckTimer = nil
+	hasPending := c.pendingAck
+	c.mu.Unlock()
+
+	if hasPending {
+		c.sendAck()
+	}
+}
+
+// startRetransmitTimer starts the retransmit timer for data packets
+func (c *Connection) startRetransmitTimer() {
+	if c.retransmitTimer != nil {
+		return
+	}
+	timeout := c.getRetransmitTimeout()
+	c.retransmitTimer = time.AfterFunc(timeout, func() {
+		c.onRetransmitTimer()
+	})
+}
+
+// onRetransmitTimer handles retransmit timer expiration
+// Per MS-RDPEUDP Section 3.1.6.1
+func (c *Connection) onRetransmitTimer() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.retransmitTimer = nil
+	if c.state != StateEstablished {
+		return
+	}
+
+	now := time.Now()
+	hasOutstanding := false
+
+	// Check all packets in send buffer for retransmission
+	for seqNum, pkt := range c.sendBuffer {
+		if now.After(pkt.nextRetry) {
+			if pkt.retryCount >= MaxDataRetransmitCount {
+				// Too many retransmissions - close connection
+				c.state = StateClosed
+				c.closedOnce.Do(func() { close(c.closeChan) })
+				return
+			}
+
+			// Retransmit
+			pkt.retryCount++
+			pkt.sentTime = now
+			pkt.nextRetry = now.Add(c.getRetransmitTimeout())
+			c.stats.Retransmits++
+
+			if c.conn != nil && len(pkt.data) > 0 {
+				c.conn.Write(pkt.data)
+			}
+		}
+
+		if pkt.seqNum > c.lastAckedSeq {
+			hasOutstanding = true
+		}
+		_ = seqNum // Silence unused warning
+	}
+
+	// Restart timer if we still have outstanding packets
+	if hasOutstanding {
+		c.startRetransmitTimer()
+	}
+}
+
+// stopTimers stops all running timers
+func (c *Connection) stopTimers() {
+	if c.keepaliveTimer != nil {
+		c.keepaliveTimer.Stop()
+		c.keepaliveTimer = nil
+	}
+	if c.retransmitTimer != nil {
+		c.retransmitTimer.Stop()
+		c.retransmitTimer = nil
+	}
+	if c.delayedAckTimer != nil {
+		c.delayedAckTimer.Stop()
+		c.delayedAckTimer = nil
+	}
 }

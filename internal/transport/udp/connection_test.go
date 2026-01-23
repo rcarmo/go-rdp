@@ -400,3 +400,249 @@ func TestBuildSynPacket_Lossy(t *testing.T) {
 		t.Error("Lossy SYN should have SYNLOSSY flag")
 	}
 }
+
+// ============================================================================
+// Retransmission Timer Tests
+// Reference: MS-RDPEUDP Section 3.1.6.1
+// ============================================================================
+
+func TestGetRetransmitTimeout_V1(t *testing.T) {
+	cfg := &Config{
+		ProtocolVersion: rdpeudp.ProtocolVersion1,
+	}
+	conn, _ := NewConnection(cfg)
+
+	timeout := conn.getRetransmitTimeout()
+
+	// Per spec: "RDPUDP_PROTOCOL_VERSION_1: the minimum retransmit time-out is 500 ms"
+	if timeout < RetransmitTimeoutV1 {
+		t.Errorf("V1 retransmit timeout = %v, want >= %v", timeout, RetransmitTimeoutV1)
+	}
+}
+
+func TestGetRetransmitTimeout_V2(t *testing.T) {
+	cfg := &Config{
+		ProtocolVersion: rdpeudp.ProtocolVersion2,
+	}
+	conn, _ := NewConnection(cfg)
+
+	timeout := conn.getRetransmitTimeout()
+
+	// Per spec: "RDPUDP_PROTOCOL_VERSION_2: the minimum retransmit time-out is 300 ms"
+	if timeout < RetransmitTimeoutV2 {
+		t.Errorf("V2 retransmit timeout = %v, want >= %v", timeout, RetransmitTimeoutV2)
+	}
+}
+
+func TestGetRetransmitTimeout_RTTBased(t *testing.T) {
+	cfg := &Config{
+		ProtocolVersion: rdpeudp.ProtocolVersion2,
+	}
+	conn, _ := NewConnection(cfg)
+
+	// Simulate a measured RTT that's much larger than minimum
+	conn.rtt = 500 * time.Millisecond
+
+	timeout := conn.getRetransmitTimeout()
+
+	// Per spec: "minimum retransmit time-out or twice the RTT, whichever is longer"
+	expected := 2 * conn.rtt
+	if timeout != expected {
+		t.Errorf("RTT-based timeout = %v, want %v (2 * RTT)", timeout, expected)
+	}
+}
+
+// ============================================================================
+// ACK Vector Tests  
+// Reference: MS-RDPEUDP Section 2.2.2.7 and 3.1.1.4.1
+// ============================================================================
+
+func TestBuildAckVector_Empty(t *testing.T) {
+	conn, _ := NewConnection(nil)
+
+	// With no received packets, ACK vector should be nil
+	vector := conn.buildAckVector()
+	if vector != nil {
+		t.Error("ACK vector should be nil with no received packets")
+	}
+}
+
+func TestBuildAckVector_AllReceived(t *testing.T) {
+	conn, _ := NewConnection(nil)
+
+	// Simulate receiving consecutive packets
+	conn.nextExpectSeq = 100
+	conn.highestRecvSeq = 103
+	// Packets 100, 101, 102, 103 all received
+
+	vector := conn.buildAckVector()
+	if vector == nil {
+		t.Fatal("ACK vector should not be nil")
+	}
+
+	// All packets received, so first element should indicate received state
+	if len(vector.AckVectorElements) == 0 {
+		t.Fatal("ACK vector should have elements")
+	}
+
+	// Per spec: 2 bits state, 6 bits length
+	firstElement := vector.AckVectorElements[0]
+	state := (firstElement >> 6) & 0x03
+	if state != AckStateReceived {
+		t.Errorf("First element state = %d, want %d (RECEIVED)", state, AckStateReceived)
+	}
+}
+
+func TestBuildAckVector_WithGaps(t *testing.T) {
+	conn, _ := NewConnection(nil)
+
+	// Simulate receiving packets with a gap
+	conn.nextExpectSeq = 100
+	conn.highestRecvSeq = 105
+	// Put packet 103 in receive buffer (out of order)
+	conn.recvBuffer[103] = []byte("data")
+	// Packets 100, 101, 102 delivered, 103 buffered, 104 missing, 105 received
+
+	vector := conn.buildAckVector()
+	if vector == nil {
+		t.Fatal("ACK vector should not be nil")
+	}
+
+	// Should have multiple elements due to state changes
+	t.Logf("ACK vector has %d elements", len(vector.AckVectorElements))
+}
+
+func TestProcessAckVector_Basic(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.lastAckedSeq = 102 // The cumulative ACK
+
+	// Add packets to send buffer (seq 100, 101, 102)
+	conn.sendBuffer[100] = &sentPacket{seqNum: 100, data: []byte("data100")}
+	conn.sendBuffer[101] = &sentPacket{seqNum: 101, data: []byte("data101")}
+	conn.sendBuffer[102] = &sentPacket{seqNum: 102, data: []byte("data102")}
+
+	// Create ACK vector indicating packets from lastAckedSeq going backwards are received
+	// Per spec: ACK vector starts at snSourceAck (lastAckedSeq) and goes backwards
+	// Element encoding: state in top 2 bits, length in bottom 6 bits
+	// State 0 = received, length 2 means 3 packets (seq 102, 101, 100)
+	ackVector := &rdpeudp.AckVector{
+		AckVectorSize:     1,
+		AckVectorElements: []uint8{(AckStateReceived << 6) | 2}, // 3 packets received
+	}
+
+	conn.processAckVector(ackVector)
+
+	// All 3 packets should be removed from send buffer
+	// Note: The ACK vector processes from lastAckedSeq (102) backwards
+	if _, ok := conn.sendBuffer[102]; ok {
+		t.Error("Packet 102 should be removed from send buffer")
+	}
+	if _, ok := conn.sendBuffer[101]; ok {
+		t.Error("Packet 101 should be removed from send buffer")
+	}
+	if _, ok := conn.sendBuffer[100]; ok {
+		t.Error("Packet 100 should be removed from send buffer")
+	}
+}
+
+// ============================================================================
+// Congestion Control Tests
+// Reference: MS-RDPEUDP Section 3.1.1.6
+// ============================================================================
+
+func TestHandleCongestionNotification(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	initialCwnd := conn.congestionWindow
+
+	conn.handleCongestionNotification()
+
+	// Per spec: multiplicative decrease (halve the window)
+	expectedCwnd := initialCwnd / 2
+	if conn.congestionWindow != expectedCwnd {
+		t.Errorf("Congestion window = %d, want %d (half of %d)", 
+			conn.congestionWindow, expectedCwnd, initialCwnd)
+	}
+
+	// Stats should be updated
+	if conn.stats.CongestionEvents != 1 {
+		t.Errorf("CongestionEvents = %d, want 1", conn.stats.CongestionEvents)
+	}
+}
+
+func TestHandleCongestionNotification_MinWindow(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.congestionWindow = 1
+
+	conn.handleCongestionNotification()
+
+	// Window should never go below 1
+	if conn.congestionWindow < 1 {
+		t.Errorf("Congestion window = %d, should never be < 1", conn.congestionWindow)
+	}
+}
+
+// ============================================================================
+// Keepalive Timer Tests
+// Reference: MS-RDPEUDP Section 3.1.1.9 and 3.1.6.2
+// ============================================================================
+
+func TestKeepaliveTimeout_Value(t *testing.T) {
+	// Per spec: 65 seconds
+	if KeepaliveTimeout != 65*time.Second {
+		t.Errorf("KeepaliveTimeout = %v, want 65s", KeepaliveTimeout)
+	}
+}
+
+func TestConnection_LastRecvTimeTracking(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+
+	// Simulate receiving a packet
+	packet := &rdpeudp.Packet{
+		Header: rdpeudp.FECHeader{
+			Flags: rdpeudp.FlagACK,
+		},
+	}
+
+	data, _ := packet.Serialize()
+	before := time.Now()
+	conn.handleReceivedPacket(data)
+	after := time.Now()
+
+	// lastRecvTime should be updated
+	if conn.lastRecvTime.Before(before) || conn.lastRecvTime.After(after) {
+		t.Error("lastRecvTime not updated correctly on packet receive")
+	}
+}
+
+// ============================================================================
+// Connection Stats Tests
+// ============================================================================
+
+func TestConnectionStats_RTT(t *testing.T) {
+	cfg := DefaultConfig()
+	conn, _ := NewConnection(cfg)
+
+	// Initial RTT should be set to default
+	if conn.rtt != RetransmitTimeoutV2 {
+		t.Errorf("Initial RTT = %v, want %v", conn.rtt, RetransmitTimeoutV2)
+	}
+}
+
+func TestConnectionStats_CongestionEvents(t *testing.T) {
+	conn, _ := NewConnection(nil)
+
+	// Initial congestion events should be 0
+	stats := conn.Stats()
+	if stats.CongestionEvents != 0 {
+		t.Errorf("Initial CongestionEvents = %d, want 0", stats.CongestionEvents)
+	}
+
+	// After handling congestion, count should increment
+	conn.handleCongestionNotification()
+	stats = conn.Stats()
+	if stats.CongestionEvents != 1 {
+		t.Errorf("CongestionEvents after notification = %d, want 1", stats.CongestionEvents)
+	}
+}
