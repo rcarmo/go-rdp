@@ -337,3 +337,223 @@ func TestTunnelCreateRequest_InvalidRequestID(t *testing.T) {
 		t.Errorf("requestID = 0x%08X, want 0xDEADBEEF", sc.requestID)
 	}
 }
+
+// ============================================================================
+// Additional SecureConnection Coverage Tests
+// ============================================================================
+
+// TestSecureConnection_Read validates the Read method
+func TestSecureConnection_Read(t *testing.T) {
+	cfg := &SecureConfig{
+		UDPConfig: DefaultConfig(),
+		Reliable:  true,
+	}
+
+	sc, err := NewSecureConnection(cfg)
+	if err != nil {
+		t.Fatalf("NewSecureConnection: %v", err)
+	}
+
+	// Test Read when not established
+	buf := make([]byte, 100)
+	_, err = sc.Read(buf)
+	if err != ErrClosed {
+		t.Errorf("Read() when not established error = %v, want ErrClosed", err)
+	}
+
+	// Set up mock secure connection
+	mockConn := &mockReadWriter{
+		readData: []byte("test data from tunnel"),
+	}
+	sc.mu.Lock()
+	sc.secureConn = mockConn
+	sc.tunnelEstablished = true
+	sc.mu.Unlock()
+
+	// Test successful Read
+	n, err := sc.Read(buf)
+	if err != nil {
+		t.Errorf("Read() error = %v", err)
+	}
+	if n != len(mockConn.readData) {
+		t.Errorf("Read() n = %d, want %d", n, len(mockConn.readData))
+	}
+}
+
+// TestSecureConnection_Write validates the Write method
+func TestSecureConnection_Write(t *testing.T) {
+	cfg := &SecureConfig{
+		UDPConfig: DefaultConfig(),
+		Reliable:  true,
+	}
+
+	sc, err := NewSecureConnection(cfg)
+	if err != nil {
+		t.Fatalf("NewSecureConnection: %v", err)
+	}
+
+	// Test Write when not established
+	_, err = sc.Write([]byte("test"))
+	if err != ErrClosed {
+		t.Errorf("Write() when not established error = %v, want ErrClosed", err)
+	}
+
+	// Set up mock secure connection
+	mockConn := &mockReadWriter{
+		writeBuf: make([]byte, 0, 1024),
+	}
+	sc.mu.Lock()
+	sc.secureConn = mockConn
+	sc.tunnelEstablished = true
+	sc.mu.Unlock()
+
+	// Test successful Write
+	testData := []byte("test data to tunnel")
+	n, err := sc.Write(testData)
+	if err != nil {
+		t.Errorf("Write() error = %v", err)
+	}
+	if n != len(testData) {
+		t.Errorf("Write() n = %d, want %d", n, len(testData))
+	}
+
+	// Verify data was wrapped in TunnelDataPDU
+	if len(mockConn.writeBuf) == 0 {
+		t.Error("Write() should write data to underlying connection")
+	}
+}
+
+// TestSecureConnection_Close_WithMocks validates the Close method with mock connections
+func TestSecureConnection_Close_WithMocks(t *testing.T) {
+	cfg := &SecureConfig{
+		UDPConfig: DefaultConfig(),
+		Reliable:  true,
+	}
+
+	sc, err := NewSecureConnection(cfg)
+	if err != nil {
+		t.Fatalf("NewSecureConnection: %v", err)
+	}
+
+	// Set up mock secure connection
+	mockSecure := &mockCloser{}
+	sc.mu.Lock()
+	sc.secureConn = mockSecure
+	// Create a real Connection for udpConn
+	udpConn, _ := NewConnection(DefaultConfig())
+	sc.udpConn = udpConn
+	sc.mu.Unlock()
+
+	// Test Close
+	err = sc.Close()
+	if err != nil {
+		t.Errorf("Close() error = %v", err)
+	}
+
+	// Verify secure connection was closed
+	if !mockSecure.closed {
+		t.Error("Close() should close secureConn")
+	}
+}
+
+// TestSecureConnection_LocalAddr validates LocalAddr method
+func TestSecureConnection_LocalAddr(t *testing.T) {
+	cfg := &SecureConfig{
+		UDPConfig: DefaultConfig(),
+		Reliable:  true,
+	}
+
+	sc, err := NewSecureConnection(cfg)
+	if err != nil {
+		t.Fatalf("NewSecureConnection: %v", err)
+	}
+
+	// With nil udpConn, should return nil
+	addr := sc.LocalAddr()
+	if addr != nil {
+		t.Errorf("LocalAddr() with nil udpConn = %v, want nil", addr)
+	}
+}
+
+// TestSecureConnection_RemoteAddr validates RemoteAddr method
+func TestSecureConnection_RemoteAddr(t *testing.T) {
+	cfg := &SecureConfig{
+		UDPConfig: DefaultConfig(),
+		Reliable:  true,
+	}
+
+	sc, err := NewSecureConnection(cfg)
+	if err != nil {
+		t.Fatalf("NewSecureConnection: %v", err)
+	}
+
+	// With nil udpConn, should return nil
+	addr := sc.RemoteAddr()
+	if addr != nil {
+		t.Errorf("RemoteAddr() with nil udpConn = %v, want nil", addr)
+	}
+}
+
+// TestSecureConnection_ReliableVsLossy validates reliable vs lossy mode
+func TestSecureConnection_ReliableVsLossy(t *testing.T) {
+	tests := []struct {
+		name     string
+		reliable bool
+	}{
+		{"Reliable", true},
+		{"Lossy", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &SecureConfig{
+				UDPConfig: DefaultConfig(),
+				Reliable:  tc.reliable,
+			}
+
+			sc, err := NewSecureConnection(cfg)
+			if err != nil {
+				t.Fatalf("NewSecureConnection: %v", err)
+			}
+
+			if sc.reliable != tc.reliable {
+				t.Errorf("reliable = %v, want %v", sc.reliable, tc.reliable)
+			}
+		})
+	}
+}
+
+// mockReadWriter implements io.ReadWriter for testing
+type mockReadWriter struct {
+	readData []byte
+	writeBuf []byte
+	readErr  error
+	writeErr error
+}
+
+func (m *mockReadWriter) Read(b []byte) (int, error) {
+	if m.readErr != nil {
+		return 0, m.readErr
+	}
+	n := copy(b, m.readData)
+	return n, nil
+}
+
+func (m *mockReadWriter) Write(b []byte) (int, error) {
+	if m.writeErr != nil {
+		return 0, m.writeErr
+	}
+	m.writeBuf = append(m.writeBuf, b...)
+	return len(b), nil
+}
+
+func (m *mockReadWriter) Close() error { return nil }
+
+// mockCloser implements io.Closer for testing
+type mockCloser struct {
+	closed bool
+}
+
+func (m *mockCloser) Read(b []byte) (int, error)  { return 0, nil }
+func (m *mockCloser) Write(b []byte) (int, error) { return len(b), nil }
+func (m *mockCloser) Close() error                { m.closed = true; return nil }

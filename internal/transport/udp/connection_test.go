@@ -961,3 +961,435 @@ func TestS2_DataTransfer_MaxRetransmitClose(t *testing.T) {
 		t.Error("Connection should be CLOSED after max retransmissions (per MS spec Section 3.1.6.1)")
 	}
 }
+
+// ============================================================================
+// Additional Coverage Tests
+// ============================================================================
+
+// TestConnection_Read validates the Read method
+func TestConnection_Read(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.recvChan = make(chan []byte, 1)
+	conn.closeChan = make(chan struct{})
+
+	// Test successful read
+	testData := []byte("test data payload")
+	go func() {
+		conn.recvChan <- testData
+	}()
+
+	buf := make([]byte, 100)
+	n, err := conn.Read(buf)
+	if err != nil {
+		t.Errorf("Read() error = %v", err)
+	}
+	if n != len(testData) {
+		t.Errorf("Read() n = %d, want %d", n, len(testData))
+	}
+	if string(buf[:n]) != string(testData) {
+		t.Errorf("Read() data = %q, want %q", buf[:n], testData)
+	}
+}
+
+// TestConnection_Read_Closed validates Read on closed connection
+func TestConnection_Read_Closed(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.recvChan = make(chan []byte, 1)
+	conn.closeChan = make(chan struct{})
+
+	// Close the connection
+	close(conn.closeChan)
+
+	buf := make([]byte, 100)
+	_, err := conn.Read(buf)
+	if err != ErrClosed {
+		t.Errorf("Read() on closed connection error = %v, want ErrClosed", err)
+	}
+}
+
+// TestConnection_Write_InvalidState validates Write in wrong state
+func TestConnection_Write_InvalidState(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateSynSent // Not established
+	conn.config = DefaultConfig()
+
+	_, err := conn.Write([]byte("test"))
+	if err != ErrInvalidState {
+		t.Errorf("Write() in wrong state error = %v, want ErrInvalidState", err)
+	}
+}
+
+// TestConnection_Close_AlreadyClosed validates Close on already closed connection
+func TestConnection_Close_AlreadyClosed(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateClosed
+	conn.closeChan = make(chan struct{})
+
+	err := conn.Close()
+	if err != nil {
+		t.Errorf("Close() on already closed error = %v, want nil", err)
+	}
+}
+
+// TestConnection_LocalAddr_Nil validates LocalAddr with nil connection
+func TestConnection_LocalAddr_Nil(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.conn = nil
+
+	// With nil conn, should return nil
+	addr := conn.LocalAddr()
+	if addr != nil {
+		t.Errorf("LocalAddr() with nil conn = %v, want nil", addr)
+	}
+}
+
+// TestConnection_RemoteAddr_Nil validates RemoteAddr with nil connection
+func TestConnection_RemoteAddr_Nil(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.conn = nil
+
+	// With nil conn, should return nil
+	addr := conn.RemoteAddr()
+	if addr != nil {
+		t.Errorf("RemoteAddr() with nil conn = %v, want nil", addr)
+	}
+}
+
+// TestConnection_HandleSynSentState_InvalidPacket validates rejection of invalid packets
+func TestConnection_HandleSynSentState_InvalidPacket(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateSynSent
+	conn.config = DefaultConfig()
+	conn.localSeqNum = 12345
+
+	tests := []struct {
+		name   string
+		packet *rdpeudp.Packet
+	}{
+		{
+			name: "Missing SYN flag",
+			packet: &rdpeudp.Packet{
+				Header: rdpeudp.FECHeader{
+					Flags:       rdpeudp.FlagACK, // No SYN
+					SnSourceAck: 12345,
+				},
+			},
+		},
+		{
+			name: "Missing ACK flag",
+			packet: &rdpeudp.Packet{
+				Header: rdpeudp.FECHeader{
+					Flags:       rdpeudp.FlagSYN, // No ACK
+					SnSourceAck: 12345,
+				},
+			},
+		},
+		{
+			name: "Wrong sequence number",
+			packet: &rdpeudp.Packet{
+				Header: rdpeudp.FECHeader{
+					Flags:       rdpeudp.FlagSYN | rdpeudp.FlagACK,
+					SnSourceAck: 99999, // Wrong seq
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conn.state = StateSynSent
+			conn.handleSynSentState(tc.packet)
+
+			// Should still be in SYN_SENT state
+			if conn.state != StateSynSent {
+				t.Errorf("handleSynSentState() should reject invalid packet, state = %v", conn.state)
+			}
+		})
+	}
+}
+
+// TestConnection_ProcessAck validates ACK processing
+func TestConnection_ProcessAck(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.config = DefaultConfig()
+	conn.closeChan = make(chan struct{})
+
+	// Add packets to send buffer
+	conn.sendBuffer[10] = &sentPacket{seqNum: 10}
+	conn.sendBuffer[11] = &sentPacket{seqNum: 11}
+	conn.sendBuffer[12] = &sentPacket{seqNum: 12}
+
+	// Process ACK for sequence 11
+	ackPacket := &rdpeudp.Packet{
+		Header: rdpeudp.FECHeader{
+			SnSourceAck: 11,
+		},
+	}
+	conn.processAck(ackPacket)
+
+	// Packets 10 and 11 should be removed
+	if _, ok := conn.sendBuffer[10]; ok {
+		t.Error("processAck() should remove acked packet 10")
+	}
+	if _, ok := conn.sendBuffer[11]; ok {
+		t.Error("processAck() should remove acked packet 11")
+	}
+	// Packet 12 should still be there
+	if _, ok := conn.sendBuffer[12]; !ok {
+		t.Error("processAck() should not remove unacked packet 12")
+	}
+}
+
+// TestConnection_ProcessData validates data processing
+func TestConnection_ProcessData(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.config = DefaultConfig()
+	conn.closeChan = make(chan struct{})
+	conn.recvChan = make(chan []byte, 10)
+	conn.nextExpectSeq = 100
+	conn.highestRecvSeq = 99
+
+	testData := []byte("test payload")
+
+	// Create data packet
+	packet := &rdpeudp.Packet{
+		SourcePayload: &rdpeudp.SourcePayloadHeader{
+			SnSourceStart: 100,
+		},
+		Data: testData,
+	}
+
+	// Process in-order data
+	conn.processData(packet)
+
+	// nextExpectSeq should be incremented
+	if conn.nextExpectSeq != 101 {
+		t.Errorf("nextExpectSeq = %d, want 101", conn.nextExpectSeq)
+	}
+
+	// highestRecvSeq should be updated
+	if conn.highestRecvSeq != 100 {
+		t.Errorf("highestRecvSeq = %d, want 100", conn.highestRecvSeq)
+	}
+
+	// Data should be in receive channel
+	select {
+	case data := <-conn.recvChan:
+		if string(data) != string(testData) {
+			t.Errorf("received data = %q, want %q", data, testData)
+		}
+	default:
+		t.Error("processData() should send data to recvChan")
+	}
+}
+
+// TestConnection_ProcessData_OutOfOrder validates out-of-order data handling
+func TestConnection_ProcessData_OutOfOrder(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.config = DefaultConfig()
+	conn.closeChan = make(chan struct{})
+	conn.recvChan = make(chan []byte, 10)
+	conn.nextExpectSeq = 100
+	conn.highestRecvSeq = 99
+
+	// Create out-of-order packet (seq 102, expecting 100)
+	packet := &rdpeudp.Packet{
+		SourcePayload: &rdpeudp.SourcePayloadHeader{
+			SnSourceStart: 102,
+		},
+		Data: []byte("future packet"),
+	}
+
+	conn.processData(packet)
+
+	// nextExpectSeq should NOT change
+	if conn.nextExpectSeq != 100 {
+		t.Errorf("nextExpectSeq = %d, want 100 (unchanged)", conn.nextExpectSeq)
+	}
+
+	// highestRecvSeq should be updated
+	if conn.highestRecvSeq != 102 {
+		t.Errorf("highestRecvSeq = %d, want 102", conn.highestRecvSeq)
+	}
+
+	// Packet should be buffered
+	if _, ok := conn.recvBuffer[102]; !ok {
+		t.Error("processData() should buffer out-of-order packet")
+	}
+}
+
+// TestConnection_ProcessData_GapDetection validates gap detection for congestion
+func TestConnection_ProcessData_GapDetection(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.config = DefaultConfig()
+	conn.closeChan = make(chan struct{})
+	conn.recvChan = make(chan []byte, 10)
+	conn.nextExpectSeq = 100
+	conn.highestRecvSeq = 99
+	conn.congestionNotify = false
+
+	// Create packet with gap (seq 105, expecting 100)
+	packet := &rdpeudp.Packet{
+		SourcePayload: &rdpeudp.SourcePayloadHeader{
+			SnSourceStart: 105, // Creates gap of 5 packets
+		},
+		Data: []byte("test"),
+	}
+
+	conn.processData(packet)
+
+	// Should set congestion notify due to gap
+	if !conn.congestionNotify {
+		t.Error("processData() should set congestionNotify when gap detected")
+	}
+}
+
+// TestConnection_ProcessData_NilPayload validates nil payload handling
+func TestConnection_ProcessData_NilPayload(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.nextExpectSeq = 100
+
+	// Create packet without payload
+	packet := &rdpeudp.Packet{
+		SourcePayload: nil,
+	}
+
+	// Should not panic and should not change state
+	conn.processData(packet)
+
+	if conn.nextExpectSeq != 100 {
+		t.Errorf("nextExpectSeq = %d, want 100 (unchanged)", conn.nextExpectSeq)
+	}
+}
+
+// TestConnection_KeepaliveTimer validates keepalive timer behavior
+func TestConnection_KeepaliveTimer(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.config = DefaultConfig()
+	conn.closeChan = make(chan struct{})
+	conn.highestRecvSeq = 50
+
+	// Test startKeepaliveTimer
+	conn.startKeepaliveTimer()
+	if conn.keepaliveTimer == nil {
+		t.Error("startKeepaliveTimer() should create timer")
+	}
+
+	// Test resetKeepaliveTimer
+	conn.resetKeepaliveTimer()
+	// Timer should still exist
+	if conn.keepaliveTimer == nil {
+		t.Error("resetKeepaliveTimer() should maintain timer")
+	}
+
+	// Clean up
+	conn.stopTimers()
+}
+
+// TestConnection_DelayedAckTimer validates delayed ACK timer behavior
+func TestConnection_DelayedAckTimer(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.config = DefaultConfig()
+	conn.closeChan = make(chan struct{})
+	conn.highestRecvSeq = 50
+
+	// Test startDelayedAckTimer when there's pending ACK
+	conn.pendingAck = true
+	conn.startDelayedAckTimer()
+
+	if conn.delayedAckTimer == nil {
+		t.Error("startDelayedAckTimer() should create timer when pendingAck is true")
+	}
+
+	// Clean up
+	conn.stopTimers()
+}
+
+// TestConnection_StopTimers validates timer cleanup
+func TestConnection_StopTimers(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.state = StateEstablished
+	conn.config = DefaultConfig()
+
+	// Create timers
+	conn.keepaliveTimer = time.NewTimer(time.Hour)
+	conn.delayedAckTimer = time.NewTimer(time.Hour)
+	conn.retransmitTimer = time.NewTimer(time.Hour)
+
+	// Stop all timers - should not panic
+	conn.stopTimers()
+}
+
+// TestConnection_BuildAckVector validates ACK vector building
+func TestConnection_BuildAckVector(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.config = DefaultConfig()
+	conn.highestRecvSeq = 105
+	conn.nextExpectSeq = 100
+
+	// Add some received packets
+	conn.recvBuffer[102] = []byte("data")
+	conn.recvBuffer[104] = []byte("data")
+
+	ackVector := conn.buildAckVector()
+
+	if ackVector == nil {
+		t.Error("buildAckVector() should return non-nil when there are gaps")
+	}
+}
+
+// TestConnection_BuildAckVector_NoGaps validates ACK vector with no gaps
+func TestConnection_BuildAckVector_NoGaps(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.config = DefaultConfig()
+	conn.highestRecvSeq = 0
+	conn.nextExpectSeq = 0
+
+	ackVector := conn.buildAckVector()
+
+	if ackVector != nil {
+		t.Error("buildAckVector() should return nil when no sequence numbers set")
+	}
+}
+
+// TestConnection_BuildAckPacket validates ACK packet building
+func TestConnection_BuildAckPacket(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.config = DefaultConfig()
+	conn.highestRecvSeq = 100
+	conn.nextExpectSeq = 95
+
+	packet := conn.buildAckPacket()
+
+	if packet == nil {
+		t.Error("buildAckPacket() should return non-nil packet")
+	}
+
+	// Should have ACK flag
+	if !packet.Header.HasFlag(rdpeudp.FlagACK) {
+		t.Error("ACK packet should have ACK flag")
+	}
+}
+
+// TestConnection_BuildAckPacket_CongestionNotify validates CN flag in ACK
+func TestConnection_BuildAckPacket_CongestionNotify(t *testing.T) {
+	conn, _ := NewConnection(nil)
+	conn.config = DefaultConfig()
+	conn.highestRecvSeq = 100
+	conn.nextExpectSeq = 95
+	conn.congestionNotify = true
+
+	packet := conn.buildAckPacket()
+
+	// Should have CN flag when congestion detected
+	if !packet.Header.HasFlag(rdpeudp.FlagCN) {
+		t.Error("ACK packet should have CN flag when congestionNotify is true")
+	}
+}
