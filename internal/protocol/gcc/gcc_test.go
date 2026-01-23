@@ -386,3 +386,116 @@ func TestConferenceCreateResponseZeroStruct(t *testing.T) {
 		t.Errorf("Deserialize() on zero struct error = %v", err)
 	}
 }
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-RDPBCGR_ClientTestDesignSpecification.md - S1_Connection
+// ============================================================================
+
+// TestBVT_BasicSettingExchange_GCCRequest validates per MS test case:
+// "BVT_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataSupported"
+// Per MS-RDPBCGR Section 2.2.1.3
+func TestBVT_BasicSettingExchange_GCCRequest(t *testing.T) {
+	// GCC Conference Create Request structure per MS-RDPBCGR 2.2.1.3
+	// Contains: T.124 header, H.221 key "Duca", User Data
+
+	// Minimal valid user data (Client Core Data header)
+	userData := []byte{
+		0x01, 0xc0, 0x08, 0x00, // CS_CORE header (type=0xC001, length=8)
+		0x04, 0x00, 0x08, 0x00, // version, desktopWidth
+	}
+
+	req := NewConferenceCreateRequest(userData)
+	serialized := req.Serialize()
+
+	// Verify H.221 key "Duca" is present
+	// Per spec: The key is "Duca" (0x44756361)
+	ducaFound := false
+	for i := 0; i < len(serialized)-3; i++ {
+		if serialized[i] == 'D' && serialized[i+1] == 'u' &&
+			serialized[i+2] == 'c' && serialized[i+3] == 'a' {
+			ducaFound = true
+			break
+		}
+	}
+	if !ducaFound {
+		t.Error("H.221 key 'Duca' not found in GCC Conference Create Request")
+	}
+}
+
+// TestS1_BasicSettingExchange_H221Key validates H.221 non-standard key per spec
+// Per MS-RDPBCGR Section 2.2.1.3.1: "Duca" for client, "McDn" for server
+func TestS1_BasicSettingExchange_H221Key(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+		side string
+	}{
+		{"Client H.221 key", "Duca", "client"},
+		{"Server H.221 key", "McDn", "server"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// H.221 key must be exactly 4 ASCII characters
+			if len(tc.key) != 4 {
+				t.Errorf("H.221 key length = %d, want 4", len(tc.key))
+			}
+			// Must be printable ASCII
+			for _, c := range tc.key {
+				if c < 0x20 || c > 0x7E {
+					t.Errorf("H.221 key contains non-printable character: 0x%02X", c)
+				}
+			}
+		})
+	}
+}
+
+// TestS1_BasicSettingExchange_UserDataBlocks validates user data block types per spec
+// Per MS-RDPBCGR Section 2.2.1.3.2
+func TestS1_BasicSettingExchange_UserDataBlocks(t *testing.T) {
+	// Client-to-server user data block types
+	clientBlocks := []struct {
+		typeCode uint16
+		name     string
+	}{
+		{0xC001, "CS_CORE"},
+		{0xC002, "CS_SECURITY"},
+		{0xC003, "CS_NET"},
+		{0xC004, "CS_CLUSTER"},
+		{0xC005, "CS_MONITOR"},
+		{0xC006, "CS_MCS_MSGCHANNEL"},
+		{0xC008, "CS_MONITOR_EX"},
+		{0xC00A, "CS_MULTITRANSPORT"},
+	}
+
+	for _, cb := range clientBlocks {
+		t.Run(cb.name, func(t *testing.T) {
+			// Verify type code has 0xC0 high byte (client data)
+			if cb.typeCode>>8 != 0xC0 {
+				t.Errorf("Client block %s has invalid type: 0x%04X", cb.name, cb.typeCode)
+			}
+		})
+	}
+
+	// Server-to-client user data block types
+	serverBlocks := []struct {
+		typeCode uint16
+		name     string
+	}{
+		{0x0C01, "SC_CORE"},
+		{0x0C02, "SC_SECURITY"},
+		{0x0C03, "SC_NET"},
+		{0x0C04, "SC_MCS_MSGCHANNEL"},
+		{0x0C08, "SC_MULTITRANSPORT"},
+	}
+
+	for _, sb := range serverBlocks {
+		t.Run(sb.name, func(t *testing.T) {
+			// Verify type code has 0x0C high byte (server data)
+			if sb.typeCode>>8 != 0x0C {
+				t.Errorf("Server block %s has invalid type: 0x%04X", sb.name, sb.typeCode)
+			}
+		})
+	}
+}

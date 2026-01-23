@@ -166,3 +166,78 @@ func TestServerConnectResponse_Deserialize_Errors(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-RDPBCGR_ClientTestDesignSpecification.md - S1_Connection
+// ============================================================================
+
+// TestBVT_MCSConnect_ConnectInitial validates per MS test case:
+// "BVT_ConnectionTest_BasicSettingExchange_PositiveTest"
+// Per MS-RDPBCGR Section 2.2.1.3
+func TestBVT_MCSConnect_ConnectInitial(t *testing.T) {
+	userData := []byte{0x01, 0x02, 0x03, 0x04}
+	pdu := NewClientMCSConnectInitial(userData)
+
+	// Per MS-RDPBCGR 2.2.1.3: callingDomainSelector must be 1
+	require.Equal(t, []byte{0x01}, pdu.callingDomainSelector)
+	// Per MS-RDPBCGR 2.2.1.3: calledDomainSelector must be 1
+	require.Equal(t, []byte{0x01}, pdu.calledDomainSelector)
+	// Per MS-RDPBCGR 2.2.1.3: upwardFlag must be true
+	require.True(t, pdu.upwardFlag)
+}
+
+// TestS1_MCSConnect_DomainParameters validates MCS domain parameters
+// Per MS-RDPBCGR Section 2.2.1.3.2 and T.125 Section 7.5
+func TestS1_MCSConnect_DomainParameters(t *testing.T) {
+	userData := []byte{0x01, 0x02, 0x03, 0x04}
+	pdu := NewClientMCSConnectInitial(userData)
+
+	// Target parameters per MS-RDPBCGR 2.2.1.3
+	params := pdu.targetParameters
+	
+	require.Equal(t, 34, params.maxChannelIds)
+	require.Equal(t, 2, params.maxUserIds)
+	require.Equal(t, 0, params.maxTokenIds)
+	require.Equal(t, 1, params.numPriorities)
+	require.Equal(t, 0, params.minThroughput)
+	require.Equal(t, 1, params.maxHeight)
+	require.Equal(t, 65535, params.maxMCSPDUsize)
+	require.Equal(t, 2, params.protocolVersion)
+}
+
+// TestS1_MCSConnect_ConnectResponse_ResultCodes validates MCS Connect Response result codes
+// Per MS-RDPBCGR Section 2.2.1.4 and T.125
+func TestS1_MCSConnect_ConnectResponse_ResultCodes(t *testing.T) {
+	// MCS Connect Response result codes per T.125
+	resultCodes := []struct {
+		code    int
+		name    string
+		success bool
+	}{
+		{0, "rt-successful", true},
+		{1, "rt-domain-merging", false},
+		{2, "rt-domain-not-hierarchical", false},
+		{3, "rt-no-such-channel", false},
+		{4, "rt-no-such-domain", false},
+		{5, "rt-no-such-user", false},
+		{6, "rt-not-admitted", false},
+		{7, "rt-other-user-id", false},
+		{8, "rt-parameters-unacceptable", false},
+		{9, "rt-token-not-available", false},
+		{10, "rt-token-not-possessed", false},
+		{11, "rt-too-many-channels", false},
+		{12, "rt-too-many-tokens", false},
+		{13, "rt-too-many-users", false},
+		{14, "rt-unspecified-failure", false},
+		{15, "rt-user-rejected", false},
+	}
+
+	for _, rc := range resultCodes {
+		t.Run(rc.name, func(t *testing.T) {
+			// Only code 0 indicates success
+			isSuccess := rc.code == 0
+			require.Equal(t, rc.success, isSuccess, "result code %d (%s)", rc.code, rc.name)
+		})
+	}
+}

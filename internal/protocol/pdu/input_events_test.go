@@ -437,3 +437,127 @@ func TestSyncFlags(t *testing.T) {
 	require.Equal(t, uint8(0x04), SyncCapsLock)
 	require.Equal(t, uint8(0x08), SyncKanaLock)
 }
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-RDPBCGR_ClientTestDesignSpecification.md - S4_SlowPathInput
+// ============================================================================
+
+// TestBVT_SlowPathInput_KeyboardEvent validates per MS test case:
+// "BVT_SlowPathInputTest_PositiveTest_KeyboardEvent"
+// Per MS-RDPBCGR Section 2.2.8.1.1.3.1.1.1
+func TestBVT_SlowPathInput_KeyboardEvent(t *testing.T) {
+	// Test key down
+	event := NewKeyboardEvent(0, 0x1E) // 'A' key
+	serialized := event.Serialize()
+	require.NotNil(t, serialized)
+	require.Equal(t, EventCodeScanCode, event.EventCode)
+
+	// Test key up
+	event = NewKeyboardEvent(KBDFlagsRelease, 0x1E)
+	require.Equal(t, uint8(KBDFlagsRelease), event.EventFlags)
+}
+
+// TestS4_SlowPathInput_KeyboardEventTypes validates all keyboard event types
+// Per MS-RDPBCGR Section 2.2.8.1.1.3.1.1
+func TestS4_SlowPathInput_KeyboardEventTypes(t *testing.T) {
+	// Event codes map to fast-path event codes in our implementation
+	// Per MS-RDPBCGR Table 2.2.8.1.2.2.1
+	require.Equal(t, EventCode(0), EventCodeScanCode)   // FASTPATH_INPUT_EVENT_SCANCODE
+	require.Equal(t, EventCode(3), EventCodeSync)       // FASTPATH_INPUT_EVENT_SYNC  
+	require.Equal(t, EventCode(4), EventCodeUnicode)    // FASTPATH_INPUT_EVENT_UNICODE
+}
+
+// TestS4_SlowPathInput_MouseEventTypes validates all mouse event types
+// Per MS-RDPBCGR Section 2.2.8.1.1.3.1.1
+func TestS4_SlowPathInput_MouseEventTypes(t *testing.T) {
+	tests := []struct {
+		name    string
+		msgType uint16
+	}{
+		{"INPUT_EVENT_MOUSE", 0x8001},
+		{"INPUT_EVENT_MOUSEX", 0x8002},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Per MS-RDPBCGR: Mouse event message types have 0x80 in high byte
+			require.Equal(t, uint8(0x80), uint8(tc.msgType>>8))
+		})
+	}
+}
+
+// TestS4_SlowPathInput_MouseButtonFlags validates mouse button flag combinations
+// Per MS-RDPBCGR Section 2.2.8.1.1.3.1.1.3
+func TestS4_SlowPathInput_MouseButtonFlags(t *testing.T) {
+	tests := []struct {
+		name        string
+		flags       uint16
+		description string
+	}{
+		{"LeftButton_Down", PTRFlagsButton1 | PTRFlagsDown, "Left mouse button pressed"},
+		{"LeftButton_Up", PTRFlagsButton1, "Left mouse button released"},
+		{"RightButton_Down", PTRFlagsButton2 | PTRFlagsDown, "Right mouse button pressed"},
+		{"RightButton_Up", PTRFlagsButton2, "Right mouse button released"},
+		{"MiddleButton_Down", PTRFlagsButton3 | PTRFlagsDown, "Middle mouse button pressed"},
+		{"Move", PTRFlagsMove, "Mouse move event"},
+		{"WheelUp", PTRFlagsWheel | 0x0078, "Wheel scroll up (120 units)"},
+		{"WheelDown", PTRFlagsWheel | PTRFlagsWheelNegative | 0x0078, "Wheel scroll down"},
+		{"HWheelRight", PTRFlagsHWheel | 0x0078, "Horizontal wheel right"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			event := NewMouseEvent(tc.flags, 100, 200)
+			require.NotNil(t, event)
+			require.Equal(t, EventCodeMouse, event.EventCode)
+		})
+	}
+}
+
+// TestS4_SlowPathInput_ExtendedMouseButtons validates extended mouse buttons
+// Per MS-RDPBCGR Section 2.2.8.1.1.3.1.1.4
+func TestS4_SlowPathInput_ExtendedMouseButtons(t *testing.T) {
+	// Extended mouse buttons (X buttons) per spec
+	tests := []struct {
+		name  string
+		flags uint16
+	}{
+		{"XButton1_Down", PTRXFlagsButton1 | PTRXFlagsDown},
+		{"XButton1_Up", PTRXFlagsButton1},
+		{"XButton2_Down", PTRXFlagsButton2 | PTRXFlagsDown},
+		{"XButton2_Up", PTRXFlagsButton2},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			event := NewExtendedMouseEvent(tc.flags, 100, 200)
+			require.NotNil(t, event)
+			require.Equal(t, EventCodeMouseX, event.EventCode)
+		})
+	}
+}
+
+// TestS4_SlowPathInput_SyncEvent validates synchronize event
+// Per MS-RDPBCGR Section 2.2.8.1.1.3.1.1.5
+func TestS4_SlowPathInput_SyncEvent(t *testing.T) {
+	// Sync event per MS-RDPBCGR 2.2.8.1.1.3.1.1.5
+	tests := []struct {
+		name      string
+		syncFlags uint8
+	}{
+		{"ScrollLock", SyncScrollLock},
+		{"NumLock", SyncNumLock},
+		{"CapsLock", SyncCapsLock},
+		{"KanaLock", SyncKanaLock},
+		{"All_Locks", SyncScrollLock | SyncNumLock | SyncCapsLock | SyncKanaLock},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			event := NewSynchronizeEvent(tc.syncFlags)
+			require.NotNil(t, event)
+			require.Equal(t, EventCodeSync, event.EventCode)
+		})
+	}
+}

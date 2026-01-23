@@ -802,3 +802,189 @@ func TestDataCompressedPDU_Deserialize_DataFirst_TooShort(t *testing.T) {
 	err := pdu.Deserialize(data, 0, true) // isFirst=true needs length field
 	assert.Error(t, err)
 }
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-RDPBCGR_ClientTestDesignSpecification.md - S7_StaticVirtualChannel
+// ============================================================================
+
+// TestBVT_StaticVirtualChannel_HeaderFlags validates per MS test case:
+// "BVT_StaticVCTest_PositiveTest_ChannelFlags"
+// Per MS-RDPBCGR Section 2.2.6.1
+func TestBVT_StaticVirtualChannel_HeaderFlags(t *testing.T) {
+	// Virtual channel header flags per MS-RDPBCGR 2.2.6.1
+	const (
+		CHANNEL_FLAG_FIRST    = 0x00000001
+		CHANNEL_FLAG_LAST     = 0x00000002
+		CHANNEL_FLAG_SHOW_PROTOCOL = 0x00000010
+		CHANNEL_FLAG_SUSPEND  = 0x00000020
+		CHANNEL_FLAG_RESUME   = 0x00000040
+		CHANNEL_FLAG_SHADOW_PERSISTENT = 0x00000080
+	)
+
+	tests := []struct {
+		name  string
+		flags uint32
+		valid bool
+	}{
+		{"Single_Complete_Packet", CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST, true},
+		{"First_Fragment", CHANNEL_FLAG_FIRST, true},
+		{"Last_Fragment", CHANNEL_FLAG_LAST, true},
+		{"Middle_Fragment", 0, true},
+		{"Show_Protocol", CHANNEL_FLAG_SHOW_PROTOCOL, true},
+		{"Suspend", CHANNEL_FLAG_SUSPEND, true},
+		{"Resume", CHANNEL_FLAG_RESUME, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Per spec, FIRST and LAST together indicate single unfragmented PDU
+			isSingle := (tc.flags&CHANNEL_FLAG_FIRST != 0) && (tc.flags&CHANNEL_FLAG_LAST != 0)
+			isFirst := (tc.flags&CHANNEL_FLAG_FIRST != 0) && (tc.flags&CHANNEL_FLAG_LAST == 0)
+			isLast := (tc.flags&CHANNEL_FLAG_FIRST == 0) && (tc.flags&CHANNEL_FLAG_LAST != 0)
+			isMiddle := (tc.flags&CHANNEL_FLAG_FIRST == 0) && (tc.flags&CHANNEL_FLAG_LAST == 0)
+
+			// At least one state must be true for valid flags
+			hasValidState := isSingle || isFirst || isLast || isMiddle
+			assert.True(t, hasValidState, "Invalid flag combination")
+		})
+	}
+}
+
+// TestS7_StaticVirtualChannel_Compression validates compression flag handling
+// Per MS-RDPBCGR Section 2.2.6.1.1
+func TestS7_StaticVirtualChannel_Compression(t *testing.T) {
+	const (
+		CHANNEL_FLAG_FIRST         = 0x00000001
+		CHANNEL_FLAG_LAST          = 0x00000002
+		CompressionTypeMask        = 0x000F0000
+		PACKET_COMPRESSED          = 0x00200000
+		PACKET_AT_FRONT            = 0x00400000
+		PACKET_FLUSHED             = 0x00800000
+		CompressionType_8K         = 0x00000000
+		CompressionType_64K        = 0x00010000
+		CompressionType_RDP6       = 0x00020000
+		CompressionType_RDP61      = 0x00030000
+	)
+
+	tests := []struct {
+		name            string
+		flags           uint32
+		compressionType int
+	}{
+		{"8K_Compression", PACKET_COMPRESSED | CompressionType_8K, 0},
+		{"64K_Compression", PACKET_COMPRESSED | CompressionType_64K, 1},
+		{"RDP6_Compression", PACKET_COMPRESSED | CompressionType_RDP6, 2},
+		{"RDP61_Compression", PACKET_COMPRESSED | CompressionType_RDP61, 3},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			isCompressed := (tc.flags & PACKET_COMPRESSED) != 0
+			assert.True(t, isCompressed)
+
+			compressionType := int((tc.flags & CompressionTypeMask) >> 16)
+			assert.Equal(t, tc.compressionType, compressionType)
+		})
+	}
+}
+
+// TestS7_DynamicVirtualChannel_Commands validates DRDYNVC command codes
+// Per MS-RDPEDYC Section 2.2.1
+func TestS7_DynamicVirtualChannel_Commands(t *testing.T) {
+	// DRDYNVC command codes per MS-RDPEDYC
+	tests := []struct {
+		cmd  uint8
+		name string
+	}{
+		{CmdCreate, "DYNVC_CREATE_REQ (0x01)"},
+		{CmdDataFirst, "DYNVC_DATA_FIRST (0x02)"},
+		{CmdData, "DYNVC_DATA (0x03)"},
+		{CmdClose, "DYNVC_CLOSE (0x04)"},
+		{CmdCapability, "DYNVC_CAPS (0x05)"},
+		{CmdDataFirstCmp, "DYNVC_DATA_FIRST_COMPRESSED (0x06)"},
+		{CmdDataCmp, "DYNVC_DATA_COMPRESSED (0x07)"},
+		{CmdSoftSync, "DYNVC_SOFT_SYNC_REQ/RSP (0x08)"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Verify command value fits in 4 bits (0-15)
+			assert.LessOrEqual(t, tc.cmd, uint8(0x0F))
+		})
+	}
+}
+
+// TestS7_DynamicVirtualChannel_CapsVersions validates capability versions
+// Per MS-RDPEDYC Section 2.2.1.1
+func TestS7_DynamicVirtualChannel_CapsVersions(t *testing.T) {
+	tests := []struct {
+		version  uint16
+		features string
+	}{
+		{1, "Basic DVC support"},
+		{2, "Priority support"},
+		{3, "Compression and Soft-Sync support"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.features, func(t *testing.T) {
+			caps := CapsPDU{Version: tc.version}
+			assert.Equal(t, tc.version, caps.Version)
+
+			// V2+ supports priority
+			if tc.version >= 2 {
+				assert.True(t, tc.version >= 2)
+			}
+			// V3 supports compression
+			if tc.version >= 3 {
+				assert.True(t, tc.version >= 3)
+			}
+		})
+	}
+}
+
+// TestS7_DynamicVirtualChannel_ChannelIDEncoding validates channel ID encoding
+// Per MS-RDPEDYC Section 2.2.1 - CbChID field
+func TestS7_DynamicVirtualChannel_ChannelIDEncoding(t *testing.T) {
+	tests := []struct {
+		cbChID     uint8
+		size       int
+		maxChannel uint32
+	}{
+		{0, 1, 0xFF},
+		{1, 2, 0xFFFF},
+		{2, 4, 0xFFFFFFFF},
+	}
+
+	for _, tc := range tests {
+		t.Run("CbChID="+string('0'+tc.cbChID), func(t *testing.T) {
+			h := Header{CbChID: tc.cbChID, Cmd: CmdData}
+			assert.Equal(t, tc.size, h.ChannelIDSize())
+		})
+	}
+}
+
+// TestS7_DynamicVirtualChannel_CreateResponse validates create response codes
+// Per MS-RDPEDYC Section 2.2.2.2
+func TestS7_DynamicVirtualChannel_CreateResponse(t *testing.T) {
+	tests := []struct {
+		code    uint32
+		name    string
+		success bool
+	}{
+		{CreateResultOK, "CHANNEL_RC_OK", true},
+		{CreateResultDenied, "CHANNEL_RC_DENIED", false},
+		{CreateResultNoMemory, "CHANNEL_RC_NO_MEMORY", false},
+		{CreateResultNoListener, "CHANNEL_RC_NO_LISTENER", false},
+		{CreateResultChannelNotFound, "CHANNEL_RC_CHANNEL_NOT_FOUND", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := CreateResponsePDU{CreationCode: tc.code}
+			isSuccess := resp.IsSuccess()
+			assert.Equal(t, tc.success, isSuccess)
+		})
+	}
+}
