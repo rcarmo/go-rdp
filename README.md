@@ -61,6 +61,7 @@ Environment variables:
 | `TLS_CERT_FILE` | - | Path to TLS certificate |
 | `TLS_KEY_FILE` | - | Path to TLS private key |
 | `RDP_ENABLE_RFX` | `true` | Enable RemoteFX codec support |
+| `RDP_ENABLE_UDP` | `false` | Enable UDP transport (experimental) |
 
 Command-line flags:
 
@@ -74,6 +75,7 @@ Command-line flags:
 | `-tls-allow-any-server-name` | Allow connecting without enforcing SNI (lab/testing only) |
 | `-nla` | Enable Network Level Authentication |
 | `-no-rfx` | Disable RemoteFX codec support |
+| `-udp` | Enable UDP transport (experimental) |
 
 See [docs/configuration.md](docs/configuration.md) for full configuration options.
 

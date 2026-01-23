@@ -77,6 +77,10 @@ export USE_NLA=true
 # Enable RemoteFX codec support (default: true)
 # Set to false to disable RFX and use simpler codecs for testing
 export RDP_ENABLE_RFX=true
+
+# Enable UDP transport (experimental, default: false)
+# When enabled, the client will attempt to use UDP for data transfer
+export RDP_ENABLE_UDP=false
 ```
 
 ## Command-Line Flags
@@ -95,6 +99,7 @@ Options:
   -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)
   -nla               Enable Network Level Authentication
   -no-rfx            Disable RemoteFX codec support
+  -udp               Enable UDP transport (experimental)
   -help              Show help message
   -version           Show version information
 ```
