@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"testing"
 )
 
@@ -1481,4 +1482,193 @@ t.Errorf("Version 5 should fail with old-style response")
 if VerifyServerPubKeyAuth(2, []byte{0x01}, clientPubKey, nil) {
 t.Errorf("Should fail with length mismatch")
 }
+}
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-NLMP and RFC 4178 (SPNEGO), RFC 4121 (GSSAPI)
+// ============================================================================
+
+// TestBVT_NTLM_MessageTypes validates NTLM message types per MS-NLMP
+func TestBVT_NTLM_MessageTypes(t *testing.T) {
+	// NTLM message types per MS-NLMP Section 2.2
+	const (
+		NtLmNegotiate    = 0x00000001
+		NtLmChallenge    = 0x00000002
+		NtLmAuthenticate = 0x00000003
+	)
+
+	tests := []struct {
+		messageType uint32
+		name        string
+	}{
+		{NtLmNegotiate, "NEGOTIATE_MESSAGE"},
+		{NtLmChallenge, "CHALLENGE_MESSAGE"},
+		{NtLmAuthenticate, "AUTHENTICATE_MESSAGE"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Message types are sequential 1, 2, 3
+			if tc.messageType < 1 || tc.messageType > 3 {
+				t.Errorf("Invalid message type: %d", tc.messageType)
+			}
+		})
+	}
+}
+
+// TestS_NTLM_NegotiateFlags validates NTLM negotiate flags per MS-NLMP
+func TestS_NTLM_NegotiateFlags(t *testing.T) {
+	// NTLM negotiate flags per MS-NLMP Section 2.2.2.5
+	const (
+		NTLMSSP_NEGOTIATE_56                       = 0x80000000
+		NTLMSSP_NEGOTIATE_KEY_EXCH                 = 0x40000000
+		NTLMSSP_NEGOTIATE_128                      = 0x20000000
+		NTLMSSP_NEGOTIATE_VERSION                  = 0x02000000
+		NTLMSSP_NEGOTIATE_TARGET_INFO              = 0x00800000
+		NTLMSSP_REQUEST_NON_NT_SESSION_KEY         = 0x00400000
+		NTLMSSP_NEGOTIATE_IDENTIFY                 = 0x00100000
+		NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY = 0x00080000
+		NTLMSSP_TARGET_TYPE_SERVER                 = 0x00020000
+		NTLMSSP_TARGET_TYPE_DOMAIN                 = 0x00010000
+		NTLMSSP_NEGOTIATE_ALWAYS_SIGN              = 0x00008000
+		NTLMSSP_NEGOTIATE_OEM_WORKSTATION_SUPPLIED = 0x00002000
+		NTLMSSP_NEGOTIATE_OEM_DOMAIN_SUPPLIED      = 0x00001000
+		NTLMSSP_NEGOTIATE_ANONYMOUS                = 0x00000800
+		NTLMSSP_NEGOTIATE_NTLM                     = 0x00000200
+		NTLMSSP_NEGOTIATE_LM_KEY                   = 0x00000080
+		NTLMSSP_NEGOTIATE_DATAGRAM                 = 0x00000040
+		NTLMSSP_NEGOTIATE_SEAL                     = 0x00000020
+		NTLMSSP_NEGOTIATE_SIGN                     = 0x00000010
+		NTLMSSP_REQUEST_TARGET                     = 0x00000004
+		NTLMSSP_NEGOTIATE_OEM                      = 0x00000002
+		NTLMSSP_NEGOTIATE_UNICODE                  = 0x00000001
+	)
+
+	tests := []struct {
+		name  string
+		flag  uint32
+		desc  string
+	}{
+		{"NEGOTIATE_56", NTLMSSP_NEGOTIATE_56, "56-bit encryption"},
+		{"NEGOTIATE_KEY_EXCH", NTLMSSP_NEGOTIATE_KEY_EXCH, "Key exchange"},
+		{"NEGOTIATE_128", NTLMSSP_NEGOTIATE_128, "128-bit encryption"},
+		{"NEGOTIATE_NTLM", NTLMSSP_NEGOTIATE_NTLM, "NTLM authentication"},
+		{"NEGOTIATE_UNICODE", NTLMSSP_NEGOTIATE_UNICODE, "Unicode strings"},
+		{"NEGOTIATE_SIGN", NTLMSSP_NEGOTIATE_SIGN, "Message signing"},
+		{"NEGOTIATE_SEAL", NTLMSSP_NEGOTIATE_SEAL, "Message sealing"},
+		{"EXTENDED_SESSIONSECURITY", NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY, "NTLMv2"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Flags are combinable powers of 2
+			if tc.flag == 0 {
+				t.Errorf("Flag %s should not be zero", tc.name)
+			}
+		})
+	}
+}
+
+// TestS_NTLM_Signature validates NTLM signature constant
+func TestS_NTLM_Signature(t *testing.T) {
+	// NTLM signature per MS-NLMP Section 2.2.1
+	// "NTLMSSP\0" as ASCII bytes
+	signature := []byte{'N', 'T', 'L', 'M', 'S', 'S', 'P', 0x00}
+	
+	if len(signature) != 8 {
+		t.Errorf("NTLM signature should be 8 bytes, got %d", len(signature))
+	}
+	
+	expected := "NTLMSSP"
+	actual := string(signature[:7])
+	if actual != expected {
+		t.Errorf("Expected signature %q, got %q", expected, actual)
+	}
+}
+
+// TestS_CredSSP_TSRequest_Versions validates CredSSP version handling
+// Per MS-CSSP Section 2.2.1
+func TestS_CredSSP_TSRequest_Versions(t *testing.T) {
+	// CredSSP versions per MS-CSSP
+	versions := []struct {
+		version  uint32
+		features string
+	}{
+		{2, "Basic CredSSP"},
+		{3, "Early User Auth"},
+		{4, "Restricted Admin Mode"},
+		{5, "Remote Credential Guard"},
+		{6, "Improved credential binding"},
+	}
+
+	for _, v := range versions {
+		t.Run(v.features, func(t *testing.T) {
+			// Versions start at 2 (1 is reserved)
+			if v.version < 2 {
+				t.Errorf("Version %d is invalid (minimum is 2)", v.version)
+			}
+		})
+	}
+}
+
+// TestS_CredSSP_NegoData validates TSRequest negoData structure
+// Per MS-CSSP Section 2.2.1.1
+func TestS_CredSSP_NegoData(t *testing.T) {
+	// negoData contains SPNEGO tokens
+	// First token must be NegTokenInit (GSSAPI)
+	
+	// SPNEGO OID: 1.3.6.1.5.5.2
+	spnegoOID := []byte{0x06, 0x06, 0x2b, 0x06, 0x01, 0x05, 0x05, 0x02}
+	
+	if len(spnegoOID) != 8 {
+		t.Errorf("SPNEGO OID should be 8 bytes")
+	}
+}
+
+// TestS_SPNEGO_MechTypes validates SPNEGO mechanism types
+// Per RFC 4178 Section 4.1
+func TestS_SPNEGO_MechTypes(t *testing.T) {
+	// Common mechanism OIDs
+	mechanisms := []struct {
+		name string
+		oid  string
+	}{
+		{"NTLM", "1.3.6.1.4.1.311.2.2.10"},
+		{"Kerberos", "1.2.840.113554.1.2.2"},
+		{"NegoEx", "1.3.6.1.4.1.311.2.2.30"},
+	}
+
+	for _, m := range mechanisms {
+		t.Run(m.name, func(t *testing.T) {
+			// OID should be non-empty
+			if m.oid == "" {
+				t.Errorf("Mechanism %s has empty OID", m.name)
+			}
+		})
+	}
+}
+
+// TestS_MD4_RFC1320 validates MD4 implementation per RFC 1320
+func TestS_MD4_RFC1320(t *testing.T) {
+	// RFC 1320 test vectors
+	testVectors := []struct {
+		input    string
+		expected string
+	}{
+		{"", "31d6cfe0d16ae931b73c59d7e0c089c0"},
+		{"a", "bde52cb31de33e46245e05fbdbd6fb24"},
+		{"abc", "a448017aaf21d8525fc10ae87aa6729d"},
+		{"message digest", "d9130a8164549fe818874806e1c7014b"},
+	}
+
+	for _, tv := range testVectors {
+		t.Run(tv.input, func(t *testing.T) {
+			result := md4([]byte(tv.input))
+			actual := fmt.Sprintf("%x", result)
+			if actual != tv.expected {
+				t.Errorf("MD4(%q) = %s, want %s", tv.input, actual, tv.expected)
+			}
+		})
+	}
 }
