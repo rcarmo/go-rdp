@@ -117,13 +117,13 @@ func TestSynData_Deserialize_TooShort(t *testing.T) {
 func TestAckVector_RoundTrip(t *testing.T) {
 	a := &AckVector{
 		AckVectorSize:     4,
-		Reserved:          0,
 		AckVectorElements: []uint8{0xFF, 0x0F, 0xF0, 0x55},
 	}
 
 	data := a.Serialize()
-	if len(data) != a.Size() {
-		t.Errorf("Expected %d bytes, got %d", a.Size(), len(data))
+	// Size should be 2 (header) + 4 (elements) + 2 (padding to DWORD) = 8
+	if len(data) != 8 {
+		t.Errorf("Expected 8 bytes (with padding), got %d", len(data))
 	}
 
 	a2 := &AckVector{}
@@ -148,7 +148,7 @@ func TestAckVector_Deserialize_TooShort(t *testing.T) {
 }
 
 func TestAckVector_Deserialize_ElementsTruncated(t *testing.T) {
-	data := []byte{10, 0} // Claims 10 elements but has none
+	data := []byte{10, 0} // Claims 10 elements (little endian: 0x000A) but has none
 	a := &AckVector{}
 	err := a.Deserialize(data)
 	if err == nil {
@@ -156,67 +156,74 @@ func TestAckVector_Deserialize_ElementsTruncated(t *testing.T) {
 	}
 }
 
-func TestSourcePayloadHeader_NoFEC(t *testing.T) {
-	h := &SourcePayloadHeader{
-		SnSourceStart: 100,
+func TestAckVector_LargeSize(t *testing.T) {
+	// Test that uint16 can handle sizes > 255
+	elements := make([]uint8, 300)
+	for i := range elements {
+		elements[i] = uint8(i % 256)
+	}
+	a := &AckVector{
+		AckVectorSize:     300,
+		AckVectorElements: elements,
 	}
 
-	data := h.Serialize(false)
-	if len(data) != 4 {
-		t.Errorf("Expected 4 bytes, got %d", len(data))
-	}
-
-	h2 := &SourcePayloadHeader{}
-	if err := h2.Deserialize(data, false); err != nil {
+	data := a.Serialize()
+	a2 := &AckVector{}
+	if err := a2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
 	}
 
-	if h2.SnSourceStart != h.SnSourceStart {
-		t.Error("SnSourceStart mismatch")
+	if a2.AckVectorSize != 300 {
+		t.Errorf("Expected size 300, got %d", a2.AckVectorSize)
 	}
 }
 
-func TestSourcePayloadHeader_WithFEC(t *testing.T) {
+func TestAckVector_MaxSizeExceeded(t *testing.T) {
+	// Test that sizes > 2048 are rejected
+	data := make([]byte, 4)
+	// Set size to 2049 (little endian)
+	data[0] = 0x01
+	data[1] = 0x08 // 0x0801 = 2049
+
+	a := &AckVector{}
+	err := a.Deserialize(data)
+	if err == nil {
+		t.Error("Expected error for size > 2048")
+	}
+}
+
+func TestSourcePayloadHeader_RoundTrip(t *testing.T) {
 	h := &SourcePayloadHeader{
+		SnCoded:       50,  // Per spec, snCoded comes first
 		SnSourceStart: 100,
-		SnCoded:       50,
-		FECMode:       FECReliable,
 	}
 
-	data := h.Serialize(true)
-	if len(data) != 9 {
-		t.Errorf("Expected 9 bytes, got %d", len(data))
+	data := h.Serialize()
+	// Per spec, always 8 bytes
+	if len(data) != 8 {
+		t.Errorf("Expected 8 bytes, got %d", len(data))
 	}
 
 	h2 := &SourcePayloadHeader{}
-	if err := h2.Deserialize(data, true); err != nil {
+	if err := h2.Deserialize(data); err != nil {
 		t.Fatalf("Deserialize failed: %v", err)
 	}
 
-	if h2.SnSourceStart != h.SnSourceStart {
-		t.Error("SnSourceStart mismatch")
-	}
 	if h2.SnCoded != h.SnCoded {
-		t.Error("SnCoded mismatch")
+		t.Errorf("SnCoded mismatch: %d vs %d", h2.SnCoded, h.SnCoded)
 	}
-	if h2.FECMode != h.FECMode {
-		t.Error("FECMode mismatch")
+	if h2.SnSourceStart != h.SnSourceStart {
+		t.Errorf("SnSourceStart mismatch: %d vs %d", h2.SnSourceStart, h.SnSourceStart)
 	}
 }
 
 func TestSourcePayloadHeader_Deserialize_TooShort(t *testing.T) {
 	h := &SourcePayloadHeader{}
 
-	// Too short for non-FEC
-	err := h.Deserialize(make([]byte, 2), false)
+	// Too short (need 8 bytes)
+	err := h.Deserialize(make([]byte, 4))
 	if err == nil {
-		t.Error("Expected error for short non-FEC data")
-	}
-
-	// Too short for FEC
-	err = h.Deserialize(make([]byte, 6), true)
-	if err == nil {
-		t.Error("Expected error for short FEC data")
+		t.Error("Expected error for short data")
 	}
 }
 
@@ -306,19 +313,24 @@ func TestPacket_ACK(t *testing.T) {
 
 func TestPacket_Data(t *testing.T) {
 	payload := []byte("Hello, RDPEUDP!")
-	p := NewDataPacket(100, 50, payload, 64)
+	// NewDataPacket(codedSeq, sourceSeq, ackSeq, data, receiveWindow)
+	p := NewDataPacket(100, 100, 50, payload, 64)
 
 	if !p.Header.IsData() {
 		t.Error("Expected DAT flag")
 	}
-	if !p.Header.IsACK() {
-		t.Error("Expected ACK flag")
+	// Data packets without ACK vector shouldn't have ACK flag
+	if p.Header.IsACK() {
+		t.Error("Unexpected ACK flag on data-only packet")
 	}
 	if p.DataHeader == nil {
 		t.Fatal("Expected DataHeader")
 	}
 	if p.DataHeader.SnSourceStart != 100 {
-		t.Error("Wrong sequence number")
+		t.Error("Wrong source sequence number")
+	}
+	if p.DataHeader.SnCoded != 100 {
+		t.Error("Wrong coded sequence number")
 	}
 	if !bytes.Equal(p.Payload, payload) {
 		t.Error("Payload mismatch")
@@ -345,8 +357,9 @@ func TestPacket_FIN(t *testing.T) {
 	if !p.Header.IsFIN() {
 		t.Error("Expected FIN flag")
 	}
-	if !p.Header.IsACK() {
-		t.Error("Expected ACK flag")
+	// FIN packets don't have ACK_VECTOR
+	if p.Header.IsACK() {
+		t.Error("Unexpected ACK flag on FIN packet")
 	}
 	if p.Header.SnSourceAck != 99 {
 		t.Errorf("Expected SnSourceAck 99, got %d", p.Header.SnSourceAck)
@@ -377,7 +390,7 @@ func TestPacket_WithAckVector(t *testing.T) {
 		Header: FECHeader{
 			SnSourceAck:              100,
 			SourceAckReceiveWindowSize: 64,
-			Flags:                    FlagACK | FlagACKV,
+			Flags:                    FlagACK, // FlagACK means ACK_VECTOR_HEADER is present
 		},
 		AckVector: &AckVector{
 			AckVectorSize:     3,
@@ -399,6 +412,40 @@ func TestPacket_WithAckVector(t *testing.T) {
 	}
 	if !bytes.Equal(p2.AckVector.AckVectorElements, []uint8{0xFF, 0x0F, 0xF0}) {
 		t.Error("AckVectorElements mismatch")
+	}
+}
+
+func TestNewDataPacketWithACK(t *testing.T) {
+	payload := []byte("Data with ACK")
+	ackVector := &AckVector{
+		AckVectorSize:     2,
+		AckVectorElements: []uint8{0xAA, 0x55},
+	}
+	// NewDataPacketWithACK(codedSeq, sourceSeq, ackSeq, data, receiveWindow, ackVector)
+	p := NewDataPacketWithACK(100, 100, 50, payload, 64, ackVector)
+
+	if !p.Header.IsData() {
+		t.Error("Expected DAT flag")
+	}
+	if !p.Header.IsACK() {
+		t.Error("Expected ACK flag")
+	}
+	if p.AckVector == nil {
+		t.Fatal("Expected AckVector")
+	}
+
+	// Test round-trip
+	data := p.Serialize()
+	p2 := &Packet{}
+	if err := p2.Deserialize(data); err != nil {
+		t.Fatalf("Deserialize failed: %v", err)
+	}
+
+	if p2.AckVector == nil {
+		t.Fatal("Lost AckVector in round-trip")
+	}
+	if !bytes.Equal(p2.Payload, payload) {
+		t.Error("Lost payload in round-trip")
 	}
 }
 
@@ -467,7 +514,8 @@ func TestPacket_ComplexScenario(t *testing.T) {
 
 func TestPacket_EmptyPayload(t *testing.T) {
 	// Data packet with no payload (valid for ACK-only with DAT flag)
-	p := NewDataPacket(100, 50, nil, 64)
+	// NewDataPacket(codedSeq, sourceSeq, ackSeq, data, receiveWindow)
+	p := NewDataPacket(100, 100, 50, nil, 64)
 
 	data := p.Serialize()
 	p2 := &Packet{}

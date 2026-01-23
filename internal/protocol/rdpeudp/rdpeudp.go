@@ -16,20 +16,19 @@ const (
 	Version2 uint8 = 0x02 // RDPEUDP2 with enhancements
 
 	// RDPUDP_FLAG values from [MS-RDPEUDP] Section 2.2.1.1
-	FlagSYN uint16 = 0x0001 // Synchronization packet
-	FlagFIN uint16 = 0x0002 // Finish (connection close)
-	FlagACK uint16 = 0x0004 // Acknowledgment
-	FlagDAT uint16 = 0x0008 // Data packet
-	FlagFEC uint16 = 0x0010 // Forward Error Correction
-	FlagCN  uint16 = 0x0020 // Connection correlation
-	FlagCWR uint16 = 0x0040 // Congestion Window Reduced
-	FlagAOA uint16 = 0x0100 // Ack of Acks
-	FlagSYN2 uint16 = 0x0200 // SYN phase 2 (version 2)
-	FlagACKV uint16 = 0x0400 // ACK vector present
-
-	// FEC modes
-	FECReliable uint8 = 0x01 // Reliable mode with retransmission
-	FECLossy    uint8 = 0x02 // Lossy mode for audio/video
+	FlagSYN           uint16 = 0x0001 // Synchronization packet
+	FlagFIN           uint16 = 0x0002 // Finish (currently unused per spec)
+	FlagACK           uint16 = 0x0004 // ACK_VECTOR_HEADER present
+	FlagDAT           uint16 = 0x0008 // SOURCE_PAYLOAD or FEC_PAYLOAD present
+	FlagFEC           uint16 = 0x0010 // FEC_PAYLOAD_HEADER present
+	FlagCN            uint16 = 0x0020 // Congestion Notification
+	FlagCWR           uint16 = 0x0040 // Congestion Window Reset
+	FlagSACKOption    uint16 = 0x0080 // Not used
+	FlagAOA           uint16 = 0x0100 // Ack of Acks (ACK_OF_ACKVECTOR present)
+	FlagSYNLossy      uint16 = 0x0200 // Connection does not require persistent retransmits
+	FlagACKDelayed    uint16 = 0x0400 // ACK was delayed, don't use for RTT
+	FlagCorrelationID uint16 = 0x0800 // CORRELATION_ID_PAYLOAD present
+	FlagSYNEX         uint16 = 0x1000 // SYNDATAEX_PAYLOAD present
 
 	// Default values
 	DefaultSnSourceAck    uint32 = 0xFFFFFFFF // Initial ack sequence number
@@ -40,10 +39,9 @@ const (
 	DefaultMaxRetransmits uint8  = 5          // Max retransmission attempts
 
 	// Header sizes
-	FECHeaderSize          = 4  // snSourceStart(4)
-	AckHeaderSize          = 12 // snAcked(4) + receiveWindow(2) + flags(1) + reserved(1) + ackVector(4)
-	SynDataSize            = 8  // snInitialSequenceNumber(4) + upstreamMTU(2) + downstreamMTU(2)
-	SourcePayloadHeaderMin = 4  // snSourceStart(4), optional snCoded(4)
+	FECHeaderSize           = 8 // snSourceAck(4) + uReceiveWindowSize(2) + uFlags(2)
+	SynDataSize             = 8 // snInitialSequenceNumber(4) + upstreamMTU(2) + downstreamMTU(2)
+	SourcePayloadHeaderSize = 8 // snCoded(4) + snSourceStart(4) - always 8 bytes per spec
 )
 
 // Errors
@@ -151,15 +149,22 @@ func (s *SynData) Serialize() []byte {
 }
 
 // AckVector represents the RDPUDP_ACK_VECTOR_HEADER structure.
-// [MS-RDPEUDP] Section 2.2.1.2
+// [MS-RDPEUDP] Section 2.2.2.7
 type AckVector struct {
-	AckVectorSize     uint8   // Number of bytes in the ack vector
-	Reserved          uint8   // Reserved, must be 0
-	AckVectorElements []uint8 // Each bit represents a packet state
+	AckVectorSize     uint16  // Size of AckVector in bytes (max 2048)
+	AckVectorElements []uint8 // RLE-encoded packet state (each element is an ACK Vector Element)
 }
 
-// Size returns the serialized size of AckVector.
+// Size returns the serialized size of AckVector including DWORD padding.
 func (a *AckVector) Size() int {
+	baseSize := 2 + len(a.AckVectorElements)
+	// Pad to DWORD (4-byte) boundary per spec
+	padding := (4 - (baseSize % 4)) % 4
+	return baseSize + padding
+}
+
+// SizeWithoutPadding returns the serialized size without padding.
+func (a *AckVector) SizeWithoutPadding() int {
 	return 2 + len(a.AckVectorElements)
 }
 
@@ -169,11 +174,14 @@ func (a *AckVector) Deserialize(data []byte) error {
 		return fmt.Errorf("%w: ACK vector header too short", ErrInvalidPacket)
 	}
 
-	a.AckVectorSize = data[0]
-	a.Reserved = data[1]
+	a.AckVectorSize = binary.LittleEndian.Uint16(data[0:2])
 
 	if int(a.AckVectorSize) > len(data)-2 {
 		return fmt.Errorf("%w: ACK vector elements truncated", ErrInvalidPacket)
+	}
+
+	if a.AckVectorSize > 2048 {
+		return fmt.Errorf("%w: ACK vector size exceeds max (2048)", ErrInvalidPacket)
 	}
 
 	a.AckVectorElements = make([]uint8, a.AckVectorSize)
@@ -181,68 +189,56 @@ func (a *AckVector) Deserialize(data []byte) error {
 	return nil
 }
 
-// Serialize encodes AckVector to bytes.
+// Serialize encodes AckVector to bytes with DWORD padding.
 func (a *AckVector) Serialize() []byte {
 	buf := make([]byte, a.Size())
-	buf[0] = a.AckVectorSize
-	buf[1] = a.Reserved
+	binary.LittleEndian.PutUint16(buf[0:2], a.AckVectorSize)
 	copy(buf[2:], a.AckVectorElements)
+	// Remaining bytes are already zero (padding)
 	return buf
 }
 
 // SourcePayloadHeader represents the RDPUDP_SOURCE_PAYLOAD_HEADER structure.
-// [MS-RDPEUDP] Section 2.2.3.1
+// [MS-RDPEUDP] Section 2.2.2.4
+// Per spec, this structure is always 8 bytes: snCoded(4) + snSourceStart(4)
 type SourcePayloadHeader struct {
-	SnSourceStart uint32 // Starting sequence number of this data
-	SnCoded       uint32 // Present only if FEC flag is set
-	FECMode       uint8  // Present only if FEC flag is set
+	SnCoded       uint32 // Coded packet sequence number (comes FIRST per spec)
+	SnSourceStart uint32 // Source packet sequence number (comes SECOND per spec)
 }
 
-// Size returns the serialized size depending on FEC mode.
-func (h *SourcePayloadHeader) Size(hasFEC bool) int {
-	if hasFEC {
-		return 9 // snSourceStart(4) + snCoded(4) + fecMode(1)
-	}
-	return 4 // snSourceStart(4) only
+// Size returns the serialized size (always 8 bytes per spec).
+func (h *SourcePayloadHeader) Size() int {
+	return SourcePayloadHeaderSize
 }
 
 // Deserialize parses SourcePayloadHeader from bytes.
-func (h *SourcePayloadHeader) Deserialize(data []byte, hasFEC bool) error {
-	minSize := 4
-	if hasFEC {
-		minSize = 9
-	}
-	if len(data) < minSize {
+func (h *SourcePayloadHeader) Deserialize(data []byte) error {
+	if len(data) < SourcePayloadHeaderSize {
 		return fmt.Errorf("%w: source payload header too short", ErrInvalidPacket)
 	}
 
-	h.SnSourceStart = binary.LittleEndian.Uint32(data[0:4])
-	if hasFEC {
-		h.SnCoded = binary.LittleEndian.Uint32(data[4:8])
-		h.FECMode = data[8]
-	}
+	// Per MS-RDPEUDP Section 2.2.2.4: snCoded comes FIRST, snSourceStart SECOND
+	h.SnCoded = binary.LittleEndian.Uint32(data[0:4])
+	h.SnSourceStart = binary.LittleEndian.Uint32(data[4:8])
 	return nil
 }
 
 // Serialize encodes SourcePayloadHeader to bytes.
-func (h *SourcePayloadHeader) Serialize(hasFEC bool) []byte {
-	size := h.Size(hasFEC)
-	buf := make([]byte, size)
-	binary.LittleEndian.PutUint32(buf[0:4], h.SnSourceStart)
-	if hasFEC {
-		binary.LittleEndian.PutUint32(buf[4:8], h.SnCoded)
-		buf[8] = h.FECMode
-	}
+func (h *SourcePayloadHeader) Serialize() []byte {
+	buf := make([]byte, SourcePayloadHeaderSize)
+	// Per MS-RDPEUDP Section 2.2.2.4: snCoded comes FIRST, snSourceStart SECOND
+	binary.LittleEndian.PutUint32(buf[0:4], h.SnCoded)
+	binary.LittleEndian.PutUint32(buf[4:8], h.SnSourceStart)
 	return buf
 }
 
 // Packet represents a complete RDPEUDP packet.
 type Packet struct {
-	Header      FECHeader
-	SynData     *SynData
-	AckVector   *AckVector
-	DataHeader  *SourcePayloadHeader
-	Payload     []byte
+	Header     FECHeader
+	SynData    *SynData
+	AckVector  *AckVector
+	DataHeader *SourcePayloadHeader
+	Payload    []byte
 }
 
 // Deserialize parses a complete RDPEUDP packet.
@@ -263,22 +259,26 @@ func (p *Packet) Deserialize(data []byte) error {
 	}
 
 	// Parse ACK vector if present
-	if p.Header.HasFlag(FlagACK) && p.Header.HasFlag(FlagACKV) {
-		p.AckVector = &AckVector{}
-		if err := p.AckVector.Deserialize(data[offset:]); err != nil {
-			return err
+	// Per MS-RDPEUDP, ACK_VECTOR_HEADER is present when FlagACK is set,
+	// but NOT during SYN phase (SYN and SYN+ACK packets don't include ACK vectors)
+	if p.Header.HasFlag(FlagACK) && !p.Header.HasFlag(FlagSYN) {
+		// Only parse ACK vector if there's data remaining beyond what we've parsed
+		if offset < len(data) {
+			p.AckVector = &AckVector{}
+			if err := p.AckVector.Deserialize(data[offset:]); err != nil {
+				return err
+			}
+			offset += p.AckVector.Size()
 		}
-		offset += p.AckVector.Size()
 	}
 
 	// Parse data header and payload if present
 	if p.Header.HasFlag(FlagDAT) {
 		p.DataHeader = &SourcePayloadHeader{}
-		hasFEC := p.Header.HasFlag(FlagFEC)
-		if err := p.DataHeader.Deserialize(data[offset:], hasFEC); err != nil {
+		if err := p.DataHeader.Deserialize(data[offset:]); err != nil {
 			return err
 		}
-		offset += p.DataHeader.Size(hasFEC)
+		offset += p.DataHeader.Size()
 
 		// Remaining bytes are payload
 		if offset < len(data) {
@@ -303,14 +303,13 @@ func (p *Packet) Serialize() []byte {
 	}
 
 	// Write ACK vector if present
-	if p.AckVector != nil && p.Header.HasFlag(FlagACK) && p.Header.HasFlag(FlagACKV) {
+	if p.AckVector != nil && p.Header.HasFlag(FlagACK) {
 		buf.Write(p.AckVector.Serialize())
 	}
 
 	// Write data header and payload if present
 	if p.DataHeader != nil && p.Header.HasFlag(FlagDAT) {
-		hasFEC := p.Header.HasFlag(FlagFEC)
-		buf.Write(p.DataHeader.Serialize(hasFEC))
+		buf.Write(p.DataHeader.Serialize())
 		if len(p.Payload) > 0 {
 			buf.Write(p.Payload)
 		}
@@ -362,28 +361,49 @@ func NewACKPacket(ackSeq uint32, receiveWindow uint16) *Packet {
 	}
 }
 
-// NewDataPacket creates a data packet.
-func NewDataPacket(seq uint32, ackSeq uint32, data []byte, receiveWindow uint16) *Packet {
+// NewDataPacket creates a data packet without ACK vector.
+// codedSeq is the coded packet sequence number, sourceSeq is the source packet sequence number.
+// Use NewDataPacketWithACK if you need to include an ACK vector.
+func NewDataPacket(codedSeq, sourceSeq uint32, ackSeq uint32, data []byte, receiveWindow uint16) *Packet {
 	return &Packet{
 		Header: FECHeader{
-			SnSourceAck:              ackSeq,
+			SnSourceAck:                ackSeq,
 			SourceAckReceiveWindowSize: receiveWindow,
-			Flags:                    FlagDAT | FlagACK,
+			Flags:                      FlagDAT, // Only DATA flag, no ACK_VECTOR
 		},
 		DataHeader: &SourcePayloadHeader{
-			SnSourceStart: seq,
+			SnCoded:       codedSeq,
+			SnSourceStart: sourceSeq,
 		},
 		Payload: data,
 	}
 }
 
+// NewDataPacketWithACK creates a data packet with an ACK vector for selective acknowledgment.
+func NewDataPacketWithACK(codedSeq, sourceSeq uint32, ackSeq uint32, data []byte, receiveWindow uint16, ackVector *AckVector) *Packet {
+	return &Packet{
+		Header: FECHeader{
+			SnSourceAck:                ackSeq,
+			SourceAckReceiveWindowSize: receiveWindow,
+			Flags:                      FlagDAT | FlagACK,
+		},
+		DataHeader: &SourcePayloadHeader{
+			SnCoded:       codedSeq,
+			SnSourceStart: sourceSeq,
+		},
+		AckVector: ackVector,
+		Payload:   data,
+	}
+}
+
 // NewFINPacket creates a FIN packet for connection termination.
+// Note: FIN flag is currently unused per spec, but we include it for completeness.
 func NewFINPacket(ackSeq uint32) *Packet {
 	return &Packet{
 		Header: FECHeader{
-			SnSourceAck:              ackSeq,
+			SnSourceAck:                ackSeq,
 			SourceAckReceiveWindowSize: 0,
-			Flags:                    FlagFIN | FlagACK,
+			Flags:                      FlagFIN, // No ACK_VECTOR
 		},
 	}
 }
@@ -415,11 +435,17 @@ func FlagsString(flags uint16) string {
 	if flags&FlagAOA != 0 {
 		parts = append(parts, "AOA")
 	}
-	if flags&FlagSYN2 != 0 {
-		parts = append(parts, "SYN2")
+	if flags&FlagSYNLossy != 0 {
+		parts = append(parts, "SYNLOSSY")
 	}
-	if flags&FlagACKV != 0 {
-		parts = append(parts, "ACKV")
+	if flags&FlagACKDelayed != 0 {
+		parts = append(parts, "ACKDELAYED")
+	}
+	if flags&FlagCorrelationID != 0 {
+		parts = append(parts, "CORRELATIONID")
+	}
+	if flags&FlagSYNEX != 0 {
+		parts = append(parts, "SYNEX")
 	}
 	if len(parts) == 0 {
 		return "NONE"
