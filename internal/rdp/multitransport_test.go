@@ -317,3 +317,105 @@ func TestGenerateCookieHash(t *testing.T) {
 		t.Error("First half of hash should match cookie")
 	}
 }
+
+// ============================================================================
+// New Tests for Extended Functionality
+// ============================================================================
+
+func TestMultitransportHandler_SetServerAddress(t *testing.T) {
+	handler := NewMultitransportHandler(func(data []byte) error { return nil })
+
+	handler.SetServerAddress("192.168.1.100", 3389)
+
+	if handler.serverHost != "192.168.1.100" {
+		t.Errorf("serverHost = %q, want 192.168.1.100", handler.serverHost)
+	}
+	if handler.serverPort != 3389 {
+		t.Errorf("serverPort = %d, want 3389", handler.serverPort)
+	}
+}
+
+func TestMultitransportHandler_SetSoftSyncSupported(t *testing.T) {
+	handler := NewMultitransportHandler(func(data []byte) error { return nil })
+
+	if handler.softSyncSupported {
+		t.Error("softSyncSupported should be false by default")
+	}
+
+	handler.SetSoftSyncSupported(true)
+	if !handler.softSyncSupported {
+		t.Error("softSyncSupported should be true")
+	}
+}
+
+func TestMultitransportHandler_Close(t *testing.T) {
+	handler := NewMultitransportHandler(func(data []byte) error { return nil })
+
+	// Close should not panic even with no tunnel manager
+	handler.Close()
+
+	// Close again should still not panic
+	handler.Close()
+}
+
+func TestMultitransportHandler_GetTunnelState_NoManager(t *testing.T) {
+	handler := NewMultitransportHandler(func(data []byte) error { return nil })
+
+	state := handler.GetTunnelState(123)
+	if state != "NO_TUNNEL_MANAGER" {
+		t.Errorf("state = %q, want NO_TUNNEL_MANAGER", state)
+	}
+}
+
+func TestMultitransportHandler_SendOverUDP_NoManager(t *testing.T) {
+	handler := NewMultitransportHandler(func(data []byte) error { return nil })
+
+	err := handler.SendOverUDP(123, []byte("test"))
+	if err == nil {
+		t.Error("expected error when tunnel manager not available")
+	}
+}
+
+func TestExtractHostPort(t *testing.T) {
+	tests := []struct {
+		addr     string
+		wantHost string
+		wantPort int
+	}{
+		{"192.168.1.1:3389", "192.168.1.1", 3389},
+		{"server.example.com:3390", "server.example.com", 3390},
+		{"192.168.1.1", "192.168.1.1", 3389}, // No port, default
+		{"server.example.com", "server.example.com", 3389},
+		{"localhost:9999", "localhost", 9999},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.addr, func(t *testing.T) {
+			host, port := ExtractHostPort(tc.addr)
+			if host != tc.wantHost {
+				t.Errorf("host = %q, want %q", host, tc.wantHost)
+			}
+			if port != tc.wantPort {
+				t.Errorf("port = %d, want %d", port, tc.wantPort)
+			}
+		})
+	}
+}
+
+// TestMultitransportHandler_SetTunnelDataCallback verifies data callback setting
+func TestMultitransportHandler_SetTunnelDataCallback(t *testing.T) {
+	handler := NewMultitransportHandler(func(data []byte) error { return nil })
+
+	called := false
+	handler.SetTunnelDataCallback(func(requestID uint32, data []byte) {
+		called = true
+	})
+
+	// Callback should be stored (not called yet)
+	if handler.onTunnelData == nil {
+		t.Error("onTunnelData callback not set")
+	}
+	if called {
+		t.Error("callback should not be called during SetTunnelDataCallback")
+	}
+}
