@@ -709,3 +709,120 @@ func Test_ConnectionConfirm_InvalidCodes(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// Microsoft Protocol Test Suite Validation Tests
+// Reference: MS-RDPBCGR_ClientTestDesignSpecification.md - S1_Connection
+// ============================================================================
+
+// TestBVT_ConnectionInitiation_X224Request validates per MS test case:
+// "BVT_ConnectionTest_ConnectionInitiation_PositiveTest"
+func TestBVT_ConnectionInitiation_X224Request(t *testing.T) {
+	// Per MS-RDPBCGR Section 2.2.1.1:
+	// Client X.224 Connection Request PDU requirements
+	req := ConnectionRequest{
+		CRCDT:       0xE0, // Connection Request
+		DSTREF:      0,    // Must be 0 per spec
+		SRCREF:      0,    // May be 0
+		ClassOption: 0,    // Class 0
+	}
+
+	data := req.Serialize()
+
+	// Verify TPDU header is correct
+	// Per X.224: LI (length indicator), CRCDT, DSTREF, SRCREF, ClassOption
+	require.True(t, len(data) >= 7, "X.224 CR PDU minimum size is 7 bytes")
+	require.Equal(t, byte(0xE0), data[1], "CRCDT must be 0xE0 for Connection Request")
+}
+
+// TestBVT_ConnectionInitiation_X224Confirm validates per MS test case:
+// "SUT can process the valid Server X.224 Connection Confirm PDU correctly"
+func TestBVT_ConnectionInitiation_X224Confirm(t *testing.T) {
+	// Per MS-RDPBCGR Section 2.2.1.2:
+	// Server X.224 Connection Confirm PDU
+	confirmData := []byte{
+		0x0e,       // LI = 14
+		0xD0,       // CCCDT (Connection Confirm)
+		0x00, 0x00, // DSTREF
+		0x12, 0x34, // SRCREF
+		0x00,       // Class 0
+		// RDP Negotiation Response
+		0x02,             // type: TYPE_RDP_NEG_RSP
+		0x00,             // flags
+		0x08, 0x00,       // length = 8
+		0x00, 0x00, 0x00, 0x00, // selectedProtocol = 0 (RDP)
+	}
+
+	var cc ConnectionConfirm
+	err := cc.Deserialize(bytes.NewBuffer(confirmData))
+	require.NoError(t, err)
+	require.Equal(t, byte(0xD0), cc.CCCDT)
+}
+
+// TestS1_Connection_NegotiationFlags validates per MS-RDPBCGR Section 2.2.1.2.1
+func TestS1_Connection_NegotiationFlags(t *testing.T) {
+	// RDP Negotiation Response flags
+	tests := []struct {
+		name        string
+		flags       byte
+		description string
+	}{
+		{"NoFlags", 0x00, "No special flags"},
+		{"EXTENDED_CLIENT_DATA_SUPPORTED", 0x01, "Server supports extended client data"},
+		{"DYNVC_GFX_PROTOCOL_SUPPORTED", 0x02, "Server supports GFX protocol"},
+		{"RDP_NEGRSP_RESERVED", 0x04, "Reserved flag"},
+		{"RESTRICTED_ADMIN_MODE_SUPPORTED", 0x08, "Restricted admin mode"},
+		{"REDIRECTED_AUTHENTICATION_MODE_SUPPORTED", 0x10, "Redirected auth"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			confirmData := []byte{
+				0x0e, 0xD0, 0x00, 0x00, 0x12, 0x34, 0x00,
+				0x02,                   // TYPE_RDP_NEG_RSP
+				tc.flags,               // flags
+				0x08, 0x00,             // length
+				0x00, 0x00, 0x00, 0x00, // protocol
+			}
+
+			var cc ConnectionConfirm
+			err := cc.Deserialize(bytes.NewBuffer(confirmData))
+			require.NoError(t, err, "Failed to parse with flags: %s", tc.description)
+		})
+	}
+}
+
+// TestS1_Connection_ProtocolSelection validates protocol selection per spec
+func TestS1_Connection_ProtocolSelection(t *testing.T) {
+	// Per MS-RDPBCGR Section 2.2.1.1.1
+	protocols := []struct {
+		value uint32
+		name  string
+	}{
+		{0x00000000, "PROTOCOL_RDP"},
+		{0x00000001, "PROTOCOL_SSL"},
+		{0x00000002, "PROTOCOL_HYBRID"},
+		{0x00000004, "PROTOCOL_RDSTLS"},
+		{0x00000008, "PROTOCOL_HYBRID_EX"},
+		{0x00000010, "PROTOCOL_RDSAAD"},
+	}
+
+	for _, p := range protocols {
+		t.Run(p.name, func(t *testing.T) {
+			confirmData := make([]byte, 15)
+			confirmData[0] = 0x0e
+			confirmData[1] = 0xD0
+			confirmData[7] = 0x02 // TYPE_RDP_NEG_RSP
+			confirmData[9] = 0x08
+			// Set protocol in little-endian
+			confirmData[11] = byte(p.value)
+			confirmData[12] = byte(p.value >> 8)
+			confirmData[13] = byte(p.value >> 16)
+			confirmData[14] = byte(p.value >> 24)
+
+			var cc ConnectionConfirm
+			err := cc.Deserialize(bytes.NewBuffer(confirmData))
+			require.NoError(t, err, "Failed for protocol %s", p.name)
+		})
+	}
+}
