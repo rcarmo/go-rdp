@@ -25,7 +25,7 @@ docker run -e LOG_LEVEL=debug -p 8080:8080 ghcr.io/rcarmo/rdp-html5:latest
 | Level | Description |
 |-------|-------------|
 | `debug` | Protocol details, byte dumps, timing, internal state |
-| `info` | Connection events, capability negotiation, audio format selection |
+| `info` | Connection events, capability negotiation, audio format selection (PCM/MP3) |
 | `warn` | Recoverable issues, fallbacks, missing optional features |
 | `error` | Failures that affect operation |
 
@@ -36,7 +36,9 @@ docker run -e LOG_LEVEL=debug -p 8080:8080 ghcr.io/rcarmo/rdp-html5:latest
 [INFO] Client connected from 192.168.1.100
 [INFO] RDP connection established to 10.0.0.5:3389
 [DEBUG] NLA: Received NTLM challenge, flags=0xe2888235
-[WARN] Audio: Unsupported format, falling back to PCM
+[INFO] Audio: Negotiated format: PCM 44100Hz 2ch 16bit
+[INFO] Audio: No PCM formats available, using MP3
+[WARN] Audio: No supported formats offered by server (need PCM or MP3); audio disabled
 [ERROR] Connection lost: read tcp: connection reset by peer
 ```
 
@@ -100,6 +102,8 @@ Logger.getLevel();     // Returns current level string
 [Config] Log level synced: info
 [Clipboard] Initialized clipboard handler
 [Audio] Audio context created, sample rate: 48000
+[Audio] Format: PCM 44100Hz 2ch 16bit
+[Audio] Format: MP3 44100Hz 2ch 0bit
 ```
 
 ## Common Issues

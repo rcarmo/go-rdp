@@ -114,7 +114,7 @@ This implementation follows Microsoft's open protocol specifications:
 - **TLS Support** - TLS 1.2+ encryption for RDP connections
 - **NLA Authentication** - Network Level Authentication (with limitations)
 - **Clipboard** - Bidirectional text clipboard
-- **Audio** - Basic audio redirection
+- **Audio** - Audio redirection with PCM and MP3 support
 - **WebAssembly** - RLE/NSCodec/RemoteFX decoding via WASM
 - **Configurable** - Environment-based configuration
 

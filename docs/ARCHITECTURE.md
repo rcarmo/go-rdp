@@ -39,7 +39,7 @@ This project implements a browser-based Remote Desktop Protocol (RDP) client usi
 | Authentication | ✅     | NLA (CredSSP/NTLMv2), TLS, standard RDP |
 | Color Depths   | ✅     | 8, 15, 16, 24, 32-bit                   |
 | Codecs         | ✅     | RLE, NSCodec, Planar                    |
-| Audio          | ✅     | RDPSND channel with PCM output          |
+| Audio          | ✅     | RDPSND channel with PCM and MP3 output  |
 | Clipboard      | ✅     | Text copy/paste                         |
 | UDP Transport  | 🔧     | Experimental, MS-RDPEUDP/MS-RDPEMT      |
 
@@ -775,7 +775,7 @@ RDP Server (RDPSND Virtual Channel)
 │                                                               │
 │  handleServerFormats()                                        │
 │    • Parse available formats                                  │
-│    • Select PCM format (preferred: 16-bit, 44.1kHz, stereo)   │
+│    • Select format (prefer PCM for low latency, MP3 fallback) │
 │    • Send SNDC_FORMATS response                               │
 │                                                               │
 │  handleTraining()                                             │
@@ -783,7 +783,7 @@ RDP Server (RDPSND Virtual Channel)
 │                                                               │
 │  handleWave() / handleWave2()                                 │
 │    • Extract audio data                                       │
-│    • Call callback with PCM data                              │
+│    • Call callback with audio data + format info              │
 │    • Send SNDC_WAVE_CONFIRM                                   │
 └───────────────────────────────────────────────────────────────┘
          │
@@ -794,6 +794,7 @@ RDP Server (RDPSND Virtual Channel)
 │                                                               │
 │  sendAudioData()                                              │
 │    • Build audio message: 0xFE marker + format + data         │
+│    • Include format tag to identify PCM vs MP3                │
 │    • Send over WebSocket                                      │
 └───────────────────────────────────────────────────────────────┘
          │
@@ -807,20 +808,35 @@ RDP Server (RDPSND Virtual Channel)
 │    • Set sample rate from format                              │
 │                                                               │
 │  handleAudioMessage()                                         │
-│    • Parse format info                                        │
-│    • Decode PCM to Float32                                    │
+│    • Parse format info (including format tag)                 │
+│    • Route to appropriate decoder based on format:            │
+│      - PCM: Direct decode to Float32                          │
+│      - MP3: Decode via decodeAudioData() (async)              │
 │    • Schedule playback via AudioBufferSourceNode              │
 └───────────────────────────────────────────────────────────────┘
 ```
 
 ### Supported Audio Formats
 
-| Format Tag | Name                   | Support |
-| ---------- | ---------------------- | ------- |
-| 0x0001     | WAVE_FORMAT_PCM        | ✅ Full |
-| 0x0011     | WAVE_FORMAT_ADPCM      | ❌      |
-| 0x0055     | WAVE_FORMAT_MPEGLAYER3 | ❌      |
-| 0xFFFE     | WAVE_FORMAT_EXTENSIBLE | ❌      |
+| Format Tag | Name                   | Support     | Notes                              |
+| ---------- | ---------------------- | ----------- | ---------------------------------- |
+| 0x0001     | WAVE_FORMAT_PCM        | ✅ Primary  | Preferred for low latency          |
+| 0x0055     | WAVE_FORMAT_MPEGLAYER3 | ✅ Fallback | ~10x bandwidth savings vs PCM      |
+| 0x0011     | WAVE_FORMAT_ADPCM      | ❌          |                                    |
+| 0xFFFE     | WAVE_FORMAT_EXTENSIBLE | ❌          |                                    |
+
+### Format Selection Strategy
+
+1. **PCM is preferred** when available (16-bit, 44.1kHz, stereo ideal)
+   - Direct playback with no decode overhead
+   - Lowest latency for real-time audio
+
+2. **MP3 is used as fallback** when no PCM formats offered
+   - Browser decodes via `AudioContext.decodeAudioData()`
+   - Slight latency increase (~20-50ms decode time)
+   - Significant bandwidth reduction
+
+3. If server offers both, **PCM is always selected** for latency reasons
 
 ---
 
