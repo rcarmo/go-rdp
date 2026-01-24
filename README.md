@@ -2,7 +2,7 @@
 
 ![Logo](docs/icon-256.png)
 
-A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssembly, originally inspired by [`kulaginda/rdp-html5`]https://github.com/kulaginds/rdp-html5] but completely rewritten from scratch to pass all the reference tests in Microsoft's [MS-RDPBCGR] specification and be a reference implementation for RDP in Go.
+A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssembly, originally inspired by [`kulaginda/rdp-html5`](https://github.com/kulaginds/rdp-html5) but completely rewritten from scratch to pass all the reference tests in Microsoft's [MS-RDPBCGR] specification and be a reference implementation for RDP in Go.
 
 > ⚠️ **Note**: While functional, this implementation has known limitations.
 
