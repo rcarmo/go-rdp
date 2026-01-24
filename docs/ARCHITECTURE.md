@@ -32,16 +32,16 @@ This project implements a browser-based Remote Desktop Protocol (RDP) client usi
 
 ### Key Capabilities
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Display | ✅ | FastPath and slow-path bitmap updates |
-| Input | ✅ | Mouse and keyboard via FastPath |
-| Authentication | ✅ | NLA (CredSSP/NTLMv2), TLS, standard RDP |
-| Color Depths | ✅ | 8, 15, 16, 24, 32-bit |
-| Codecs | ✅ | RLE, NSCodec, Planar |
-| Audio | ✅ | RDPSND channel with PCM output |
-| Clipboard | ✅ | Text copy/paste |
-| UDP Transport | 🔧 | Experimental, MS-RDPEUDP/MS-RDPEMT |
+| Feature        | Status | Description                             |
+| -------------- | ------ | --------------------------------------- |
+| Display        | ✅     | FastPath and slow-path bitmap updates   |
+| Input          | ✅     | Mouse and keyboard via FastPath         |
+| Authentication | ✅     | NLA (CredSSP/NTLMv2), TLS, standard RDP |
+| Color Depths   | ✅     | 8, 15, 16, 24, 32-bit                   |
+| Codecs         | ✅     | RLE, NSCodec, Planar                    |
+| Audio          | ✅     | RDPSND channel with PCM output          |
+| Clipboard      | ✅     | Text copy/paste                         |
+| UDP Transport  | 🔧     | Experimental, MS-RDPEUDP/MS-RDPEMT      |
 
 ---
 
@@ -110,37 +110,37 @@ This project implements a browser-based Remote Desktop Protocol (RDP) client usi
 ### Connection Establishment
 
 ```
-Browser                    Go Server                   RDP Server
-   │                           │                            │
-   │──GET /connect?params────▶│                            │
-   │                           │──TCP Connect────────────▶│
-   │                           │◀─────────────────────────│
-   │                           │                            │
-   │                           │──X.224 Connection Req───▶│
-   │                           │◀─X.224 Connection Conf───│
-   │                           │                            │
-   │                           │══TLS Handshake══════════▶│
-   │                           │◀════════════════════════│
-   │                           │                            │
-   │                           │──NLA (if enabled)───────▶│
-   │                           │◀─────────────────────────│
-   │                           │                            │
-   │                           │──MCS Connect-Initial────▶│
-   │                           │◀─MCS Connect-Response────│
-   │                           │                            │
-   │                           │──Channel Join────────────▶│
-   │                           │◀─────────────────────────│
-   │                           │                            │
-   │                           │──Client Info─────────────▶│
-   │                           │◀─License Response────────│
-   │                           │                            │
-   │                           │──Capability Confirm──────▶│
-   │                           │◀─────────────────────────│
-   │                           │                            │
-   │◀─WebSocket Upgrade───────│                            │
-   │                           │                            │
-   │◀─Capabilities JSON───────│                            │
-   │                           │                            │
+Browser                    Go Server                 RDP Server
+   │                          │                          │
+   │──GET /connect?params────▶│                          │
+   │                          │──TCP Connect────────────▶│
+   │                          │◀─────────────────────────│
+   │                          │                          │
+   │                          │──X.224 Connection Req───▶│
+   │                          │◀─X.224 Connection Conf───│
+   │                          │                          │
+   │                          │══TLS Handshake══════════▶│
+   │                          │◀═════════════════════════│
+   │                          │                          │
+   │                          │──NLA (if enabled)───────▶│
+   │                          │◀─────────────────────────│
+   │                          │                          │
+   │                          │──MCS Connect-Initial────▶│
+   │                          │◀─MCS Connect-Response────│
+   │                          │                          │
+   │                          │──Channel Join───────────▶│
+   │                          │◀─────────────────────────│
+   │                          │                          │
+   │                          │──Client Info────────────▶│
+   │                          │◀─License Response────────│
+   │                          │                          │
+   │                          │──Capability Confirm─────▶│
+   │                          │◀─────────────────────────│
+   │                          │                          │
+   │◀─WebSocket Upgrade───────│                          │
+   │                          │                          │
+   │◀─Capabilities JSON───────│                          │
+   │                          │                          │
 ```
 
 ### Runtime Data Flow
@@ -281,24 +281,24 @@ type Client struct {
     // Network
     conn       net.Conn
     buffReader *bufio.Reader
-    
+
     // Protocol layers
     tpktLayer    *tpkt.Protocol
     x224Layer    *x224.Protocol
     mcsLayer     MCSLayer
     fastPath     *fastpath.FastPath
-    
+
     // Session state
     userID            uint16
     channelIDMap      map[string]uint16
     selectedProtocol  pdu.NegotiationProtocol
-    
+
     // Configuration
     desktopWidth  int
     desktopHeight int
     colorDepth    int
     useNLA        bool
-    
+
     // Handlers
     audioHandler  *AudioHandler
 }
@@ -312,25 +312,25 @@ The connection follows MS-RDPBCGR specification:
 func (c *Client) Connect() error {
     // Phase 1: Connection Initiation
     c.connectionInitiation()  // X.224 + protocol negotiation
-    
-    // Phase 2: Basic Settings Exchange  
+
+    // Phase 2: Basic Settings Exchange
     c.basicSettingsExchange() // MCS Connect + GCC
-    
+
     // Phase 3: Channel Connection
     c.channelConnection()     // Erect domain, attach user, join channels
-    
+
     // Phase 4: Secure Settings Exchange
     c.secureSettingsExchange() // Client Info PDU
-    
+
     // Phase 5: Licensing
     c.licensing()             // License validation
-    
+
     // Phase 6: Capabilities Exchange
     c.capabilitiesExchange()  // Demand/Confirm Active PDU
-    
+
     // Phase 7: Connection Finalization
     c.connectionFinalization() // Synchronize, control, font list
-    
+
     return nil
 }
 ```
@@ -472,12 +472,12 @@ The client supports optional UDP transport for improved performance over high-la
 
 ### Key Features
 
-| Feature | Description |
-|---------|-------------|
-| Reliable Transport | TLS-secured, sequenced delivery with retransmission |
-| Lossy Transport | DTLS-secured, best-effort delivery for bulk data |
-| Multitransport Negotiation | Server-initiated, client can accept or decline |
-| Automatic Fallback | Declines UDP requests when disabled (E_ABORT) |
+| Feature                    | Description                                         |
+| -------------------------- | --------------------------------------------------- |
+| Reliable Transport         | TLS-secured, sequenced delivery with retransmission |
+| Lossy Transport            | DTLS-secured, best-effort delivery for bulk data    |
+| Multitransport Negotiation | Server-initiated, client can accept or decline      |
+| Automatic Fallback         | Declines UDP requests when disabled (E_ABORT)       |
 
 ### Enabling UDP
 
@@ -529,25 +529,25 @@ The JavaScript client uses a mixin-based architecture:
 
 ```javascript
 // web/src/js/client.js
-import { SessionMixin } from './session.js';
-import { InputMixin } from './input.js';
-import { GraphicsMixin } from './graphics.js';
-import { ClipboardMixin } from './clipboard.js';
-import { UIMixin } from './ui.js';
-import AudioMixin from './audio.js';
+import { SessionMixin } from "./session.js";
+import { InputMixin } from "./input.js";
+import { GraphicsMixin } from "./graphics.js";
+import { ClipboardMixin } from "./clipboard.js";
+import { UIMixin } from "./ui.js";
+import AudioMixin from "./audio.js";
 
 function Client(websocketURL, canvasID, hostID, userID, passwordID) {
-    this.websocketURL = websocketURL;
-    this.canvas = document.getElementById(canvasID);
-    this.ctx = this.canvas.getContext('2d');
-    this.socket = null;
-    
-    // Initialize all mixins
-    this.initSession();
-    this.initInput();
-    this.initGraphics();
-    this.initUI();
-    this.initAudio();
+  this.websocketURL = websocketURL;
+  this.canvas = document.getElementById(canvasID);
+  this.ctx = this.canvas.getContext("2d");
+  this.socket = null;
+
+  // Initialize all mixins
+  this.initSession();
+  this.initInput();
+  this.initGraphics();
+  this.initUI();
+  this.initAudio();
 }
 
 // Apply mixins to prototype
@@ -578,7 +578,7 @@ func main() {
         "decodeRFXTile":   js.FuncOf(jsDecodeRFXTile),
         "setRFXQuant":     js.FuncOf(jsSetRFXQuant),
     }))
-    
+
     <-c // Keep alive
 }
 ```
@@ -590,17 +590,32 @@ When WASM is unavailable (older browsers, disabled WebAssembly), the client fall
 ```javascript
 // web/src/js/codec-fallback.js
 const FallbackCodec = {
-    rgb565ToRGBA(src, dst) { /* ... */ },
-    rgb555ToRGBA(src, dst) { /* ... */ },
-    bgr24ToRGBA(src, dst)  { /* ... */ },
-    bgra32ToRGBA(src, dst) { /* ... */ },
-    palette8ToRGBA(src, dst) { /* ... */ },
-    flipVertical(data, width, height, bytesPerPixel) { /* ... */ },
-    processBitmap(src, width, height, bpp, isCompressed, dst) { /* ... */ }
+  rgb565ToRGBA(src, dst) {
+    /* ... */
+  },
+  rgb555ToRGBA(src, dst) {
+    /* ... */
+  },
+  bgr24ToRGBA(src, dst) {
+    /* ... */
+  },
+  bgra32ToRGBA(src, dst) {
+    /* ... */
+  },
+  palette8ToRGBA(src, dst) {
+    /* ... */
+  },
+  flipVertical(data, width, height, bytesPerPixel) {
+    /* ... */
+  },
+  processBitmap(src, width, height, bpp, isCompressed, dst) {
+    /* ... */
+  },
 };
 ```
 
 **Fallback Limitations:**
+
 - Compressed formats (RLE, NSCodec, RemoteFX) not supported
 - Recommend 16-bit color depth for best performance
 - ~2-5x slower than WASM for color conversion
@@ -662,41 +677,41 @@ Compressed Bitmap from Server
 
 ### Authentication Methods
 
-| Method | Protocol | Security Level |
-|--------|----------|----------------|
-| Standard RDP | None | Low (legacy) |
-| TLS | SSL/TLS | Medium |
-| NLA (CredSSP) | TLS + NTLMv2 | High |
+| Method        | Protocol     | Security Level |
+| ------------- | ------------ | -------------- |
+| Standard RDP  | None         | Low (legacy)   |
+| TLS           | SSL/TLS      | Medium         |
+| NLA (CredSSP) | TLS + NTLMv2 | High           |
 
 ### NLA Flow
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                    NLA Authentication Flow                    │
-└───────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    NLA Authentication Flow                      │
+└─────────────────────────────────────────────────────────────────┘
 
-Client                                              Server
-   │                                                    │
-   │──────────── TLS Handshake ────────────────────────▶│
-   │◀───────────────────────────────────────────────────│
-   │                                                    │
-   │  TSRequest (version=6, negoTokens=[NTLM Negotiate])│
-   │─────────────────────────────────────────────────▶│
-   │                                                    │
-   │  TSRequest (version=6, negoTokens=[NTLM Challenge])│
-   │◀─────────────────────────────────────────────────│
-   │                                                    │
-   │  TSRequest (negoTokens=[NTLM Auth], pubKeyAuth)   │
-   │─────────────────────────────────────────────────▶│
-   │                                                    │
-   │  TSRequest (pubKeyAuth verified)                   │
-   │◀─────────────────────────────────────────────────│
-   │                                                    │
-   │  TSRequest (authInfo=[encrypted credentials])      │
-   │─────────────────────────────────────────────────▶│
-   │                                                    │
-   │  ─────────── Continue RDP Connection ────────────▶│
-   │                                                    │
+Client                                                     Server
+   │                                                          │
+   │─────────────── TLS Handshake ───────────────────────────▶│
+   │◀─────────────────────────────────────────────────────────│
+   │                                                          │
+   │  TSRequest (version=6, negoTokens=[NTLM Negotiate])      │
+   │─────────────────────────────────────────────────────────▶│
+   │                                                          │
+   │  TSRequest (version=6, negoTokens=[NTLM Challenge])      │
+   │◀─────────────────────────────────────────────────────────│
+   │                                                          │
+   │  TSRequest (negoTokens=[NTLM Auth], pubKeyAuth)          │
+   │─────────────────────────────────────────────────────────▶│
+   │                                                          │
+   │  TSRequest (pubKeyAuth verified)                         │
+   │◀─────────────────────────────────────────────────────────│
+   │                                                          │
+   │  TSRequest (authInfo=[encrypted credentials])            │
+   │─────────────────────────────────────────────────────────▶│
+   │                                                          │
+   │  ─────────────── Continue RDP Connection ───────────────▶│
+   │                                                          │
 ```
 
 ### NTLM Message Structure
@@ -800,12 +815,12 @@ RDP Server (RDPSND Virtual Channel)
 
 ### Supported Audio Formats
 
-| Format Tag | Name | Support |
-|------------|------|---------|
-| 0x0001 | WAVE_FORMAT_PCM | ✅ Full |
-| 0x0011 | WAVE_FORMAT_ADPCM | ❌ |
-| 0x0055 | WAVE_FORMAT_MPEGLAYER3 | ❌ |
-| 0xFFFE | WAVE_FORMAT_EXTENSIBLE | ❌ |
+| Format Tag | Name                   | Support |
+| ---------- | ---------------------- | ------- |
+| 0x0001     | WAVE_FORMAT_PCM        | ✅ Full |
+| 0x0011     | WAVE_FORMAT_ADPCM      | ❌      |
+| 0x0055     | WAVE_FORMAT_MPEGLAYER3 | ❌      |
+| 0xFFFE     | WAVE_FORMAT_EXTENSIBLE | ❌      |
 
 ---
 
@@ -855,14 +870,14 @@ type LoggingConfig struct {
 2. **Environment variables**
 3. **Default values** (lowest priority)
 
-| Setting | Flag | Environment Variable | Default |
-|---------|------|---------------------|---------|
-| Host | `-host` | `SERVER_HOST` | `0.0.0.0` |
-| Port | `-port` | `SERVER_PORT` | `8080` |
-| Log Level | `-log-level` | `LOG_LEVEL` | `info` |
-| Skip TLS | `-tls-skip-verify` | `TLS_SKIP_VERIFY` | `false` |
-| Allow any SNI | `-tls-allow-any-server-name` | `TLS_ALLOW_ANY_SERVER_NAME` | `false` |
-| Use NLA | `-nla` | `USE_NLA` | `true` |
+| Setting       | Flag                         | Environment Variable        | Default   |
+| ------------- | ---------------------------- | --------------------------- | --------- |
+| Host          | `-host`                      | `SERVER_HOST`               | `0.0.0.0` |
+| Port          | `-port`                      | `SERVER_PORT`               | `8080`    |
+| Log Level     | `-log-level`                 | `LOG_LEVEL`                 | `info`    |
+| Skip TLS      | `-tls-skip-verify`           | `TLS_SKIP_VERIFY`           | `false`   |
+| Allow any SNI | `-tls-allow-any-server-name` | `TLS_ALLOW_ANY_SERVER_NAME` | `false`   |
+| Use NLA       | `-nla`                       | `USE_NLA`                   | `true`    |
 
 ---
 
@@ -904,7 +919,7 @@ w.Header().Set("X-Frame-Options", "DENY")
 w.Header().Set("X-XSS-Protection", "1; mode=block")
 w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-w.Header().Set("Content-Security-Policy", 
+w.Header().Set("Content-Security-Policy",
     "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; ...")
 ```
 
@@ -915,13 +930,14 @@ As of v1.0.0, credentials are transmitted securely via WebSocket message:
 1. Browser opens WebSocket with non-sensitive parameters only (width, height, colorDepth)
 2. After WebSocket opens, browser sends credentials as JSON message:
    ```json
-   {"type": "credentials", "host": "...", "user": "...", "password": "..."}
+   { "type": "credentials", "host": "...", "user": "...", "password": "..." }
    ```
 3. Server receives credentials via WebSocket (not visible in URL/logs)
 4. Credentials are never stored on server (stateless bridge)
 5. Encrypted via NLA/TLS before reaching RDP server
 
 This approach prevents credentials from appearing in:
+
 - Browser history
 - Server access logs
 - Proxy logs
@@ -933,11 +949,11 @@ This approach prevents credentials from appearing in:
 
 ### WASM Acceleration
 
-| Operation | JavaScript | WASM | Speedup |
-|-----------|------------|------|---------|
-| RLE16 decompress | ~50ms | ~2ms | 25x |
-| Vertical flip | ~20ms | ~1ms | 20x |
-| Color conversion | ~30ms | ~1ms | 30x |
+| Operation        | JavaScript | WASM | Speedup |
+| ---------------- | ---------- | ---- | ------- |
+| RLE16 decompress | ~50ms      | ~2ms | 25x     |
+| Vertical flip    | ~20ms      | ~1ms | 20x     |
+| Color conversion | ~30ms      | ~1ms | 30x     |
 
 ### Buffer Management
 
@@ -956,10 +972,10 @@ c.buffReader = bufio.NewReaderSize(c.conn, readBufferSize)
 
 FastPath reduces per-update overhead:
 
-| Mode | Header Size | Use Case |
-|------|-------------|----------|
-| Slow Path (X.224) | ~20 bytes | Connection setup |
-| FastPath | 2-3 bytes | Runtime updates |
+| Mode              | Header Size | Use Case         |
+| ----------------- | ----------- | ---------------- |
+| Slow Path (X.224) | ~20 bytes   | Connection setup |
+| FastPath          | 2-3 bytes   | Runtime updates  |
 
 ---
 
@@ -1009,12 +1025,12 @@ curl http://localhost:8080/  # Should return HTML
 
 ### WebSocket Message Types
 
-| Prefix | Type | Direction | Description |
-|--------|------|-----------|-------------|
+| Prefix      | Type            | Direction     | Description            |
+| ----------- | --------------- | ------------- | ---------------------- |
 | `0x00-0x0F` | FastPath Update | Server→Client | Bitmap/pointer updates |
-| `0xFE` | Audio Data | Server→Client | PCM audio samples |
-| `0xFF` | JSON Metadata | Server→Client | Capabilities, errors |
-| (none) | Input Event | Client→Server | Mouse/keyboard |
+| `0xFE`      | Audio Data      | Server→Client | PCM audio samples      |
+| `0xFF`      | JSON Metadata   | Server→Client | Capabilities, errors   |
+| (none)      | Input Event     | Client→Server | Mouse/keyboard         |
 
 ### Capability Message
 
