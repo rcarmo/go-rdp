@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"strings"
 
-	"github.com/rcarmo/rdp-html5/internal/codec"
+	"github.com/rcarmo/go-rdp/internal/codec"
 )
 
 // SystemTime represents the Windows SYSTEMTIME structure used for timezone

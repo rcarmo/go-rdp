@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpemt"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpemt"
 )
 
 // TestTunnelState_String validates tunnel state string representations

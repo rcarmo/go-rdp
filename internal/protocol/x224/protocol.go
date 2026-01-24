@@ -5,7 +5,7 @@ package x224
 import (
 	"io"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/tpkt"
+	"github.com/rcarmo/go-rdp/internal/protocol/tpkt"
 )
 
 // tpktConnection is the interface that wraps tpkt protocol operations

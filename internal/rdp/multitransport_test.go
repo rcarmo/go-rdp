@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpemt"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpemt"
 )
 
 func TestNewMultitransportHandler(t *testing.T) {

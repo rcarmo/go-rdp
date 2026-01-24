@@ -1,6 +1,6 @@
 # Logging Package
 
-> Internal leveled logging for the RDP HTML5 client
+> Internal leveled logging for the Go RDP client
 
 ## Overview
 
@@ -65,7 +65,7 @@ type Logger struct {
 ### Setting Log Level
 
 ```go
-import "github.com/rcarmo/rdp-html5/internal/logging"
+import "github.com/rcarmo/go-rdp/internal/logging"
 
 // From code
 logging.SetLevel(logging.LevelDebug)
@@ -102,13 +102,13 @@ func setupLogging(cfg config.LoggingConfig) {
 
 Set via `LOG_LEVEL` environment variable:
 ```bash
-LOG_LEVEL=debug ./rdp-html5
+LOG_LEVEL=debug ./go-rdp
 ```
 
 ### Command Line
 
 ```bash
-./rdp-html5 -log-level debug
+./go-rdp -log-level debug
 ```
 
 ## Output Format

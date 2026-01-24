@@ -7,13 +7,9 @@ import (
 	"io"
 	"testing"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-)
-
-// TestBasicSettingsExchange_Success tests the basic settings exchange phase
-func TestBasicSettingsExchange_Success(t *testing.T) {
+	"github.com/rcarmo/go-rdp/internal/protocol/audio"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
+)func TestBasicSettingsExchange_Success(t *testing.T) {
 	client := &Client{
 		selectedProtocol: pdu.NegotiationProtocolSSL,
 		desktopWidth:     1920,

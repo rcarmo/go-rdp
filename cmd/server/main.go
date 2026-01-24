@@ -13,14 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/config"
-	"github.com/rcarmo/rdp-html5/internal/handler"
-	"github.com/rcarmo/rdp-html5/internal/logging"
-	"github.com/rcarmo/rdp-html5/web"
+	"github.com/rcarmo/go-rdp/internal/config"
+	"github.com/rcarmo/go-rdp/internal/handler"
+	"github.com/rcarmo/go-rdp/internal/logging"
+	"github.com/rcarmo/go-rdp/web"
 )
 
 const (
-	appName    = "RDP HTML5 Client"
+	appName    = "Go RDP Client"
 	appVersion = "1.0.0"
 )
 
@@ -278,7 +278,7 @@ func startServer(server *http.Server, _ *config.Config) error {
 
 func showHelp() {
 	fmt.Println(appName)
-	fmt.Println("USAGE: rdp-html5 [options]")
+	fmt.Println("USAGE: go-rdp [options]")
 	fmt.Println("OPTIONS:")
 	fmt.Println("  -host               Set server listen host (default 0.0.0.0)")
 	fmt.Println("  -port               Set server listen port (default 8080)")

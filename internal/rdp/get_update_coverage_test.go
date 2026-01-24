@@ -7,8 +7,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/protocol/audio"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

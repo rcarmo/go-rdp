@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpemt"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpemt"
 )
 
 // TunnelState represents the state of a UDP tunnel

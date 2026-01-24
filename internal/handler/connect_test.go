@@ -13,9 +13,9 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
-	"github.com/rcarmo/rdp-html5/internal/rdp"
+	"github.com/rcarmo/go-rdp/internal/protocol/audio"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/rdp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

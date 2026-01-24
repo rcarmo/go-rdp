@@ -8,10 +8,10 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/rcarmo/rdp-html5/internal/logging"
-	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
-	"github.com/rcarmo/rdp-html5/internal/protocol/drdynvc"
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/logging"
+	"github.com/rcarmo/go-rdp/internal/protocol/audio"
+	"github.com/rcarmo/go-rdp/internal/protocol/drdynvc"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
 )
 
 // updateCounter tracks total updates processed (for debugging/metrics)

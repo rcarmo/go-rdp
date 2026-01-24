@@ -2,7 +2,7 @@
 // layer for RDP connections as specified in MS-RDPBCGR.
 package mcs
 
-import "github.com/rcarmo/rdp-html5/internal/protocol/x224"
+import "github.com/rcarmo/go-rdp/internal/protocol/x224"
 
 type Protocol struct {
 	x224Conn x224Conn

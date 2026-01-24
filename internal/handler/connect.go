@@ -17,11 +17,11 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/rcarmo/rdp-html5/internal/config"
-	"github.com/rcarmo/rdp-html5/internal/logging"
-	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
-	"github.com/rcarmo/rdp-html5/internal/rdp"
+	"github.com/rcarmo/go-rdp/internal/config"
+	"github.com/rcarmo/go-rdp/internal/logging"
+	"github.com/rcarmo/go-rdp/internal/protocol/audio"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/rdp"
 )
 
 type rdpConn interface {

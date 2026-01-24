@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2"
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpemt"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpemt"
 )
 
 // SecureConnection wraps an RDPEUDP connection with TLS or DTLS security.

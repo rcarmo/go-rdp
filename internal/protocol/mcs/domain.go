@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/encoding"
+	"github.com/rcarmo/go-rdp/internal/protocol/encoding"
 )
 
 type DomainPDUApplication uint8

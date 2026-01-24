@@ -8,8 +8,8 @@ package main
 import (
 	"syscall/js"
 
-	"github.com/rcarmo/rdp-html5/internal/codec"
-	"github.com/rcarmo/rdp-html5/internal/codec/rfx"
+	"github.com/rcarmo/go-rdp/internal/codec"
+	"github.com/rcarmo/go-rdp/internal/codec/rfx"
 )
 
 // jsDecompressRLE16 is the JS wrapper for RLEDecompress16

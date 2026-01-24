@@ -1,4 +1,4 @@
-# RDP HTML5 Client
+# Go RDP Client
 
 A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssembly.
 
@@ -10,7 +10,7 @@ A browser-based Remote Desktop Protocol (RDP) client built with Go and WebAssemb
 
 ```bash
 # Run with default settings (TLS validation enabled)
-docker run -d -p 8080:8080 ghcr.io/rcarmo/rdp-html5:latest
+docker run -d -p 8080:8080 ghcr.io/rcarmo/go-rdp:latest
 
 # Run with TLS validation disabled (for self-signed certs)
 docker run -d -p 8080:8080 -e TLS_SKIP_VERIFY=true ghcr.io/rcarmo/rdp-html5:latest
@@ -24,7 +24,7 @@ Then open http://localhost:8080 in your browser.
 ### Using Docker Compose
 
 ```bash
-git clone https://github.com/rcarmo/rdp-html5.git
+git clone https://github.com/rcarmo/go-rdp.git
 cd rdp-html5
 docker-compose up -d
 ```
@@ -38,13 +38,13 @@ docker-compose up -d
 
 ```bash
 # Clone and build
-git clone https://github.com/rcarmo/rdp-html5.git
+git clone https://github.com/rcarmo/go-rdp.git
 cd rdp-html5
 make deps    # Install dependencies
 make build   # Build everything (WASM + JS + binary)
 
 # Run
-./bin/rdp-html5
+./bin/go-rdp
 ```
 
 ## Configuration

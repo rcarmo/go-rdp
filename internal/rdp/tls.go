@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/config"
-	"github.com/rcarmo/rdp-html5/internal/logging"
+	"github.com/rcarmo/go-rdp/internal/config"
+	"github.com/rcarmo/go-rdp/internal/logging"
 )
 
 // StartTLS upgrades the connection to TLS for RDP security.

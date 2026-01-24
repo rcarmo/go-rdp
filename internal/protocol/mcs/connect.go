@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/encoding"
-	"github.com/rcarmo/rdp-html5/internal/protocol/gcc"
+	"github.com/rcarmo/go-rdp/internal/protocol/encoding"
+	"github.com/rcarmo/go-rdp/internal/protocol/gcc"
 )
 
 type ConnectPDUApplication uint8

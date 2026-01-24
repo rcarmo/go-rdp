@@ -6,7 +6,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/rcarmo/rdp-html5/internal/codec"
+	"github.com/rcarmo/go-rdp/internal/codec"
 )
 
 // LicensingBinaryBlob represents a LICENSE_BINARY_BLOB structure (MS-RDPELE 2.2.2.4).

@@ -3,8 +3,8 @@ package rdp
 import (
 	"bytes"
 
-	"github.com/rcarmo/rdp-html5/internal/logging"
-	"github.com/rcarmo/rdp-html5/internal/protocol/audio"
+	"github.com/rcarmo/go-rdp/internal/logging"
+	"github.com/rcarmo/go-rdp/internal/protocol/audio"
 )
 
 // AudioCallback is called when audio data is available to send to the client

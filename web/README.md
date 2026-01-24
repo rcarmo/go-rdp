@@ -1,6 +1,6 @@
 # web
 
-Web client assets for the RDP HTML5 client.
+Web client assets for the Go RDP client.
 
 ## Overview
 
@@ -60,7 +60,7 @@ Static assets are embedded into the Go binary using `go:embed`. The `embed.go` f
 provides access to the dist/ filesystem:
 
 ```go
-import "github.com/rcarmo/rdp-html5/web"
+import "github.com/rcarmo/go-rdp/web"
 
 staticFS, _ := web.DistFS()
 http.Handle("/", http.FileServerFS(staticFS))

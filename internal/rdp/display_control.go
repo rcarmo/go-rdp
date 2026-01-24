@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/drdynvc"
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpedisp"
+	"github.com/rcarmo/go-rdp/internal/protocol/drdynvc"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpedisp"
 )
 
 // DisplayControlHandler manages the display control dynamic channel

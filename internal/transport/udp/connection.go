@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpeudp"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpeudp"
 )
 
 // Connection states per MS-RDPEUDP Section 3.1.5

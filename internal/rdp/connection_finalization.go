@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
 )
 
 func (c *Client) connectionFinalization() error {

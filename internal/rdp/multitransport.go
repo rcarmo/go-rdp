@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpemt"
-	"github.com/rcarmo/rdp-html5/internal/transport/udp"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpemt"
+	"github.com/rcarmo/go-rdp/internal/transport/udp"
 )
 
 // MultitransportHandler manages the multitransport negotiation for UDP transport.

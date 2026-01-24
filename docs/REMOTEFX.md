@@ -1,6 +1,6 @@
 # RemoteFX (RFX) Implementation
 
-This document describes the RemoteFX codec implementation in rdp-html5 for browser-side tile decoding via TinyGo WebAssembly.
+This document describes the RemoteFX codec implementation in go-rdp for browser-side tile decoding via TinyGo WebAssembly.
 
 ## Overview
 
@@ -106,7 +106,7 @@ web/src/js/wasm.js    # WASMCodec module, RFXDecoder class
 ### Go Package
 
 ```go
-import "github.com/rcarmo/rdp-html5/internal/codec/rfx"
+import "github.com/rcarmo/go-rdp/internal/codec/rfx"
 
 // Decode single tile
 quant := rfx.DefaultQuant()
@@ -235,14 +235,14 @@ To disable RemoteFX and fall back to simpler codecs:
 
 ```bash
 # Command line
-./rdp-html5 -no-rfx
+./go-rdp
 
 # Environment variable
 export RDP_ENABLE_RFX=false
 ./rdp-html5
 
 # Docker
-docker run -e RDP_ENABLE_RFX=false -p 8080:8080 ghcr.io/rcarmo/rdp-html5:latest
+docker run -e RDP_ENABLE_RFX=false -p 8080:8080 ghcr.io/rcarmo/go-rdp:latest
 ```
 
 ### Future Work (Protocol Integration)

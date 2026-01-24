@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/protocol/fastpath"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

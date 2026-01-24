@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/rdpeudp"
+	"github.com/rcarmo/go-rdp/internal/protocol/rdpeudp"
 )
 
 // ============================================================================

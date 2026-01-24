@@ -1,4 +1,4 @@
-module github.com/rcarmo/rdp-html5
+module github.com/rcarmo/go-rdp
 
 go 1.24.0
 

@@ -15,7 +15,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/rcarmo/rdp-html5/internal/codec"
+	"github.com/rcarmo/go-rdp/internal/codec"
 )
 
 // RailState represents the current state of the RAIL protocol state machine.

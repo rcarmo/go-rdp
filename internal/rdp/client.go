@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/fastpath"
-	"github.com/rcarmo/rdp-html5/internal/protocol/mcs"
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
-	"github.com/rcarmo/rdp-html5/internal/protocol/tpkt"
-	"github.com/rcarmo/rdp-html5/internal/protocol/x224"
+	"github.com/rcarmo/go-rdp/internal/protocol/fastpath"
+	"github.com/rcarmo/go-rdp/internal/protocol/mcs"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/protocol/tpkt"
+	"github.com/rcarmo/go-rdp/internal/protocol/x224"
 )
 
 // RemoteApp contains configuration for running a remote application (RAIL).

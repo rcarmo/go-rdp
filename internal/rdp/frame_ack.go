@@ -1,6 +1,6 @@
 package rdp
 
-import "github.com/rcarmo/rdp-html5/internal/protocol/pdu"
+import "github.com/rcarmo/go-rdp/internal/protocol/pdu"
 
 // SendFrameAcknowledge sends a Frame Acknowledge PDU to the server
 // This is required when using Surface Commands - the server expects

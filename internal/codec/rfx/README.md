@@ -36,7 +36,7 @@ rfx/
 ### Decode a single tile
 
 ```go
-import "github.com/rcarmo/rdp-html5/internal/codec/rfx"
+import "github.com/rcarmo/go-rdp/internal/codec/rfx"
 
 // Get tile data from RFX message (CBT_TILE block starting at 0xCAC3)
 tileData := []byte{...}

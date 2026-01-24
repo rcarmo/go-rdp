@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/config"
+	"github.com/rcarmo/go-rdp/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -314,7 +314,7 @@ func TestShowHelp(t *testing.T) {
 
 	// Verify help contains expected content
 	captured := string(output[:n])
-	assert.Contains(t, captured, "RDP HTML5 Client")
+	assert.Contains(t, captured, "Go RDP Client")
 	assert.Contains(t, captured, "USAGE:")
 	assert.Contains(t, captured, "OPTIONS:")
 	assert.Contains(t, captured, "ENVIRONMENT VARIABLES:")
@@ -340,7 +340,7 @@ func TestShowVersion(t *testing.T) {
 
 	// Verify version contains expected content
 	captured := string(output[:n])
-	assert.Contains(t, captured, "RDP HTML5 Client 1.0.0")
+	assert.Contains(t, captured, "Go RDP Client 1.0.0")
 	assert.Contains(t, captured, "Built with Go")
 	assert.Contains(t, captured, "Protocol: RDP 10.x")
 }

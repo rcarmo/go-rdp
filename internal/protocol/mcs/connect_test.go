@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/rcarmo/rdp-html5/internal/protocol/gcc"
+	"github.com/rcarmo/go-rdp/internal/protocol/gcc"
 )
 
 // TestClientMCSConnectInitialPDU_Serialize from MS-RDPBCGR protocol examples 4.1.3.

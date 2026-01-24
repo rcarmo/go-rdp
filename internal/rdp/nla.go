@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/auth"
-	"github.com/rcarmo/rdp-html5/internal/config"
-	"github.com/rcarmo/rdp-html5/internal/logging"
+	"github.com/rcarmo/go-rdp/internal/auth"
+	"github.com/rcarmo/go-rdp/internal/config"
+	"github.com/rcarmo/go-rdp/internal/logging"
 )
 
 // maxNLAMessageSize is the maximum size for NLA/CredSSP messages (64KB)

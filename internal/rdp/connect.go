@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/rcarmo/rdp-html5/internal/logging"
-	"github.com/rcarmo/rdp-html5/internal/protocol/pdu"
+	"github.com/rcarmo/go-rdp/internal/logging"
+	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
 )
 
 // Connect performs the RDP connection sequence including negotiation,
