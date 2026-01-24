@@ -41,6 +41,9 @@ The log level is automatically synchronized to the browser client when a connect
 export ALLOWED_ORIGINS="https://example.com,https://app.example.com"
 
 export MAX_CONNECTIONS=100
+
+# Rate limiting (NOTE: Currently a placeholder - not enforced)
+# These settings are parsed but have no effect in the current implementation
 export ENABLE_RATE_LIMIT=true
 export RATE_LIMIT_PER_MINUTE=60
 

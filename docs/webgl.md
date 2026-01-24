@@ -1,7 +1,13 @@
-# WebGL Renderer Implementation Plan
+# WebGL Renderer
 
 ## Summary
-This plan adds a WebGL-based renderer to accelerate bitmap display while preserving the current 2D canvas path as a fallback. The WebGL renderer will *only* blit already-decoded RGBA frames to the screen (no shader-based decoding). WebGL2 is preferred, with WebGL1 as a fallback for compatibility with 2025 Edge/Chromium/Firefox.
+The WebGL-based renderer accelerates bitmap display while preserving the 2D canvas path as a fallback. The WebGL renderer *only* blits already-decoded RGBA frames to the screen (no shader-based decoding). WebGL2 is preferred, with WebGL1 as a fallback for browser compatibility.
+
+## Implementation Status: ✅ Complete
+
+The WebGL renderer has been implemented in:
+- `web/src/js/renderer.js` - Renderer interface + CanvasRenderer
+- `web/src/js/webgl-renderer.js` - WebGL1/2 renderer implementation
 
 ## Goals
 - Reduce per-frame render time by replacing `putImageData(...)` with GPU texture uploads and draw calls.
@@ -198,12 +204,12 @@ Optional configuration:
 - `?disableWebGL=1` to force CanvasRenderer.
 - Console log to indicate active renderer and fallback events.
 
-## File-Level Change List (Planned)
-- `web/src/js/renderer.js` (new): renderer interface + CanvasRenderer.
-- `web/src/js/webgl-renderer.js` (new): WebGL1/2 renderer.
-- `web/src/js/graphics.js`: route drawing to renderer.
-- `web/src/js/client.js`: ensure cleanup on disconnect.
-- `docs/webgl.md`: this plan.
+## File-Level Changes (Implemented)
+- `web/src/js/renderer.js`: renderer interface + CanvasRenderer.
+- `web/src/js/webgl-renderer.js`: WebGL1/2 renderer.
+- `web/src/js/graphics.js`: routes drawing to renderer.
+- `web/src/js/client.js`: cleanup on disconnect.
+- `docs/webgl.md`: this document.
 
 ## Acceptance Criteria
 - WebGL path renders correctly at standard resolutions (1080p/1440p).

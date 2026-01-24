@@ -51,8 +51,10 @@ Each Go package has its own README with implementation details:
 - `web/src/js/` - Browser client modules
   - `wasm.js` - WASM codec wrapper (WASMCodec, RFXDecoder)
   - `codec-fallback.js` - Pure JS fallback codecs
-  - `graphics.js` - Canvas rendering
-  - `audio.js` - Audio redirection
+  - `graphics.js` - Bitmap processing and rendering
+  - `renderer.js` - Renderer interface (Canvas/WebGL abstraction)
+  - `webgl-renderer.js` - WebGL1/2 hardware-accelerated renderer
+  - `audio.js` - Audio redirection (PCM and MP3 support)
   - `session.js` - Connection management
 
 ## Protocol References

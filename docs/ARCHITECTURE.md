@@ -38,7 +38,7 @@ This project implements a browser-based Remote Desktop Protocol (RDP) client usi
 | Input          | ✅     | Mouse and keyboard via FastPath         |
 | Authentication | ✅     | NLA (CredSSP/NTLMv2), TLS, standard RDP |
 | Color Depths   | ✅     | 8, 15, 16, 24, 32-bit                   |
-| Codecs         | ✅     | RLE, NSCodec, Planar                    |
+| Codecs         | ✅     | RLE, NSCodec, Planar, RemoteFX          |
 | Audio          | ✅     | RDPSND channel with PCM and MP3 output  |
 | Clipboard      | ✅     | Text copy/paste                         |
 | UDP Transport  | 🔧     | Experimental, MS-RDPEUDP/MS-RDPEMT      |
@@ -512,10 +512,12 @@ web/
 │   │   ├── client.js       # Main client class
 │   │   ├── session.js      # Connection management
 │   │   ├── input.js        # Mouse/keyboard handling
-│   │   ├── graphics.js     # Canvas rendering
+│   │   ├── graphics.js     # Bitmap processing
+│   │   ├── renderer.js     # Renderer interface (Canvas/WebGL)
+│   │   ├── webgl-renderer.js # WebGL1/2 renderer
 │   │   ├── clipboard.js    # Copy/paste
 │   │   ├── ui.js           # UI state
-│   │   ├── audio.js        # Audio playback
+│   │   ├── audio.js        # Audio playback (PCM/MP3)
 │   │   ├── wasm.js         # WASM codec wrapper
 │   │   └── codec-fallback.js # Pure JS fallback codecs
 │   └── wasm/
