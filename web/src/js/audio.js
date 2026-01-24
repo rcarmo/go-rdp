@@ -2,6 +2,10 @@
 
 import { Logger } from './logger.js';
 
+// Audio format tags (matching WAVE format identifiers from backend)
+const WAVE_FORMAT_PCM = 0x0001;
+const WAVE_FORMAT_MPEGLAYER3 = 0x0055;
+
 const AudioMixin = {
     initAudio() {
         this.audioContext = null;
@@ -18,6 +22,7 @@ const AudioMixin = {
         this.audioSampleRate = 44100;
         this.audioChannels = 2;
         this.audioBitsPerSample = 16;
+        this.audioFormatTag = WAVE_FORMAT_PCM; // Default to PCM
     },
 
     enableAudio() {
@@ -79,12 +84,50 @@ const AudioMixin = {
         let offset = 4;
 
         // Check for format info (msgType = 2)
-        if (msgType === 0x02 && data.length >= 12) {
+        if (msgType === 0x02 && data.length >= 14) {
+            const channels = view.getUint16(4, true);
+            const sampleRate = view.getUint32(6, true);
+            const bitsPerSample = view.getUint16(10, true);
+            const formatTag = view.getUint16(12, true);
+            
+            // Validate audio format parameters
+            if (channels < 1 || channels > 8) {
+                Logger.warn('Audio', `Invalid channel count: ${channels}`);
+                return;
+            }
+            if (sampleRate < 8000 || sampleRate > 192000) {
+                Logger.warn('Audio', `Invalid sample rate: ${sampleRate}`);
+                return;
+            }
+            // For PCM, validate bit depth; MP3 doesn't use this field the same way
+            if (formatTag === WAVE_FORMAT_PCM && bitsPerSample !== 8 && bitsPerSample !== 16) {
+                Logger.warn('Audio', `Unsupported PCM bit depth: ${bitsPerSample}`);
+                return;
+            }
+            
+            this.audioChannels = channels;
+            this.audioSampleRate = sampleRate;
+            this.audioBitsPerSample = bitsPerSample;
+            this.audioFormatTag = formatTag;
+            offset = 14;
+            
+            const formatName = formatTag === WAVE_FORMAT_MPEGLAYER3 ? 'MP3' : 'PCM';
+            const encoding = `${formatName} ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`;
+            Logger.debug('Audio', `Format: ${encoding}`);
+            if (!this._audioEncodingLogged) {
+                this._audioEncodingLogged = true;
+                console.info(
+                    '%c[RDP Session] Audio encoding',
+                    'color: #03A9F4; font-weight: bold',
+                    encoding
+                );
+            }
+        } else if (msgType === 0x02 && data.length >= 12) {
+            // Legacy format without formatTag - assume PCM
             const channels = view.getUint16(4, true);
             const sampleRate = view.getUint32(6, true);
             const bitsPerSample = view.getUint16(10, true);
             
-            // Validate audio format parameters
             if (channels < 1 || channels > 8) {
                 Logger.warn('Audio', `Invalid channel count: ${channels}`);
                 return;
@@ -101,6 +144,7 @@ const AudioMixin = {
             this.audioChannels = channels;
             this.audioSampleRate = sampleRate;
             this.audioBitsPerSample = bitsPerSample;
+            this.audioFormatTag = WAVE_FORMAT_PCM;
             offset = 12;
             
             const encoding = `PCM ${this.audioSampleRate}Hz ${this.audioChannels}ch ${this.audioBitsPerSample}bit`;
@@ -115,17 +159,21 @@ const AudioMixin = {
             }
         }
 
-        // Get PCM data
-        const pcmData = data.slice(offset);
-        if (pcmData.length === 0) {
+        // Get audio data
+        const audioData = data.slice(offset);
+        if (audioData.length === 0) {
             return;
         }
 
-        // Queue audio for playback
-        this.queueAudio(pcmData, timestamp);
+        // Queue audio for playback - route based on format
+        if (this.audioFormatTag === WAVE_FORMAT_MPEGLAYER3) {
+            this.queueMP3Audio(audioData, timestamp);
+        } else {
+            this.queuePCMAudio(audioData, timestamp);
+        }
     },
 
-    queueAudio(pcmData, timestamp) {
+    queuePCMAudio(pcmData, timestamp) {
         // Convert PCM data to Float32 samples
         const samples = this.pcmToFloat32(pcmData);
         if (!samples || samples.length === 0) {
@@ -140,7 +188,7 @@ const AudioMixin = {
             return;
         }
         
-        Logger.debug('Audio', `Queueing ${frameCount} frames, context state: ${this.audioContext?.state}`);
+        Logger.debug('Audio', `Queueing ${frameCount} PCM frames, context state: ${this.audioContext?.state}`);
 
         try {
             const audioBuffer = this.audioContext.createBuffer(
@@ -168,7 +216,48 @@ const AudioMixin = {
                 this.playNextAudio();
             }
         } catch (e) {
-            Logger.error('Audio', `Buffer creation failed: ${e.message}`);
+            Logger.error('Audio', `PCM buffer creation failed: ${e.message}`);
+        }
+    },
+
+    queueMP3Audio(mp3Data, timestamp) {
+        // Decode MP3 data using Web Audio API's decodeAudioData
+        // This is async, so we handle it with a Promise
+        Logger.debug('Audio', `Decoding ${mp3Data.length} bytes of MP3 data`);
+
+        // Create an ArrayBuffer copy for decodeAudioData
+        const arrayBuffer = mp3Data.buffer.slice(
+            mp3Data.byteOffset,
+            mp3Data.byteOffset + mp3Data.byteLength
+        );
+
+        this.audioContext.decodeAudioData(arrayBuffer)
+            .then((audioBuffer) => {
+                Logger.debug('Audio', `MP3 decoded: ${audioBuffer.length} frames, ${audioBuffer.numberOfChannels}ch`);
+                
+                // Queue the decoded buffer
+                this.audioQueue.push({
+                    buffer: audioBuffer,
+                    timestamp: timestamp
+                });
+
+                // Start playback if not already playing
+                if (!this.audioPlaying) {
+                    this.playNextAudio();
+                }
+            })
+            .catch((e) => {
+                Logger.warn('Audio', `MP3 decode failed: ${e.message}`);
+                // Continue silently - don't break audio pipeline
+            });
+    },
+
+    // Legacy method name for backwards compatibility
+    queueAudio(audioData, timestamp) {
+        if (this.audioFormatTag === WAVE_FORMAT_MPEGLAYER3) {
+            this.queueMP3Audio(audioData, timestamp);
+        } else {
+            this.queuePCMAudio(audioData, timestamp);
         }
     },
 

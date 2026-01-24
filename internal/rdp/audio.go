@@ -118,11 +118,12 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 
 	h.serverFormats = serverFormats.Formats
 
-	// Find a format we support - require PCM for Web Audio
+	// Find a format we support - PCM preferred (lower latency), MP3 as fallback (bandwidth savings)
 	selectedIndex := -1
+	mp3Index := -1
 	for i, format := range serverFormats.Formats {
 		logging.Debug("Audio:   Format %d: %s", i, format.String())
-		// We can handle PCM directly in Web Audio
+		// We can handle PCM directly in Web Audio (preferred for low latency)
 		if format.FormatTag == audio.WAVE_FORMAT_PCM {
 			if selectedIndex == -1 {
 				selectedIndex = i
@@ -132,10 +133,22 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 				selectedIndex = i
 			}
 		}
+		// MP3 can be decoded via Web Audio decodeAudioData() - use as fallback
+		if format.FormatTag == audio.WAVE_FORMAT_MPEGLAYER3 {
+			if mp3Index == -1 {
+				mp3Index = i
+			}
+		}
+	}
+
+	// Fall back to MP3 if no PCM available
+	if selectedIndex == -1 && mp3Index != -1 {
+		selectedIndex = mp3Index
+		logging.Info("Audio: No PCM formats available, using MP3")
 	}
 
 	if selectedIndex == -1 {
-		logging.Warn("Audio: No PCM formats offered by server; audio disabled")
+		logging.Warn("Audio: No supported formats offered by server (need PCM or MP3); audio disabled")
 		h.selectedFormat = -1
 		h.serverFormats = nil
 		h.Disable()
@@ -143,7 +156,7 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 	}
 
 	// Log negotiated format for debugging
-	logging.Info("Audio: Negotiated PCM format: %s", serverFormats.Formats[selectedIndex].String())
+	logging.Info("Audio: Negotiated format: %s", serverFormats.Formats[selectedIndex].String())
 
 	if len(h.serverFormats) == 0 {
 		logging.Warn("Audio: No formats available from server")
@@ -159,17 +172,17 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 
 // sendClientFormats sends SNDC_FORMATS response to server
 func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version uint16) error {
-	// Echo back formats we support (just PCM for now)
+	// Echo back formats we support (PCM and MP3)
 	var supportedFormats []audio.AudioFormat
 	for _, format := range formats {
-		if format.FormatTag == audio.WAVE_FORMAT_PCM {
+		if format.FormatTag == audio.WAVE_FORMAT_PCM || format.FormatTag == audio.WAVE_FORMAT_MPEGLAYER3 {
 			supportedFormats = append(supportedFormats, format)
 		}
 	}
 
-	// If no PCM formats, disable audio (browser only supports PCM)
+	// If no supported formats, disable audio
 	if len(supportedFormats) == 0 {
-		logging.Warn("Audio: No PCM formats to send; audio disabled")
+		logging.Warn("Audio: No supported formats to send (need PCM or MP3); audio disabled")
 		h.Disable()
 		return nil
 	}

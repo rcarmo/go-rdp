@@ -316,3 +316,170 @@ if err != nil {
 t.Errorf("HandleChannelData() error = %v for unknown message type", err)
 }
 }
+
+func TestAudioHandler_GetSelectedFormat_MP3(t *testing.T) {
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+
+	// Set up formats with MP3
+	handler.serverFormats = []audio.AudioFormat{
+		{FormatTag: audio.WAVE_FORMAT_MPEGLAYER3, Channels: 2, SamplesPerSec: 44100},
+		{FormatTag: audio.WAVE_FORMAT_ADPCM, Channels: 1, SamplesPerSec: 22050},
+	}
+	handler.selectedFormat = 0
+
+	format := handler.GetSelectedFormat()
+	if format == nil {
+		t.Fatal("GetSelectedFormat() returned nil after setting MP3 format")
+	}
+	if format.FormatTag != audio.WAVE_FORMAT_MPEGLAYER3 {
+		t.Errorf("GetSelectedFormat() FormatTag = %v, want MP3 (0x0055)", format.FormatTag)
+	}
+}
+
+func TestAudioHandler_HandleChannelData_ServerFormats_MP3Only(t *testing.T) {
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
+
+	// Build a server formats message with only MP3 format
+	channelData := []byte{
+		// Channel header: totalLength=48, flags=0x03 (first+last)
+		0x30, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0x07 (SND_FORMATS), reserved=0, bodySize=44
+		0x07, 0x00, 0x2C, 0x00,
+		// ServerFormats: dwFlags=0, dwVolume=0xFFFFFFFF, dwPitch=0, wDGramPort=0, wNumberOfFormats=1, cLastBlockConfirmed=0, wVersion=6, bPad=0
+		0x00, 0x00, 0x00, 0x00,
+		0xFF, 0xFF, 0xFF, 0xFF,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, // wDGramPort=0
+		0x01, 0x00, // wNumberOfFormats=1
+		0x00,       // cLastBlockConfirmed
+		0x06, 0x00, // wVersion=6
+		0x00,       // bPad
+		// Format: wFormatTag=0x55 (MP3), nChannels=2, nSamplesPerSec=44100, nAvgBytesPerSec=16000, nBlockAlign=1, wBitsPerSample=0, cbSize=0
+		0x55, 0x00, // FormatTag=MP3
+		0x02, 0x00, // Channels=2
+		0x44, 0xAC, 0x00, 0x00, // SamplesPerSec=44100
+		0x80, 0x3E, 0x00, 0x00, // AvgBytesPerSec=16000
+		0x01, 0x00, // BlockAlign=1
+		0x00, 0x00, // BitsPerSample=0 (not used for MP3)
+		0x00, 0x00, // cbSize=0
+	}
+
+	// This exercises the code path - handler should accept MP3 when no PCM available
+	err := handler.HandleChannelData(channelData)
+	_ = err
+
+	// Verify MP3 was selected (format index 0)
+	if handler.selectedFormat != 0 {
+		t.Errorf("Expected selectedFormat=0 for MP3, got %d", handler.selectedFormat)
+	}
+	if handler.serverFormats != nil && len(handler.serverFormats) > 0 {
+		if handler.serverFormats[0].FormatTag != audio.WAVE_FORMAT_MPEGLAYER3 {
+			t.Errorf("Expected MP3 format tag, got 0x%04X", handler.serverFormats[0].FormatTag)
+		}
+	}
+}
+
+func TestAudioHandler_HandleChannelData_ServerFormats_PCMPreferredOverMP3(t *testing.T) {
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
+
+	// Build a server formats message with both MP3 and PCM (MP3 first)
+	channelData := []byte{
+		// Channel header: totalLength=66, flags=0x03 (first+last)
+		0x42, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0x07 (SND_FORMATS), reserved=0, bodySize=62
+		0x07, 0x00, 0x3E, 0x00,
+		// ServerFormats header
+		0x00, 0x00, 0x00, 0x00, // dwFlags=0
+		0xFF, 0xFF, 0xFF, 0xFF, // dwVolume
+		0x00, 0x00, 0x00, 0x00, // dwPitch
+		0x00, 0x00, // wDGramPort=0
+		0x02, 0x00, // wNumberOfFormats=2
+		0x00,       // cLastBlockConfirmed
+		0x06, 0x00, // wVersion=6
+		0x00,       // bPad
+		// Format 0: MP3
+		0x55, 0x00, // FormatTag=MP3
+		0x02, 0x00, // Channels=2
+		0x44, 0xAC, 0x00, 0x00, // SamplesPerSec=44100
+		0x80, 0x3E, 0x00, 0x00, // AvgBytesPerSec=16000
+		0x01, 0x00, // BlockAlign=1
+		0x00, 0x00, // BitsPerSample=0
+		0x00, 0x00, // cbSize=0
+		// Format 1: PCM
+		0x01, 0x00, // FormatTag=PCM
+		0x02, 0x00, // Channels=2
+		0x44, 0xAC, 0x00, 0x00, // SamplesPerSec=44100
+		0x10, 0xB1, 0x02, 0x00, // AvgBytesPerSec=176400
+		0x04, 0x00, // BlockAlign=4
+		0x10, 0x00, // BitsPerSample=16
+		0x00, 0x00, // cbSize=0
+	}
+
+	err := handler.HandleChannelData(channelData)
+	_ = err
+
+	// Verify PCM was selected (format index 1) over MP3 (index 0)
+	if handler.selectedFormat != 1 {
+		t.Errorf("Expected selectedFormat=1 for PCM (preferred over MP3), got %d", handler.selectedFormat)
+	}
+	if handler.serverFormats != nil && len(handler.serverFormats) > 1 {
+		if handler.serverFormats[handler.selectedFormat].FormatTag != audio.WAVE_FORMAT_PCM {
+			t.Errorf("Expected PCM format tag for selected format, got 0x%04X", handler.serverFormats[handler.selectedFormat].FormatTag)
+		}
+	}
+}
+
+func TestAudioHandler_HandleChannelData_ServerFormats_NoSupportedFormats(t *testing.T) {
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
+
+	// Build a server formats message with only unsupported formats (ADPCM)
+	channelData := []byte{
+		// Channel header: totalLength=48, flags=0x03 (first+last)
+		0x30, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0x07 (SND_FORMATS), reserved=0, bodySize=44
+		0x07, 0x00, 0x2C, 0x00,
+		// ServerFormats header
+		0x00, 0x00, 0x00, 0x00,
+		0xFF, 0xFF, 0xFF, 0xFF,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, // wDGramPort=0
+		0x01, 0x00, // wNumberOfFormats=1
+		0x00,       // cLastBlockConfirmed
+		0x06, 0x00, // wVersion=6
+		0x00,       // bPad
+		// Format: ADPCM (unsupported)
+		0x02, 0x00, // FormatTag=ADPCM
+		0x02, 0x00, // Channels=2
+		0x44, 0xAC, 0x00, 0x00, // SamplesPerSec=44100
+		0x00, 0x00, 0x00, 0x00, // AvgBytesPerSec
+		0x00, 0x00, // BlockAlign
+		0x04, 0x00, // BitsPerSample=4
+		0x00, 0x00, // cbSize=0
+	}
+
+	err := handler.HandleChannelData(channelData)
+	_ = err
+
+	// Verify no format was selected and audio is disabled
+	if handler.selectedFormat != -1 {
+		t.Errorf("Expected selectedFormat=-1 for unsupported formats, got %d", handler.selectedFormat)
+	}
+	if handler.IsEnabled() {
+		t.Error("Expected audio to be disabled when no supported formats available")
+	}
+}

@@ -41,7 +41,7 @@ func TestAudioHandler_SendClientFormatsFunc(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			name: "no PCM format - disable audio",
+			name: "MP3 format - accepted as fallback",
 			formats: []audio.AudioFormat{
 				{
 					FormatTag:      0x0055, // MP3
@@ -50,6 +50,21 @@ func TestAudioHandler_SendClientFormatsFunc(t *testing.T) {
 					AvgBytesPerSec: 32000,
 					BlockAlign:     1,
 					BitsPerSample:  0,
+				},
+			},
+			version:   6,
+			expectErr: false,
+		},
+		{
+			name: "no supported format - disable audio",
+			formats: []audio.AudioFormat{
+				{
+					FormatTag:      audio.WAVE_FORMAT_ADPCM, // ADPCM - not supported
+					Channels:       2,
+					SamplesPerSec:  44100,
+					AvgBytesPerSec: 32000,
+					BlockAlign:     1,
+					BitsPerSample:  4,
 				},
 			},
 			version:   6,
@@ -90,7 +105,7 @@ func TestAudioHandler_SendClientFormatsFunc(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				if tt.name == "no PCM format - disable audio" {
+				if tt.name == "no supported format - disable audio" {
 					assert.Empty(t, sentData)
 				} else {
 					assert.NotEmpty(t, sentData)

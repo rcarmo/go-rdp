@@ -137,6 +137,60 @@ func TestAudioFormat_Deserialize(t *testing.T) {
 	}
 }
 
+func TestAudioFormat_Deserialize_MP3(t *testing.T) {
+	// MP3 44100Hz stereo
+	data := []byte{
+		0x55, 0x00, // FormatTag = MP3 (0x0055)
+		0x02, 0x00, // Channels = 2
+		0x44, 0xAC, 0x00, 0x00, // SamplesPerSec = 44100
+		0x80, 0x3E, 0x00, 0x00, // AvgBytesPerSec = 16000 (128kbps)
+		0x01, 0x00, // BlockAlign = 1
+		0x00, 0x00, // BitsPerSample = 0 (not used for MP3)
+		0x00, 0x00, // ExtraDataSize = 0
+	}
+
+	var f AudioFormat
+	err := f.Deserialize(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("Deserialize() error = %v", err)
+	}
+
+	if f.FormatTag != WAVE_FORMAT_MPEGLAYER3 {
+		t.Errorf("FormatTag = 0x%04X, want 0x%04X (MP3)", f.FormatTag, WAVE_FORMAT_MPEGLAYER3)
+	}
+	if f.Channels != 2 {
+		t.Errorf("Channels = %v, want 2", f.Channels)
+	}
+	if f.SamplesPerSec != 44100 {
+		t.Errorf("SamplesPerSec = %v, want 44100", f.SamplesPerSec)
+	}
+	if f.AvgBytesPerSec != 16000 {
+		t.Errorf("AvgBytesPerSec = %v, want 16000", f.AvgBytesPerSec)
+	}
+}
+
+func TestAudioFormat_Serialize_MP3(t *testing.T) {
+	format := AudioFormat{
+		FormatTag:      WAVE_FORMAT_MPEGLAYER3,
+		Channels:       2,
+		SamplesPerSec:  44100,
+		AvgBytesPerSec: 16000,
+		BlockAlign:     1,
+		BitsPerSample:  0,
+		ExtraDataSize:  0,
+	}
+
+	result := format.Serialize()
+	if len(result) != 18 {
+		t.Errorf("Serialize() length = %d, want 18", len(result))
+	}
+
+	// Verify format tag (first 2 bytes) is MP3
+	if result[0] != 0x55 || result[1] != 0x00 {
+		t.Errorf("FormatTag = [0x%02X, 0x%02X], want [0x55, 0x00]", result[0], result[1])
+	}
+}
+
 func TestAudioFormat_String(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -162,6 +216,26 @@ func TestAudioFormat_String(t *testing.T) {
 				BitsPerSample: 4,
 			},
 			contains: "ADPCM",
+		},
+		{
+			name: "MP3 format",
+			format: AudioFormat{
+				FormatTag:     WAVE_FORMAT_MPEGLAYER3,
+				Channels:      2,
+				SamplesPerSec: 44100,
+				BitsPerSample: 0,
+			},
+			contains: "MP3",
+		},
+		{
+			name: "AAC format",
+			format: AudioFormat{
+				FormatTag:     WAVE_FORMAT_AAC,
+				Channels:      2,
+				SamplesPerSec: 48000,
+				BitsPerSample: 0,
+			},
+			contains: "AAC",
 		},
 		{
 			name: "Unknown format",

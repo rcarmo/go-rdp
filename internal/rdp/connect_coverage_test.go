@@ -7,9 +7,12 @@ import (
 	"io"
 	"testing"
 
-	"github.com/rcarmo/go-rdp/internal/protocol/audio"
 	"github.com/rcarmo/go-rdp/internal/protocol/pdu"
-)func TestBasicSettingsExchange_Success(t *testing.T) {
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestBasicSettingsExchange_Success(t *testing.T) {
 	client := &Client{
 		selectedProtocol: pdu.NegotiationProtocolSSL,
 		desktopWidth:     1920,
