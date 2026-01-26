@@ -46,14 +46,28 @@ func TestNSCodecRLEDecompress_RunSegment(t *testing.T) {
 }
 
 func TestNSCodecRLEDecompress_LiteralSegment(t *testing.T) {
-	// Literal segment: header byte without 0x80
-	// For NSCodec RLE, the data needs at least 4 bytes of EndData
-	// and length < expected size to trigger decompression
-	// Let's test by just verifying the raw data case works correctly
-	data := []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77}
-	result := NSCodecRLEDecompress(data, 7)
+	// Literal segment: header byte without 0x80 (compressed run keeps data smaller)
+	data := []byte{
+		0x84, // Run header: 4 bytes
+		0x11, // Run value
+		0x02, // Literal length 2
+		0x22, 0x33, // Literal bytes
+		0xAA, 0xBB, 0xCC, 0xDD, // EndData
+	}
+	result := NSCodecRLEDecompress(data, 10)
 	require.NotNil(t, result)
-	require.Equal(t, data, result)
+	require.Equal(t, []byte{0x11, 0x11, 0x11, 0x11, 0x22, 0x33, 0xAA, 0xBB, 0xCC, 0xDD}, result)
+}
+
+func TestNSCodecRLEDecompress_TruncatedData(t *testing.T) {
+	// Truncated data should return nil
+	data := []byte{
+		0x03,
+		0x11, 0x22, // Missing one literal byte
+		0x00, 0x00, 0x00, 0x00,
+	}
+	result := NSCodecRLEDecompress(data, 10)
+	require.Nil(t, result)
 }
 
 func TestClampByteNS(t *testing.T) {

@@ -143,11 +143,8 @@ Raw binary input events forwarded directly to RDP server via FastPath.
 
 ## CORS Handling
 
-Origins are validated against the `ALLOWED_ORIGINS` configuration:
-
-- **Empty list (dev mode)**: All origins allowed
-- **Configured list**: Only matching origins allowed
-- **Special cases**: `localhost`, `127.0.0.1` always allowed in dev
+Origin checks are permissive to support reverse proxies and port mappings.
+The server allows any well-formed origin and logs when allowlists are present but not enforced.
 
 ## Thread Safety
 

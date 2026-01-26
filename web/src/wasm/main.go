@@ -40,9 +40,9 @@ func jsDecompressRLE16(this js.Value, args []js.Value) interface{} {
 
 // jsFlipVertical is the JS wrapper for FlipVertical
 func jsFlipVertical(this js.Value, args []js.Value) interface{} {
-	if len(args) < 4 {
-		return nil
-	}
+    if len(args) < 4 {
+        return false
+    }
 
 	dataArray := args[0]
 	width := args[1].Int()
@@ -53,17 +53,17 @@ func jsFlipVertical(this js.Value, args []js.Value) interface{} {
 	data := make([]byte, dataLen)
 	js.CopyBytesToGo(data, dataArray)
 
-	codec.FlipVertical(data, width, height, bytesPerPixel)
+    codec.FlipVertical(data, width, height, bytesPerPixel)
 
-	js.CopyBytesToJS(dataArray, data)
-	return nil
+    js.CopyBytesToJS(dataArray, data)
+    return true
 }
 
 // jsRGB565toRGBA is the JS wrapper for RGB565ToRGBA
 func jsRGB565toRGBA(this js.Value, args []js.Value) interface{} {
-	if len(args) < 2 {
-		return nil
-	}
+    if len(args) < 2 {
+        return false
+    }
 
 	srcArray := args[0]
 	dstArray := args[1]
@@ -75,17 +75,17 @@ func jsRGB565toRGBA(this js.Value, args []js.Value) interface{} {
 	dstLen := dstArray.Get("length").Int()
 	dst := make([]byte, dstLen)
 
-	codec.RGB565ToRGBA(src, dst)
+    codec.RGB565ToRGBA(src, dst)
 
-	js.CopyBytesToJS(dstArray, dst)
-	return nil
+    js.CopyBytesToJS(dstArray, dst)
+    return true
 }
 
 // jsBGR24toRGBA is the JS wrapper for BGR24ToRGBA
 func jsBGR24toRGBA(this js.Value, args []js.Value) interface{} {
-	if len(args) < 2 {
-		return nil
-	}
+    if len(args) < 2 {
+        return false
+    }
 
 	srcArray := args[0]
 	dstArray := args[1]
@@ -97,17 +97,17 @@ func jsBGR24toRGBA(this js.Value, args []js.Value) interface{} {
 	dstLen := dstArray.Get("length").Int()
 	dst := make([]byte, dstLen)
 
-	codec.BGR24ToRGBA(src, dst)
+    codec.BGR24ToRGBA(src, dst)
 
-	js.CopyBytesToJS(dstArray, dst)
-	return nil
+    js.CopyBytesToJS(dstArray, dst)
+    return true
 }
 
 // jsBGRA32toRGBA is the JS wrapper for BGRA32ToRGBA
 func jsBGRA32toRGBA(this js.Value, args []js.Value) interface{} {
-	if len(args) < 2 {
-		return nil
-	}
+    if len(args) < 2 {
+        return false
+    }
 
 	srcArray := args[0]
 	dstArray := args[1]
@@ -119,10 +119,10 @@ func jsBGRA32toRGBA(this js.Value, args []js.Value) interface{} {
 	dstLen := dstArray.Get("length").Int()
 	dst := make([]byte, dstLen)
 
-	codec.BGRA32ToRGBA(src, dst)
+    codec.BGRA32ToRGBA(src, dst)
 
-	js.CopyBytesToJS(dstArray, dst)
-	return nil
+    js.CopyBytesToJS(dstArray, dst)
+    return true
 }
 
 // jsProcessBitmap handles decompression, flip, and color conversion in one call

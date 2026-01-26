@@ -166,3 +166,33 @@ func TestDecompressPlanarPlaneRLE_Error(t *testing.T) {
 	consumed := decompressPlanarPlaneRLE(src, dst, 4, 1)
 	require.Equal(t, -1, consumed)
 }
+
+func TestDecompressPlanarPlaneRLE_DeltaClamp(t *testing.T) {
+	width := 1
+	height := 2
+	src := []byte{
+		0x10, 0xFF, // First row: 1 raw byte, value 255
+		0x10, 0xFE, // Second row: delta 0xFE -> +127
+	}
+
+	dst := make([]byte, width*height)
+	consumed := decompressPlanarPlaneRLE(src, dst, width, height)
+	require.Greater(t, consumed, 0)
+	require.Equal(t, byte(255), dst[0])
+	require.Equal(t, byte(255), dst[1])
+}
+
+func TestDecompressPlanarPlaneRLE_DeltaClampNegative(t *testing.T) {
+	width := 1
+	height := 2
+	src := []byte{
+		0x10, 0x01, // First row: 1 raw byte, value 1
+		0x10, 0x01, // Second row: delta 0x01 -> -1
+	}
+
+	dst := make([]byte, width*height)
+	consumed := decompressPlanarPlaneRLE(src, dst, width, height)
+	require.Greater(t, consumed, 0)
+	require.Equal(t, byte(1), dst[0])
+	require.Equal(t, byte(0), dst[1])
+}

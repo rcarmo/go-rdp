@@ -81,6 +81,8 @@ type Config struct {
 ### Loading Configuration
 
 ```go
+func boolPtr(v bool) *bool { return &v }
+
 // Load with defaults + environment variables
 cfg, err := config.Load()
 
@@ -89,6 +91,7 @@ opts := config.LoadOptions{
     Host:     "127.0.0.1",
     Port:     8443,
     LogLevel: "debug",
+    UseNLA:   boolPtr(false),
 }
 cfg, err := config.LoadWithOverrides(opts)
 ```

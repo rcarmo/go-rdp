@@ -79,7 +79,7 @@ The server reads configuration from environment variables with CLI overrides tak
 Key settings:
 - `SERVER_HOST`, `SERVER_PORT` - Listen address
 - `ENABLE_TLS`, `TLS_CERT_FILE`, `TLS_KEY_FILE` - HTTPS support
-- `ALLOWED_ORIGINS` - CORS allowlist
+- `ALLOWED_ORIGINS` - CORS allowlist (currently permissive for reverse proxies/port mappings)
 - `MAX_CONNECTIONS`, `ENABLE_RATE_LIMIT` - Connection limits
 
 ## Usage

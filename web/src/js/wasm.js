@@ -157,8 +157,8 @@ export const WASMCodec = {
      * @param {number} bytesPerPixel
      */
     flipVertical(data, width, height, bytesPerPixel) {
-        if (!this.isReady()) return;
-        goRLE.flipVertical(data, width, height, bytesPerPixel);
+        if (!this.isReady()) return false;
+        return goRLE.flipVertical(data, width, height, bytesPerPixel) ?? true;
     },
     
     /**
@@ -167,8 +167,8 @@ export const WASMCodec = {
      * @param {Uint8Array} dst
      */
     rgb565toRGBA(src, dst) {
-        if (!this.isReady()) return;
-        goRLE.rgb565toRGBA(src, dst);
+        if (!this.isReady()) return false;
+        return goRLE.rgb565toRGBA(src, dst) ?? true;
     },
     
     /**
@@ -177,8 +177,8 @@ export const WASMCodec = {
      * @param {Uint8Array} dst
      */
     bgr24toRGBA(src, dst) {
-        if (!this.isReady()) return;
-        goRLE.bgr24toRGBA(src, dst);
+        if (!this.isReady()) return false;
+        return goRLE.bgr24toRGBA(src, dst) ?? true;
     },
     
     /**
@@ -187,8 +187,8 @@ export const WASMCodec = {
      * @param {Uint8Array} dst
      */
     bgra32toRGBA(src, dst) {
-        if (!this.isReady()) return;
-        goRLE.bgra32toRGBA(src, dst);
+        if (!this.isReady()) return false;
+        return goRLE.bgra32toRGBA(src, dst) ?? true;
     },
     
     /**

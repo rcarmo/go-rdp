@@ -59,14 +59,9 @@ func YCbCrToRGBA(y, cb, cr []int16, output []byte) {
 		crVal := int32(cr[i])
 
 		// ICT inverse transform with fixed-point arithmetic
-		// R = Y + 1.402525*Cr
-		r := (yVal + CrToR*crVal + fpRound) >> fpShift
-
-		// G = Y - 0.343730*Cb - 0.714401*Cr
-		g := (yVal - CbToG*cbVal - CrToG*crVal + fpRound) >> fpShift
-
-		// B = Y + 1.769905*Cb
-		b := (yVal + CbToB*cbVal + fpRound) >> fpShift
+		r := fixedPointRound(yVal + CrToR*crVal)
+		g := fixedPointRound(yVal - CbToG*cbVal - CrToG*crVal)
+		b := fixedPointRound(yVal + CbToB*cbVal)
 
 		// Clamp to [0, 255] and store as RGBA
 		outIdx := i * 4
@@ -86,4 +81,11 @@ func clampToByte(v int32) byte {
 		return 255
 	}
 	return byte(v)
+}
+
+func fixedPointRound(value int32) int32 {
+	if value >= 0 {
+		return (value + fpRound) >> fpShift
+	}
+	return (value - fpRound) >> fpShift
 }

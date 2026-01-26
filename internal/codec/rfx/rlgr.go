@@ -162,6 +162,9 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 
 			// Count unary prefix (number of full run-length codes)
 			nIdx := bs.CountLeadingZeros()
+			if bs.RemainingBits() == 0 {
+				return ErrRLGRDecodeError
+			}
 
 			// Calculate run length
 			runLength := 0
@@ -194,10 +197,16 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 
 			// Decode the non-zero value
 			// Sign bit first
+			if bs.RemainingBits() == 0 {
+				return ErrRLGRDecodeError
+			}
 			sign := bs.ReadBit()
 
 			// Magnitude using GR coding (count ones, then kr bits)
 			nIdx = bs.CountLeadingOnes()
+			if bs.RemainingBits() == 0 && nIdx == 0 {
+				return ErrRLGRDecodeError
+			}
 
 			mag := uint32(0)
 			if kr > 0 && bs.RemainingBits() >= int(kr) {
@@ -240,7 +249,10 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 			// GR mode (k == 0) - no run-length coding
 			if mode == RLGR1 {
 				// RLGR1: Single value coding with interleaved sign
-				nIdx := bs.CountLeadingOnes()
+			nIdx := bs.CountLeadingOnes()
+			if bs.RemainingBits() == 0 && nIdx == 0 {
+				return ErrRLGRDecodeError
+			}
 
 				mag := uint32(0)
 				if kr > 0 && bs.RemainingBits() >= int(kr) {
@@ -295,6 +307,9 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 			} else {
 				// RLGR3: Paired value coding
 				nIdx := bs.CountLeadingOnes()
+				if bs.RemainingBits() == 0 && nIdx == 0 {
+					return ErrRLGRDecodeError
+				}
 
 				code := uint32(0)
 				if kr > 0 && bs.RemainingBits() >= int(kr) {
@@ -329,7 +344,10 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 				}
 
 				var val1, val2 uint32
-				if nIdx2 > 0 && bs.RemainingBits() >= nIdx2 {
+				if nIdx2 > 0 {
+					if bs.RemainingBits() < nIdx2 {
+						return ErrRLGRDecodeError
+					}
 					val1 = bs.ReadBits(nIdx2)
 				}
 				val2 = code - val1

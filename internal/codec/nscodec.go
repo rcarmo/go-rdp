@@ -55,24 +55,27 @@ func NSCodecRLEDecompress(data []byte, expectedSize int) []byte {
 				return nil
 			}
 
-			result = append(result, data[offset:offset+literalLength]...)
+			for _, b := range data[offset : offset+literalLength] {
+				if len(result) >= expectedSize-4 {
+					break
+				}
+				result = append(result, b)
+			}
 			offset += literalLength
 		}
 	}
 
-	// Append EndData (last 4 bytes)
-	if len(data) >= 4 {
-		endData := data[len(data)-4:]
-		for _, b := range endData {
-			if len(result) < expectedSize {
-				result = append(result, b)
-			}
-		}
+	if len(result) < expectedSize-4 || offset != dataLen {
+		return nil
 	}
 
-	// Pad with zeros if needed
-	for len(result) < expectedSize {
-		result = append(result, 0)
+	// Append EndData (last 4 bytes)
+	endData := data[len(data)-4:]
+	for _, b := range endData {
+		if len(result) >= expectedSize {
+			break
+		}
+		result = append(result, b)
 	}
 
 	return result[:expectedSize]

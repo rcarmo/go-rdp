@@ -35,7 +35,7 @@ type LoadOptions struct {
 	SkipTLSValidation bool
 	TLSServerName     string
 	AllowAnyTLSServer bool
-	UseNLA            bool
+	UseNLA            *bool
 	EnableRFX         *bool // nil = use env/default, non-nil = override
 	EnableUDP         *bool // nil = use env/default, non-nil = override
 }
@@ -134,9 +134,10 @@ func LoadWithOverrides(opts LoadOptions) (*Config, error) {
 	config.Security.TLSServerName = getOverrideOrEnv(opts.TLSServerName, "TLS_SERVER_NAME", "")
 	config.Security.AllowAnyTLSServer = getBoolWithDefault("TLS_ALLOW_ANY_SERVER_NAME", false) || opts.AllowAnyTLSServer
 	// NLA enabled by default for security; set USE_NLA=false to disable
-	config.Security.UseNLA = getBoolWithDefault("USE_NLA", true)
-	if opts.UseNLA {
-		config.Security.UseNLA = true
+	if opts.UseNLA != nil {
+		config.Security.UseNLA = *opts.UseNLA
+	} else {
+		config.Security.UseNLA = getBoolWithDefault("USE_NLA", true)
 	}
 
 	// Logging config

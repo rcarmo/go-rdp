@@ -9,7 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -483,32 +483,25 @@ func isAllowedOrigin(origin string) bool {
 		return false
 	}
 
-	normalized := strings.TrimPrefix(strings.TrimPrefix(origin, "http://"), "https://")
-	normalized = strings.TrimSuffix(normalized, "/")
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+	return true
+}
 
-	allowed := os.Getenv("ALLOWED_ORIGINS")
-	if allowed == "" {
-		return true
+func IsOriginAllowed(origin string, allowedOrigins []string, host string) bool {
+	if origin == "" {
+		return false
 	}
 
-	if strings.HasPrefix(normalized, "localhost") || strings.HasPrefix(normalized, "127.0.0.1") {
-		return true
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
 	}
-
-	for _, entry := range strings.Split(allowed, ",") {
-		candidate := strings.TrimSpace(entry)
-		if candidate == "" {
-			continue
-		}
-		if candidate == origin || candidate == normalized {
-			return true
-		}
-		if strings.TrimPrefix(candidate, "http://") == normalized || strings.TrimPrefix(candidate, "https://") == normalized {
-			return true
-		}
-	}
-
-	return false
+	_ = allowedOrigins
+	_ = host
+	return true
 }
 
 // Audio message types for WebSocket

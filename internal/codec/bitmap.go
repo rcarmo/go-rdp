@@ -238,9 +238,9 @@ func ProcessBitmap(src []byte, width, height, bpp int, isCompressed bool, rowDel
 
 	// For 32-bit compressed, check if it's planar codec (first byte has format header)
 	if isCompressed && bpp == 32 && len(src) > 0 {
-		// Check for planar codec format header
 		formatHeader := src[0]
-		if formatHeader&0xC0 == 0 { // Reserved bits should be 0 for planar
+		// Planar: reserved bits clear, and at least one known flag may be set
+		if formatHeader&0xC0 == 0 {
 			rgba := DecompressPlanar(src, width, height)
 			if rgba != nil {
 				return rgba

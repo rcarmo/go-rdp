@@ -9,6 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func boolPtr(v bool) *bool {
+	return &v
+}
+
 func TestLoad(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -169,6 +173,14 @@ func TestLoadWithOverrides(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "nla override false",
+			envVars: map[string]string{"USE_NLA": "true"},
+			opts: LoadOptions{
+				UseNLA: boolPtr(false),
+			},
+			want: &Config{},
+		},
 	}
 
 	for _, tt := range tests {
@@ -181,9 +193,13 @@ func TestLoadWithOverrides(t *testing.T) {
 			cfg, err := LoadWithOverrides(tt.opts)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.want.Server.Host, cfg.Server.Host)
-			assert.Equal(t, tt.want.Server.Port, cfg.Server.Port)
-			assert.Equal(t, tt.want.Logging.Level, cfg.Logging.Level)
+			if tt.name != "nla override false" {
+				assert.Equal(t, tt.want.Server.Host, cfg.Server.Host)
+				assert.Equal(t, tt.want.Server.Port, cfg.Server.Port)
+				assert.Equal(t, tt.want.Logging.Level, cfg.Logging.Level)
+			} else {
+				assert.False(t, cfg.Security.UseNLA)
+			}
 
 			// Clean up environment
 			for k := range tt.envVars {

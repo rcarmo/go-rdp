@@ -7,10 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rcarmo/go-rdp/internal/config"
@@ -42,7 +44,7 @@ type parsedArgs struct {
 	skipTLS       bool
 	allowAnyTLS   bool
 	tlsServerName string
-	useNLA        bool
+	useNLA        *bool
 	enableRFX     *bool // nil = use default, non-nil = override
 	enableUDP     *bool // nil = use default, non-nil = override
 }
@@ -95,6 +97,12 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 		enableUDPPtr = &udpValue
 	}
 
+	var useNLAPtr *bool
+	if *useNLA {
+		nlaValue := true
+		useNLAPtr = &nlaValue
+	}
+
 	return parsedArgs{
 		host:          strings.TrimSpace(*hostFlag),
 		port:          strings.TrimSpace(*portFlag),
@@ -102,7 +110,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 		skipTLS:       *skipTLS,
 		allowAnyTLS:   *allowAnyTLS,
 		tlsServerName: strings.TrimSpace(*tlsServerName),
-		useNLA:        *useNLA,
+		useNLA:        useNLAPtr,
 		enableRFX:     enableRFXPtr,
 		enableUDP:     enableUDPPtr,
 	}, ""
@@ -200,6 +208,13 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 func corsMiddleware(next http.Handler, allowedOrigins []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if len(allowedOrigins) == 0 {
+				log.Printf("CORS: allowing origin %q without allowlist (dev mode)", origin)
+			} else {
+				log.Printf("CORS: allowing origin %q without strict allowlist enforcement (proxy mode)", origin)
+			}
+		}
 		if isOriginAllowed(origin, allowedOrigins, r.Host) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -221,24 +236,68 @@ func isOriginAllowed(origin string, allowedOrigins []string, host string) bool {
 		return false
 	}
 
-	for _, allowed := range allowedOrigins {
-		if strings.TrimSpace(allowed) == origin {
-			return true
-		}
+	allowed := allowedOrigins
+	if len(allowed) == 0 {
+		allowed = []string{"*"}
 	}
+	return handler.IsOriginAllowed(origin, allowed, host)
+}
 
-	// When no ALLOWED_ORIGINS configured, allow all origins (development mode)
-	// For production, explicitly set ALLOWED_ORIGINS
-	if len(allowedOrigins) == 0 {
+type rateLimiter struct {
+	mu       sync.Mutex
+	capacity float64
+	tokens   float64
+	last     time.Time
+}
+
+func newRateLimiter(ratePerMinute int) *rateLimiter {
+	capacity := float64(ratePerMinute)
+	if capacity <= 0 {
+		capacity = 1
+	}
+	return &rateLimiter{capacity: capacity, tokens: capacity, last: time.Now()}
+}
+
+func (rl *rateLimiter) allow(now time.Time, refillPerSecond float64) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	elapsed := now.Sub(rl.last).Seconds()
+	if elapsed > 0 {
+		rl.tokens += elapsed * refillPerSecond
+		if rl.tokens > rl.capacity {
+			rl.tokens = rl.capacity
+		}
+		rl.last = now
+	}
+	if rl.tokens >= 1 {
+		rl.tokens -= 1
 		return true
 	}
-
 	return false
 }
 
-func rateLimitMiddleware(next http.Handler, _ int) http.Handler {
-	// Simplified placeholder: production implementation should enforce rate limits
+func rateLimitMiddleware(next http.Handler, ratePerMinute int) http.Handler {
+	refillPerSecond := float64(ratePerMinute) / 60.0
+	var clients sync.Map
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ratePerMinute <= 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		key := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			key = host
+		}
+
+		value, _ := clients.LoadOrStore(key, newRateLimiter(ratePerMinute))
+		limiter := value.(*rateLimiter)
+		if !limiter.allow(time.Now(), refillPerSecond) {
+			http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }

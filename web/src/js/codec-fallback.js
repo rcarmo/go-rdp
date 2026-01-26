@@ -206,8 +206,13 @@ export const FallbackCodec = {
         }
         
         const palette = this.palette;
+        const paletteLen = palette.length;
         for (let i = 0, len = src.length; i < len; i++) {
             const idx = src[i] << 2;
+            if (idx + 3 >= paletteLen) {
+                Logger.warn('FallbackCodec', 'palette8ToRGBA: palette index out of range');
+                return false;
+            }
             const dstIdx = i << 2;
             dst[dstIdx] = palette[idx];
             dst[dstIdx + 1] = palette[idx + 1];
@@ -288,7 +293,15 @@ export const FallbackCodec = {
         if (width <= 0 || height <= 0 || bytesPerPixel <= 0) return false;
         
         const rowSize = width * bytesPerPixel;
+        if (!Number.isSafeInteger(rowSize) || rowSize <= 0) {
+            Logger.warn('FallbackCodec', 'flipVertical: invalid row size');
+            return false;
+        }
         const expectedSize = rowSize * height;
+        if (!Number.isSafeInteger(expectedSize) || expectedSize <= 0) {
+            Logger.warn('FallbackCodec', 'flipVertical: invalid buffer size');
+            return false;
+        }
         
         if (data.length < expectedSize) {
             Logger.warn('FallbackCodec', `flipVertical: data buffer too small (${data.length} < ${expectedSize})`);
@@ -327,33 +340,29 @@ export const FallbackCodec = {
         try {
             // FAST PATH: Uncompressed 16-bit (recommended for JS fallback)
             if (!isCompressed && (bpp === 16 || bpp === 15)) {
-                if (bpp === 16) {
-                    this.rgb565ToRGBA(src, dst);
-                } else {
-                    this.rgb555ToRGBA(src, dst);
-                }
-                this.flipVertical(dst, width, height, 4);
-                return true;
+                const result = bpp === 16 ? this.rgb565ToRGBA(src, dst) : this.rgb555ToRGBA(src, dst);
+                if (!result) return false;
+                return this.flipVertical(dst, width, height, 4);
             }
             
             // Other uncompressed formats
             if (!isCompressed) {
                 switch (bpp) {
                     case 8:
-                        this.palette8ToRGBA(src, dst);
+                        result = this.palette8ToRGBA(src, dst);
                         break;
                     case 24:
-                        this.bgr24ToRGBA(src, dst);
+                        result = this.bgr24ToRGBA(src, dst);
                         break;
                     case 32:
-                        this.bgra32ToRGBA(src, dst);
+                        result = this.bgra32ToRGBA(src, dst);
                         break;
                     default:
                         Logger.warn('FallbackCodec', `Unsupported uncompressed bpp: ${bpp}`);
                         return false;
                 }
-                this.flipVertical(dst, width, height, 4);
-                return true;
+                if (!result) return false;
+                return this.flipVertical(dst, width, height, 4);
             }
             
             // Compressed formats - limited support

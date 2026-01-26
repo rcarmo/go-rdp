@@ -68,6 +68,24 @@ func TestYCbCrToRGBA_Black(t *testing.T) {
 	assert.InDelta(t, 0, int(rgba[2]), 2, "B should be ~0")
 }
 
+func TestYCbCrToRGBA_NegativeRounding(t *testing.T) {
+	y := make([]int16, TilePixels)
+	cb := make([]int16, TilePixels)
+	cr := make([]int16, TilePixels)
+	rgba := make([]byte, TileRGBASize)
+
+	for i := range y {
+		y[i] = -4096  // black base
+		cb[i] = 2048  // positive Cb
+		cr[i] = -2048 // negative Cr
+	}
+
+	YCbCrToRGBA(y, cb, cr, rgba)
+	assert.GreaterOrEqual(t, rgba[0], byte(0))
+	assert.GreaterOrEqual(t, rgba[1], byte(0))
+	assert.GreaterOrEqual(t, rgba[2], byte(0))
+}
+
 func TestYCbCrToRGBA_Red(t *testing.T) {
 	// Pure red (255,0,0) in YCbCr (BT.601): Y=76, Cb=-85, Cr=127
 	// In 11.5: Y=(76-128)<<5=-1664, Cb=-85<<5=-2720, Cr=127<<5=4064

@@ -126,8 +126,10 @@ const FallbackCodec = {
         if (dst.length < src.length * 4) return false;
         
         const palette = this.palette;
+        const paletteLen = palette.length;
         for (let i = 0, len = src.length; i < len; i++) {
             const idx = src[i] << 2;
+            if (idx + 3 >= paletteLen) return false;
             const dstIdx = i << 2;
             dst[dstIdx] = palette[idx];
             dst[dstIdx + 1] = palette[idx + 1];
@@ -179,7 +181,9 @@ const FallbackCodec = {
         if (width <= 0 || height <= 0 || bytesPerPixel <= 0) return false;
         
         const rowSize = width * bytesPerPixel;
+        if (!Number.isSafeInteger(rowSize) || rowSize <= 0) return false;
         const expectedSize = rowSize * height;
+        if (!Number.isSafeInteger(expectedSize) || expectedSize <= 0) return false;
         
         if (data.length < expectedSize) return false;
         if (height <= 1) return true;
@@ -201,15 +205,9 @@ const FallbackCodec = {
     processBitmap(src, width, height, bpp, isCompressed, dst) {
         try {
             if (!isCompressed && (bpp === 16 || bpp === 15)) {
-                let result;
-                if (bpp === 16) {
-                    result = this.rgb565ToRGBA(src, dst);
-                } else {
-                    result = this.rgb555ToRGBA(src, dst);
-                }
+                const result = bpp === 16 ? this.rgb565ToRGBA(src, dst) : this.rgb555ToRGBA(src, dst);
                 if (!result) return false;
-                this.flipVertical(dst, width, height, 4);
-                return true;
+                return this.flipVertical(dst, width, height, 4);
             }
             
             if (!isCompressed) {
@@ -228,8 +226,7 @@ const FallbackCodec = {
                         return false;
                 }
                 if (!result) return false;
-                this.flipVertical(dst, width, height, 4);
-                return true;
+                return this.flipVertical(dst, width, height, 4);
             }
             
             return false;
@@ -553,6 +550,15 @@ describe('FallbackCodec.palette8ToRGBA()', () => {
         const result = FallbackCodec.palette8ToRGBA(new Uint8Array([0, 1]), new Uint8Array(4));
         assert.equal(result, false);
     });
+
+    it('should fail on out-of-range palette index', () => {
+        const src = new Uint8Array([255]);
+        const dst = new Uint8Array(4);
+        // Shrink palette to force out-of-range check
+        FallbackCodec.palette = new Uint8Array(4);
+        const result = FallbackCodec.palette8ToRGBA(src, dst);
+        assert.equal(result, false);
+    });
 });
 
 describe('FallbackCodec.bgr24ToRGBA()', () => {
@@ -675,6 +681,12 @@ describe('FallbackCodec.flipVertical()', () => {
     it('should fail on buffer too small', () => {
         const data = new Uint8Array(4);
         const result = FallbackCodec.flipVertical(data, 2, 2, 4);
+        assert.equal(result, false);
+    });
+
+    it('should fail on oversized dimensions', () => {
+        const data = new Uint8Array(4);
+        const result = FallbackCodec.flipVertical(data, Number.MAX_SAFE_INTEGER, 2, 4);
         assert.equal(result, false);
     });
 });

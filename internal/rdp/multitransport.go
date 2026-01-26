@@ -173,6 +173,9 @@ func (h *MultitransportHandler) HandleRequest(data []byte) error {
 		err := tunnelMgr.HandleMultitransportRequest(&req)
 		if err != nil {
 			log.Printf("Failed to initiate UDP tunnel: %v", err)
+			h.mu.Lock()
+			delete(h.pendingRequests, req.RequestID)
+			h.mu.Unlock()
 			// Per spec: If unable to initiate, SHOULD send decline
 			if softSync {
 				// Soft-Sync: MUST send response regardless
@@ -204,6 +207,10 @@ func (h *MultitransportHandler) onTunnelEstablished(tunnel *udp.Tunnel) {
 		log.Printf("Tunnel established for unknown request ID: %d", tunnel.RequestID)
 		return
 	}
+
+	h.mu.Lock()
+	delete(h.pendingRequests, tunnel.RequestID)
+	h.mu.Unlock()
 
 	log.Printf("UDP tunnel %d established successfully", tunnel.RequestID)
 

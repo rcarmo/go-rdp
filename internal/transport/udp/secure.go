@@ -182,22 +182,16 @@ func (sc *SecureConnection) performTLSHandshake(ctx context.Context) error {
 
 // performDTLSHandshake wraps the UDP connection with DTLS for lossy transport
 func (sc *SecureConnection) performDTLSHandshake(ctx context.Context) error {
-	// Get remote address for DTLS dial
-	remoteAddr := sc.udpConn.RemoteAddr()
-	if remoteAddr == nil {
-		return errors.New("DTLS: no remote address")
+	// Wrap RDPEUDP connection as a net.Conn for DTLS
+	wrapper := &udpConnWrapper{conn: sc.udpConn}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = wrapper.SetDeadline(deadline)
 	}
 
-	udpAddr, ok := remoteAddr.(*net.UDPAddr)
-	if !ok {
-		return errors.New("DTLS: invalid remote address type")
-	}
-
-	// Create DTLS connection using the underlying socket
-	// Note: pion/dtls wants to manage its own socket, so we need to use Dial
-	dtlsConn, err := dtls.Dial("udp", udpAddr, sc.dtlsConfig)
+	dtlsConn, err := dtls.Client(wrapper, sc.dtlsConfig)
 	if err != nil {
-		return fmt.Errorf("DTLS dial: %w", err)
+		return fmt.Errorf("DTLS handshake: %w", err)
 	}
 
 	sc.mu.Lock()

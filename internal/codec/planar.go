@@ -14,6 +14,9 @@ func DecompressPlanar(src []byte, width, height int) []byte {
 	if len(src) < 1 {
 		return nil
 	}
+	if width <= 0 || height <= 0 {
+		return nil
+	}
 
 	formatHeader := src[0]
 	hasRLE := (formatHeader & PlanarFlagRLE) != 0
@@ -21,6 +24,9 @@ func DecompressPlanar(src []byte, width, height int) []byte {
 
 	srcIdx := 1
 	planeSize := width * height
+	if planeSize <= 0 {
+		return nil
+	}
 
 	// Allocate planes
 	planeR := make([]byte, planeSize)
@@ -186,23 +192,23 @@ func decompressPlanarPlaneRLE(src []byte, dst []byte, width, height int) int {
 						pixel = int16(deltaValue >> 1)
 					}
 
-					// Add delta to previous scanline value
-					dst[dstIdx] = byte(int16(previousScanline[x]) + pixel)
+					// Add delta to previous scanline value with saturation
+					dst[dstIdx] = clampPlanarDelta(previousScanline[x], pixel)
 					dstIdx++
 					x++
 					cRawBytes--
 				}
 
-				// For run, add same delta to each previous scanline value
-				for nRunLength > 0 {
-					if dstIdx >= len(dst) {
-						return -1
+					// For run, add same delta to each previous scanline value
+					for nRunLength > 0 {
+						if dstIdx >= len(dst) {
+							return -1
+						}
+						dst[dstIdx] = clampPlanarDelta(previousScanline[x], pixel)
+						dstIdx++
+						x++
+						nRunLength--
 					}
-					dst[dstIdx] = byte(int16(previousScanline[x]) + pixel)
-					dstIdx++
-					x++
-					nRunLength--
-				}
 			}
 		}
 
@@ -210,4 +216,15 @@ func decompressPlanarPlaneRLE(src []byte, dst []byte, width, height int) int {
 	}
 
 	return srcIdx
+}
+
+func clampPlanarDelta(base byte, delta int16) byte {
+	value := int16(base) + delta
+	if value < 0 {
+		return 0
+	}
+	if value > 255 {
+		return 255
+	}
+	return byte(value)
 }

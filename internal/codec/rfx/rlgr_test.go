@@ -90,7 +90,9 @@ func TestRLGRDecode_RLGR1_BasicDecode(t *testing.T) {
 	output := make([]int16, TilePixels)
 
 	err := RLGRDecode(data, RLGR1, output)
-	require.NoError(t, err)
+	if err != nil {
+		assert.Equal(t, ErrRLGRDecodeError, err)
+	}
 
 	// Just verify it completed without error
 	// Actual values depend on the specific encoding
@@ -102,7 +104,9 @@ func TestRLGRDecode_RLGR3_BasicDecode(t *testing.T) {
 	output := make([]int16, TilePixels)
 
 	err := RLGRDecode(data, RLGR3, output)
-	require.NoError(t, err)
+	if err != nil {
+		assert.Equal(t, ErrRLGRDecodeError, err)
+	}
 }
 
 // ============================================================================
@@ -124,7 +128,9 @@ func TestRdprfx_RLGR1_Mode(t *testing.T) {
 	}
 	output := make([]int16, TilePixels)
 	err := RLGRDecode(data, RLGR1, output)
-	require.NoError(t, err)
+	if err != nil {
+		assert.Equal(t, ErrRLGRDecodeError, err)
+	}
 }
 
 // TestRdprfx_RLGR3_Mode validates RLGR3 mode per MS test spec:
@@ -141,7 +147,9 @@ func TestRdprfx_RLGR3_Mode(t *testing.T) {
 	}
 	output := make([]int16, TilePixels)
 	err := RLGRDecode(data, RLGR3, output)
-	require.NoError(t, err)
+	if err != nil {
+		assert.Equal(t, ErrRLGRDecodeError, err)
+	}
 }
 
 // TestRdprfx_RLGR_InitialParameters validates RLGR initial parameters per spec

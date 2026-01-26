@@ -33,22 +33,17 @@ func TestNSCodecRLEDecompressRunSegment(t *testing.T) {
 	// Should output 3x 0xAA
 	// Then EndData (4 bytes)
 	data := []byte{0x83, 0xAA, 0x00, 0x00, 0x00, 0x00}
-	result := NSCodecRLEDecompress(data, 10)
-	// May return partial result based on implementation
-	if result != nil {
-		assert.Contains(t, result, byte(0xAA))
-	}
+	result := NSCodecRLEDecompress(data, 7)
+	assert.Equal(t, []byte{0xAA, 0xAA, 0xAA, 0x00, 0x00, 0x00, 0x00}, result)
 }
 
 // TestNSCodecRLEDecompressLiteralSegment tests literal segment decompression
 func TestNSCodecRLEDecompressLiteralSegment(t *testing.T) {
 	// Literal segment: 0x03 = 3 literal bytes
 	// Then 3 bytes of data, then EndData
-	data := []byte{0x03, 0xBB, 0xCC, 0xDD, 0x00, 0x00, 0x00, 0x00}
-	result := NSCodecRLEDecompress(data, 10)
-	if result != nil && len(result) >= 3 {
-		assert.Equal(t, byte(0xBB), result[0])
-	}
+	data := []byte{0x84, 0xBB, 0x03, 0xCC, 0xDD, 0x11, 0x00, 0x00, 0x00, 0x00}
+	result := NSCodecRLEDecompress(data, 11)
+	assert.Equal(t, []byte{0xBB, 0xBB, 0xBB, 0xBB, 0xCC, 0xDD, 0x11, 0x00, 0x00, 0x00, 0x00}, result)
 }
 
 // TestReadPixel15 tests 15-bit pixel reading

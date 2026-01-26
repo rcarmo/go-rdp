@@ -354,7 +354,7 @@ func (tm *TunnelManager) tunnelReceiveLoop(tunnel *Tunnel) {
 				select {
 				case tunnel.dataChan <- payload:
 				default:
-					// Buffer full
+					log.Printf("Tunnel %d: data channel full, dropping packet", tunnel.RequestID)
 				}
 			}
 		}
