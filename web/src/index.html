@@ -5,9 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="description" content="Secure HTML5 RDP Client">
     <title>RDP Client</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#ffffff">
     <!-- Single bundled client -->
     <script src="js/rle/wasm_exec.js"></script>
     <script src="js/client.bundle.min.js?v=2"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').catch((err) => {
+                    console.warn('Service worker registration failed', err);
+                });
+            });
+        }
+    </script>
     <style>
         :root {
             --background: #f5f5f5;

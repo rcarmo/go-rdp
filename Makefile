@@ -124,11 +124,14 @@ build-frontend: build-html build-wasm build-js-min ## Build WASM and JS assets
 	@echo "Frontend assets built (HTML + WASM + JS)"
 
 .PHONY: build-html
-build-html: ## Copy HTML files from src to dist
-	@echo "Copying HTML files to dist..."
-	@mkdir -p web/dist
+build-html: ## Copy HTML/manifest/PWA assets from src to dist
+	@echo "Copying HTML/manifest/PWA assets to dist..."
+	@mkdir -p web/dist web/dist/pwa
 	@cp web/src/*.html web/dist/
-	@echo "HTML files copied to web/dist/"
+	@cp web/src/*.webmanifest web/dist/
+	@cp web/src/*.js web/dist/
+	@cp web/src/pwa/*.png web/dist/pwa/
+	@echo "HTML/manifest/PWA assets copied to web/dist/"
 
 .PHONY: build-all
 build-all: build-frontend ## Build binaries for common platforms
@@ -249,7 +252,8 @@ clean: ## Clean build artifacts and caches
 .PHONY: clean-frontend
 clean-frontend: ## Clean frontend build artifacts
 	@echo "Cleaning frontend build artifacts..."
-	rm -f web/dist/*.html
+	rm -f web/dist/*.html web/dist/*.webmanifest web/dist/*.js
+	rm -rf web/dist/pwa
 	rm -f web/dist/js/*.js web/dist/js/*.js.map
 	rm -f web/dist/js/rle/*.wasm web/dist/js/rle/*.js
 

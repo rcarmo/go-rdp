@@ -8,7 +8,7 @@ import (
 
 // Embed HTML files from src/ (tracked in git)
 //
-//go:embed src/*.html
+//go:embed src/*.html src/*.webmanifest src/pwa src/*.js
 var srcFS embed.FS
 
 // Embed JS/WASM from dist/ (built artifacts)
