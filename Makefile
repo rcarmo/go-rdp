@@ -6,6 +6,7 @@ BINARY_NAME=rdp-html5
 BUILD_DIR=bin
 GO_VERSION=1.22
 LINTER=golangci-lint
+VERSION_FILE=cmd/server/main.go
 
 .PHONY: help
 help: ## Show this help
@@ -313,3 +314,28 @@ config: ## Show build configuration
 .PHONY: ci
 ci: deps check test build ## Run full CI pipeline
 	@echo "CI pipeline completed successfully"
+
+# Release helpers
+.PHONY: bump-patch
+bump-patch: ## Bump patch version and create git tag
+	@OLD=$$(grep -Po '(?<=appVersion = ")[^"]+' $(VERSION_FILE)); \
+	MAJOR=$$(echo $$OLD | cut -d. -f1); \
+	MINOR=$$(echo $$OLD | cut -d. -f2); \
+	PATCH=$$(echo $$OLD | cut -d. -f3); \
+	NEW="$$MAJOR.$$MINOR.$$((PATCH + 1))"; \
+	sed -i "s/appVersion = \"$$OLD\"/appVersion = \"$$NEW\"/" $(VERSION_FILE); \
+	git add $(VERSION_FILE); \
+	git commit -m "Bump version to $$NEW"; \
+	git tag "v$$NEW"; \
+	echo "Bumped version: $$OLD -> $$NEW (tagged v$$NEW)"
+
+.PHONY: push
+push: ## Push commits and current tag to origin
+	@TAG=$$(git describe --tags --exact-match 2>/dev/null); \
+	git push origin $$(git rev-parse --abbrev-ref HEAD); \
+	if [ -n "$$TAG" ]; then \
+		echo "Pushing tag $$TAG..."; \
+		git push origin "$$TAG"; \
+	else \
+		echo "No tag on current commit"; \
+	fi
