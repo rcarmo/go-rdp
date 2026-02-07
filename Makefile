@@ -157,22 +157,23 @@ build-all: build-frontend ## Build binaries for common platforms
 	@ls -la $(BUILD_DIR)/
 
 .PHONY: build-wasm
-build-wasm: ## Build WebAssembly module (TinyGo preferred)
+build-wasm: ## Build WebAssembly module (requires TinyGo)
 	@echo "Building Go WebAssembly RLE module with TinyGo (optimized for size)..."
 	@mkdir -p web/dist/js/rle
-	@if command -v tinygo >/dev/null 2>&1; then \
-		tinygo build -o web/dist/js/rle/rle.wasm -target wasm -opt=z ./web/src/wasm/; \
-		cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/dist/js/rle/wasm_exec.js; \
-	else \
-		echo "TinyGo not found, using standard Go (larger output)..."; \
-		GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o web/dist/js/rle/rle.wasm ./web/src/wasm/; \
-		GOROOT=$$(go env GOROOT); \
-		if [ -f "$$GOROOT/misc/wasm/wasm_exec.js" ]; then \
-			cp "$$GOROOT/misc/wasm/wasm_exec.js" web/dist/js/rle/wasm_exec.js; \
-		elif [ -f "$$GOROOT/lib/wasm/wasm_exec.js" ]; then \
-			cp "$$GOROOT/lib/wasm/wasm_exec.js" web/dist/js/rle/wasm_exec.js; \
-		fi; \
+	@if ! command -v tinygo >/dev/null 2>&1; then \
+		echo ""; \
+		echo "ERROR: TinyGo is required to build WASM artifacts but was not found."; \
+		echo ""; \
+		echo "  Install it with:  brew install tinygo-org/tools/tinygo"; \
+		echo "  Or see:           https://tinygo.org/getting-started/install/"; \
+		echo ""; \
+		echo "  Standard Go WASM builds produce ~2 MB+ output vs ~400 KB with TinyGo."; \
+		echo "  TinyGo is mandatory for distribution builds."; \
+		echo ""; \
+		exit 1; \
 	fi
+	tinygo build -o web/dist/js/rle/rle.wasm -target wasm -opt=z ./web/src/wasm/
+	cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/dist/js/rle/wasm_exec.js
 	@ls -lh web/dist/js/rle/rle.wasm
 	@echo "WebAssembly module built: web/dist/js/rle/rle.wasm"
 
