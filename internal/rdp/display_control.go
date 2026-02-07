@@ -225,7 +225,7 @@ func (h *DisplayControlHandler) RequestResize(width, height uint32) error {
 	// Validate against server capabilities
 	if h.caps != nil {
 		maxArea := h.caps.MaxMonitorAreaSize
-		if maxArea > 0 && width*height > maxArea {
+		if maxArea > 0 && uint64(width)*uint64(height) > uint64(maxArea) {
 			h.mu.Unlock()
 			return fmt.Errorf("requested resolution %dx%d exceeds server max area %d", width, height, maxArea)
 		}

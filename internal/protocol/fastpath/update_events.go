@@ -175,6 +175,7 @@ func (d *BitmapData) Deserialize(wire io.Reader) error {
 	}
 
 	if d.Flags&BitmapDataFlagNoHDR != BitmapDataFlagNoHDR && d.Flags&BitmapDataFlagCompression == BitmapDataFlagCompression {
+		d.BitmapComprHdr = &CompressedDataHeader{}
 		err = d.BitmapComprHdr.Deserialize(wire)
 		if err != nil {
 			return err

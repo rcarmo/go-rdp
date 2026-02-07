@@ -333,8 +333,11 @@ func (c *Client) getTLSPublicKey() ([]byte, error) {
 	}
 
 	// Skip AlgorithmIdentifier SEQUENCE
-	if spki[offset] != 0x30 {
+	if offset >= len(spki) || spki[offset] != 0x30 {
 		return nil, fmt.Errorf("expected SEQUENCE tag for AlgorithmIdentifier")
+	}
+	if offset+1 >= len(spki) {
+		return nil, fmt.Errorf("AlgorithmIdentifier truncated")
 	}
 	algIdLen, algIdLenBytes := parseASN1Length(spki[offset+1:])
 	offset += 1 + algIdLenBytes + algIdLen

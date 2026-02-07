@@ -163,7 +163,7 @@ func PerWriteObjectIdentifier(oid [6]byte, w io.Writer) {
 	PerWriteLength(5, w)
 
 	_, _ = w.Write([]byte{
-		(oid[0] << 4) & (oid[1] & 0x0f),
+		(oid[0] << 4) | (oid[1] & 0x0f),
 		oid[2],
 		oid[3],
 		oid[4],

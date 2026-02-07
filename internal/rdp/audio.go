@@ -2,6 +2,7 @@ package rdp
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/rcarmo/go-rdp/internal/logging"
 	"github.com/rcarmo/go-rdp/internal/protocol/audio"
@@ -242,6 +243,9 @@ func (h *AudioHandler) handleWave(body []byte) error {
 	h.pendingWaveInfo = &waveInfo
 
 	// The rest of the data follows in the same PDU after the header
+	if len(body) < 12 {
+		return fmt.Errorf("wave body too short: %d", len(body))
+	}
 	audioData := body[12:] // Skip WaveInfo header
 
 	// Combine initial data with rest
