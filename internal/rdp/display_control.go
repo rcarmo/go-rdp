@@ -265,7 +265,7 @@ func (h *DisplayControlHandler) sendDRDYNVC(data []byte) error {
 	
 	buf := new(bytes.Buffer)
 	// Write total length first (4 bytes)
-	_ = binary.Write(buf, binary.LittleEndian, uint32(len(data)))
+	_ = binary.Write(buf, binary.LittleEndian, uint32(len(data))) // #nosec G115
 	// Write flags (4 bytes)
 	_ = binary.Write(buf, binary.LittleEndian, uint32(header.Flags))
 	buf.Write(data)

@@ -211,7 +211,7 @@ func (h *MultitransportHandler) onTunnelEstablished(tunnel *udp.Tunnel) {
 
 	// Per MS-RDPBCGR: If Soft-Sync supported, MUST send success response
 	if softSync {
-		h.AcceptRequest(tunnel.RequestID)
+		h.AcceptRequest(tunnel.RequestID) // #nosec G104 -- best-effort
 	}
 
 	// Notify callback
@@ -232,7 +232,7 @@ func (h *MultitransportHandler) onTunnelClosed(requestID uint32, err error) {
 		log.Printf("UDP tunnel %d failed: %v", requestID, err)
 		// Per spec: If sideband creation fails and Soft-Sync, send decline
 		if req != nil && softSync {
-			h.sendDecline(requestID)
+			h.sendDecline(requestID) // #nosec G104 -- best-effort
 		}
 	} else {
 		log.Printf("UDP tunnel %d closed", requestID)

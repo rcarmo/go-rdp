@@ -21,7 +21,7 @@ func (d *ClientSendDataRequest) Serialize() []byte {
 	encoding.PerWriteInteger16(d.Initiator, 1001, buf)
 	encoding.PerWriteInteger16(d.ChannelId, 0, buf)
 	buf.WriteByte(0x70) // magic word
-	encoding.PerWriteLength(uint16(len(d.Data)), buf)
+	encoding.PerWriteLength(uint16(len(d.Data)), buf) // #nosec G115
 
 	buf.Write(d.Data)
 

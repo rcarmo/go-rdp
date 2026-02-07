@@ -224,7 +224,7 @@ func (c *Client) handleSlowPathGraphicsUpdate(wire io.Reader) (*Update, error) {
 	// Format: [updateHeader (1 byte)] [size (2 bytes LE)] [updateType (2 bytes LE)] [bitmap data...]
 	// The size field should be the size of everything after the updateHeader+size, i.e. updateType + bitmapData
 	updateHeader := fastpathCode                 // fragmentation=0 (single), compression=0 (none)
-	totalDataSize := uint16(2 + len(updateData)) // updateType (2 bytes) + rest of data
+	totalDataSize := uint16(2 + len(updateData)) // #nosec G115
 
 	fpData := make([]byte, 3+2+len(updateData))
 	fpData[0] = updateHeader

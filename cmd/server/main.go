@@ -9,7 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // #nosec G108 -- pprof is intentionally exposed for diagnostics
 	"os"
 	"strings"
 	"sync"

@@ -171,7 +171,7 @@ func DecodeTSRequest(data []byte) (*TSRequest, error) {
 			_, inner, _ := parseTag(value)
 			req.PubKeyAuth = inner
 		case 4: // errorCode (version 3+)
-			req.ErrorCode = uint32(parseInteger(value))
+			req.ErrorCode = uint32(parseInteger(value)) // #nosec G115
 		case 5: // clientNonce/serverNonce (version 5+)
 			_, inner, _ := parseTag(value)
 			req.ServerNonce = inner

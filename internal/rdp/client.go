@@ -97,8 +97,8 @@ func NewClient(
 		username: username,
 		password: password,
 
-		desktopWidth:  uint16(desktopWidth),
-		desktopHeight: uint16(desktopHeight),
+		desktopWidth:  uint16(desktopWidth),  // #nosec G115
+		desktopHeight: uint16(desktopHeight), // #nosec G115
 		colorDepth:    colorDepth,
 
 		selectedProtocol: pdu.NegotiationProtocolSSL,
@@ -274,7 +274,7 @@ func (c *Client) RequestResize(width, height int) error {
 	if c.displayControl == nil {
 		return fmt.Errorf("display control not enabled")
 	}
-	return c.displayControl.RequestResize(uint32(width), uint32(height))
+	return c.displayControl.RequestResize(uint32(width), uint32(height)) // #nosec G115
 }
 
 // GetDisplayControlCapabilities returns the server's display control capabilities

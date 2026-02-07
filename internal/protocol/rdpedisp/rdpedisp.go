@@ -156,7 +156,7 @@ const MonitorLayoutSize = 40
 func (m *MonitorLayoutPDU) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	monitorCount := uint32(len(m.Monitors))
+	monitorCount := uint32(len(m.Monitors)) // #nosec G115
 	// Header is 8 bytes (Type + Length), then 8 bytes (MonitorLayoutSize + NumMonitors), then monitors
 	length := uint32(8 + 8 + monitorCount*MonitorLayoutSize)
 
@@ -277,10 +277,10 @@ func ValidateNoOverlap(monitors []MonitorDef) bool {
 
 // monitorsOverlap checks if two monitors overlap
 func monitorsOverlap(a, b *MonitorDef) bool {
-	aRight := a.Left + int32(a.Width)
-	aBottom := a.Top + int32(a.Height)
-	bRight := b.Left + int32(b.Width)
-	bBottom := b.Top + int32(b.Height)
+	aRight := a.Left + int32(a.Width)   // #nosec G115
+	aBottom := a.Top + int32(a.Height)  // #nosec G115
+	bRight := b.Left + int32(b.Width)   // #nosec G115
+	bBottom := b.Top + int32(b.Height)  // #nosec G115
 
 	// No overlap if one is completely to the left/right/above/below the other
 	if aRight <= b.Left || bRight <= a.Left {
@@ -342,10 +342,10 @@ func ValidateAdjacent(monitors []MonitorDef) bool {
 
 // monitorsAdjacent checks if two monitors touch (share edge or corner)
 func monitorsAdjacent(a, b *MonitorDef) bool {
-	aRight := a.Left + int32(a.Width)
-	aBottom := a.Top + int32(a.Height)
-	bRight := b.Left + int32(b.Width)
-	bBottom := b.Top + int32(b.Height)
+	aRight := a.Left + int32(a.Width)   // #nosec G115
+	aBottom := a.Top + int32(a.Height)  // #nosec G115
+	bRight := b.Left + int32(b.Width)   // #nosec G115
+	bBottom := b.Top + int32(b.Height)  // #nosec G115
 
 	// Check for touching edges or corners
 	// Adjacent means edges touch or corners touch (no gap)

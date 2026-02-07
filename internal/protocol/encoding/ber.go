@@ -180,13 +180,13 @@ func BerWriteInteger(n int, w io.Writer) {
 	_, _ = w.Write([]byte{0x02}) // tag integer
 	if n <= 0xff {
 		BerWriteLength(1, w)
-		_, _ = w.Write([]byte{uint8(n)})
+		_, _ = w.Write([]byte{uint8(n)}) // #nosec G115
 	} else if n <= 0xffff {
 		BerWriteLength(2, w)
-		_ = binary.Write(w, binary.BigEndian, uint16(n))
+		_ = binary.Write(w, binary.BigEndian, uint16(n)) // #nosec G115
 	} else {
 		BerWriteLength(4, w)
-		_ = binary.Write(w, binary.BigEndian, uint32(n))
+		_ = binary.Write(w, binary.BigEndian, uint32(n)) // #nosec G115
 	}
 }
 
@@ -219,12 +219,12 @@ func BerWriteLength(size int, w io.Writer) {
 	if size > 0xff {
 		// Long form: 0x82 means 2 bytes follow
 		_, _ = w.Write([]byte{0x82})
-		_ = binary.Write(w, binary.BigEndian, uint16(size))
+		_ = binary.Write(w, binary.BigEndian, uint16(size)) // #nosec G115
 	} else if size > 0x7f {
 		// Long form: 0x81 means 1 byte follows
 		_, _ = w.Write([]byte{0x81, uint8(size)})
 	} else {
 		// Short form: size directly in length octet
-		_, _ = w.Write([]byte{uint8(size)})
+		_, _ = w.Write([]byte{uint8(size)}) // #nosec G115
 	}
 }

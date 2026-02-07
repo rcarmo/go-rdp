@@ -358,11 +358,12 @@ jobs:
             const keepCount = 5;
             const { owner, repo } = context.repo;
 
-            // Keep only the newest workflow runs, delete the rest
-            core.info('Fetching workflow runs...');
+            // Keep only the newest workflow runs for THIS workflow, delete the rest
+            const workflowFile = 'ci-cd.yml';
+            core.info(`Fetching workflow runs for ${workflowFile}...`);
             const runs = await github.paginate(
-              github.rest.actions.listWorkflowRunsForRepo,
-              { owner, repo, per_page: 100 }
+              github.rest.actions.listWorkflowRuns,
+              { owner, repo, workflow_id: workflowFile, per_page: 100 }
             );
             const sortedRuns = runs.sort((a, b) =>
               new Date(b.created_at) - new Date(a.created_at)
@@ -377,16 +378,16 @@ jobs:
               }
             }
 
-            // Keep only the newest tags, delete the rest
+            // Keep only the newest version tags (v*), delete the rest
             core.info('Fetching tags...');
             const tags = await github.paginate(
               github.rest.repos.listTags,
               { owner, repo, per_page: 100 }
             );
             const currentTag = context.ref.replace('refs/tags/', '');
-            const otherTags = tags.filter(tag => tag.name !== currentTag);
-            const tagsToDelete = otherTags.slice(keepCount);
-            core.info(`Found ${tags.length} tags, keeping ${keepCount} newest + current (${currentTag}), deleting ${tagsToDelete.length}...`);
+            const versionTags = tags.filter(tag => tag.name.startsWith('v') && tag.name !== currentTag);
+            const tagsToDelete = versionTags.slice(keepCount);
+            core.info(`Found ${tags.length} tags (${versionTags.length} version tags), keeping ${keepCount} newest + current (${currentTag}), deleting ${tagsToDelete.length}...`);
             for (const tag of tagsToDelete) {
               try {
                 await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag.name}` });

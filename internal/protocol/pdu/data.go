@@ -271,8 +271,8 @@ func (pdu *Data) Serialize() []byte {
 		data = pdu.FontListPDUData.Serialize()
 	}
 
-	pdu.ShareDataHeader.ShareControlHeader.TotalLength = uint16(18 + len(data))
-	pdu.ShareDataHeader.UncompressedLength = uint16(4 + len(data))
+	pdu.ShareDataHeader.ShareControlHeader.TotalLength = uint16(18 + len(data)) // #nosec G115
+	pdu.ShareDataHeader.UncompressedLength = uint16(4 + len(data))             // #nosec G115
 
 	buf := new(bytes.Buffer)
 

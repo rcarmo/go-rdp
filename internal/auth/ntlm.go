@@ -3,9 +3,9 @@ package auth
 import (
 	"bytes"
 	"crypto/hmac"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 -- MD5 is required by NTLMv2 authentication protocol
 	"crypto/rand"
-	"crypto/rc4"
+	"crypto/rc4" // #nosec G503 -- RC4 is required by NTLMv2 authentication protocol
 	"encoding/binary"
 	"time"
 	"unicode/utf16"
@@ -291,7 +291,7 @@ func (n *NTLMv2) GetAuthenticateMessage(challengeData []byte) ([]byte, *Security
 	}
 
 	encryptedRandomSessionKey := make([]byte, 16)
-	rc, _ := rc4.NewCipher(sessionBaseKey)
+	rc, _ := rc4.NewCipher(sessionBaseKey) // #nosec G405 -- RC4 is required by NTLMv2 authentication protocol
 	rc.XORKeyStream(encryptedRandomSessionKey, exportedSessionKey)
 
 	// Build authenticate message
@@ -322,8 +322,8 @@ func (n *NTLMv2) GetAuthenticateMessage(challengeData []byte) ([]byte, *Security
 	clientSealingKey := md5Hash(append(exportedSessionKey, append([]byte("session key to client-to-server sealing key magic constant"), 0x00)...))
 	serverSealingKey := md5Hash(append(exportedSessionKey, append([]byte("session key to server-to-client sealing key magic constant"), 0x00)...))
 
-	encryptRC4, _ := rc4.NewCipher(clientSealingKey)
-	decryptRC4, _ := rc4.NewCipher(serverSealingKey)
+	encryptRC4, _ := rc4.NewCipher(clientSealingKey) // #nosec G405 -- RC4 is required by NTLMv2 authentication protocol
+	decryptRC4, _ := rc4.NewCipher(serverSealingKey) // #nosec G405 -- RC4 is required by NTLMv2 authentication protocol
 
 	return authMsg, &Security{
 		encryptRC4: encryptRC4,
@@ -373,38 +373,38 @@ func (n *NTLMv2) buildAuthenticateMessage(flags uint32, domain, user, workstatio
 	currentOffset := payloadOffset
 
 	// LmChallengeResponseFields
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))  // #nosec G115
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(lmResponse)))  // #nosec G115
 	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
-	currentOffset += uint32(len(lmResponse))
+	currentOffset += uint32(len(lmResponse)) // #nosec G115
 
 	// NtChallengeResponseFields
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))  // #nosec G115
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(ntResponse)))  // #nosec G115
 	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
-	currentOffset += uint32(len(ntResponse))
+	currentOffset += uint32(len(ntResponse)) // #nosec G115
 
 	// DomainNameFields
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(domain)))
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(domain)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(domain)))  // #nosec G115
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(domain)))  // #nosec G115
 	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
-	currentOffset += uint32(len(domain))
+	currentOffset += uint32(len(domain)) // #nosec G115
 
 	// UserNameFields
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(user)))
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(user)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(user)))  // #nosec G115
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(user)))  // #nosec G115
 	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
-	currentOffset += uint32(len(user))
+	currentOffset += uint32(len(user)) // #nosec G115
 
 	// WorkstationFields
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))  // #nosec G115
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(workstation)))  // #nosec G115
 	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
-	currentOffset += uint32(len(workstation))
+	currentOffset += uint32(len(workstation)) // #nosec G115
 
 	// EncryptedRandomSessionKeyFields
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))  // #nosec G115
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(encryptedKey)))  // #nosec G115
 	_ = binary.Write(buf, binary.LittleEndian, currentOffset)
 
 	// NegotiateFlags
@@ -558,13 +558,13 @@ func hmacMD5(key, data []byte) []byte {
 }
 
 func md5Hash(data []byte) []byte {
-	h := md5.Sum(data)
+	h := md5.Sum(data) // #nosec G401 -- MD5 is required by NTLMv2 authentication protocol
 	return h[:]
 }
 
 func makeTimestamp() []byte {
 	// Windows FILETIME: 100-nanosecond intervals since January 1, 1601
-	ft := uint64(time.Now().UnixNano())/100 + 116444736000000000
+	ft := uint64(time.Now().UnixNano())/100 + 116444736000000000 // #nosec G115
 	buf := make([]byte, 8)
 	binary.LittleEndian.PutUint64(buf, ft)
 	return buf

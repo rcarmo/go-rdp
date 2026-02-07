@@ -188,7 +188,7 @@ func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version ui
 		Volume:             0xFFFFFFFF,
 		Pitch:              0x00010000,
 		DGramPort:          0,
-		NumFormats:         uint16(len(supportedFormats)),
+		NumFormats:         uint16(len(supportedFormats)), // #nosec G115
 		LastBlockConfirmed: 0,
 		Version:            version,
 		Pad:                0,

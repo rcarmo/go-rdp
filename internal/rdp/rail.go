@@ -171,7 +171,7 @@ func (pdu *RailPDU) Serialize() []byte {
 		data = pdu.RailPDUClientSystemParamUpdate.Serialize()
 	}
 
-	pdu.header.OrderLength = uint16(8 + 4 + len(data))
+	pdu.header.OrderLength = uint16(8 + 4 + len(data)) // #nosec G115
 
 	buf := new(bytes.Buffer)
 
@@ -422,13 +422,13 @@ func NewRailClientExecutePDU(app, workDir, args string) *RailPDU {
 // Serialize encodes the RailPDUClientExecute to wire format.
 func (pdu *RailPDUClientExecute) Serialize() []byte {
 	exeOrFile := codec.Encode(pdu.ExeOrFile)
-	exeOrFileLength := uint16(len(exeOrFile))
+	exeOrFileLength := uint16(len(exeOrFile)) // #nosec G115
 
 	workingDir := codec.Encode(pdu.WorkingDir)
-	workingDirLength := uint16(len(workingDir))
+	workingDirLength := uint16(len(workingDir)) // #nosec G115
 
 	arguments := codec.Encode(pdu.Arguments)
-	argumentsLen := uint16(len(arguments))
+	argumentsLen := uint16(len(arguments)) // #nosec G115
 
 	buf := new(bytes.Buffer)
 

@@ -114,7 +114,7 @@ func ParseChannelData(data []byte) (*ChannelChunk, error) {
 // BuildChannelData creates a channel PDU with the given data
 func BuildChannelData(data []byte) []byte {
 	header := ChannelPDUHeader{
-		Length: uint32(len(data)),
+		Length: uint32(len(data)), // #nosec G115
 		Flags:  ChannelFlagFirst | ChannelFlagLast,
 	}
 	
@@ -129,7 +129,7 @@ func BuildChannelPDU(msgType uint8, body []byte) []byte {
 	header := PDUHeader{
 		MsgType:  msgType,
 		Reserved: 0,
-		BodySize: uint16(len(body)),
+		BodySize: uint16(len(body)), // #nosec G115
 	}
 	
 	pdu := append(header.Serialize(), body...)

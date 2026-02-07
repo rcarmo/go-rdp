@@ -29,7 +29,7 @@ func (r *ConferenceCreateRequest) Serialize() []byte {
 
 	encoding.PerWriteChoice(0, buf)
 	encoding.PerWriteObjectIdentifier(t124_02_98_oid, buf)
-	encoding.PerWriteLength(uint16(14+len(r.UserData)), buf)
+	encoding.PerWriteLength(uint16(14+len(r.UserData)), buf) // #nosec G115
 
 	encoding.PerWriteChoice(0, buf)
 	encoding.PerWriteSelection(0x08, buf)

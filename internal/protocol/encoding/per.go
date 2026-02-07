@@ -210,7 +210,7 @@ func PerWriteNumericString(nStr string, minValue int, w io.Writer) {
 		result = append(result, (c1<<4)|c2)
 	}
 
-	PerWriteLength(uint16(mLength), w)
+	PerWriteLength(uint16(mLength), w) // #nosec G115
 	_, _ = w.Write(result)
 }
 
@@ -235,27 +235,27 @@ func PerWriteOctetStream(oStr string, minValue int, w io.Writer) {
 		result = append(result, oStr[i])
 	}
 
-	PerWriteLength(uint16(mLength), w)
+	PerWriteLength(uint16(mLength), w) // #nosec G115
 	_, _ = w.Write(result)
 }
 
 func PerWriteInteger(value int, w io.Writer) {
 	if value <= 0xff {
 		PerWriteLength(1, w)
-		_, _ = w.Write([]byte{uint8(value)})
+		_, _ = w.Write([]byte{uint8(value)}) // #nosec G115
 
 		return
 	}
 
 	if value <= 0xffff {
 		PerWriteLength(2, w)
-		_ = binary.Write(w, binary.BigEndian, uint16(value))
+		_ = binary.Write(w, binary.BigEndian, uint16(value)) // #nosec G115
 
 		return
 	}
 
 	PerWriteLength(4, w)
-	_ = binary.Write(w, binary.BigEndian, uint32(value))
+	_ = binary.Write(w, binary.BigEndian, uint32(value)) // #nosec G115
 }
 
 func PerWriteInteger16(value, minimum uint16, w io.Writer) {

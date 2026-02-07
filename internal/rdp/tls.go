@@ -56,7 +56,7 @@ func (c *Client) StartTLS() error {
 
 	// Create TLS configuration with improved error handling
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: insecureSkipVerify,
+		InsecureSkipVerify: insecureSkipVerify, // #nosec G402 -- RDP servers commonly use self-signed certificates
 		MinVersion:         c.getMinTLSVersion(minTLSVersion),
 		MaxVersion:         tls.VersionTLS13,
 		ServerName:         serverName,

@@ -202,7 +202,7 @@ func (c *BitmapCodec) Serialize() []byte {
 
 	_ = binary.Write(buf, binary.LittleEndian, c.CodecGUID)
 	_ = binary.Write(buf, binary.LittleEndian, c.CodecID)
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(c.CodecProperties)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(c.CodecProperties))) // #nosec G115
 	buf.Write(c.CodecProperties)
 
 	return buf.Bytes()
@@ -212,7 +212,7 @@ func (c *BitmapCodec) Serialize() []byte {
 func (s *BitmapCodecsCapabilitySet) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
-	_ = binary.Write(buf, binary.LittleEndian, uint8(len(s.BitmapCodecArray)))
+	_ = binary.Write(buf, binary.LittleEndian, uint8(len(s.BitmapCodecArray))) // #nosec G115
 
 	for _, codec := range s.BitmapCodecArray {
 		buf.Write(codec.Serialize())

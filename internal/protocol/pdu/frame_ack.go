@@ -38,8 +38,9 @@ func (pdu *FrameAcknowledgePDU) Serialize() []byte {
 	binary.LittleEndian.PutUint32(frameData, pdu.FrameID)
 
 	// Update lengths
-	pdu.ShareDataHeader.UncompressedLength = uint16(len(frameData))
-	pdu.ShareDataHeader.ShareControlHeader.TotalLength = 6 + 12 + uint16(len(frameData)) // ShareControl(6) + ShareData(12) + data
+	pdu.ShareDataHeader.UncompressedLength = uint16(len(frameData))                                   // #nosec G115
+	totalLen := uint16(6 + 12 + len(frameData)) // #nosec G115 -- ShareControl(6) + ShareData(12) + data
+	pdu.ShareDataHeader.ShareControlHeader.TotalLength = totalLen
 
 	// Write header and data
 	buf.Write(pdu.ShareDataHeader.Serialize())

@@ -260,11 +260,13 @@ clean-frontend: ## Clean frontend build artifacts
 	rm -f web/dist/js/rle/*.wasm web/dist/js/rle/*.js
 
 .PHONY: clean-all
-clean-all: clean clean-frontend ## Deep clean (vendor, go mod cache, docker prune)
+clean-all: clean clean-frontend ## Deep clean (vendor, go mod cache, project docker images)
 	@echo "Cleaning everything..."
 	rm -rf vendor/
 	go mod tidy -cache
-	docker system prune -f
+	@echo "Removing project Docker images..."
+	-docker rmi $$(docker images --filter "reference=rdp-html5*" -q) 2>/dev/null || true
+	-docker rmi $$(docker images --filter "reference=*/go-rdp*" -q) 2>/dev/null || true
 
 # Development helpers
 .PHONY: setup-dev
@@ -312,7 +314,7 @@ config: ## Show build configuration
 
 # Quick test and build
 .PHONY: ci
-ci: deps check test build ## Run full CI pipeline
+ci: deps check security test build ## Run full CI pipeline
 	@echo "CI pipeline completed successfully"
 
 # Release helpers

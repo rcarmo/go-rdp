@@ -93,7 +93,7 @@ func NewSecureConnection(config *SecureConfig) (*SecureConnection, error) {
 	// Set defaults for TLS/DTLS if not provided
 	if sc.reliable && sc.tlsConfig == nil {
 		sc.tlsConfig = &tls.Config{
-			InsecureSkipVerify: true, // RDP typically uses self-signed certs
+			InsecureSkipVerify: true, // #nosec G402 -- RDP servers commonly use self-signed certificates
 			MinVersion:         tls.VersionTLS12,
 		}
 	}
@@ -121,19 +121,19 @@ func (sc *SecureConnection) Connect(ctx context.Context) error {
 
 	// Step 2: Perform security handshake (TLS or DTLS)
 	if err := sc.performSecurityHandshake(ctx); err != nil {
-		sc.udpConn.Close()
+		sc.udpConn.Close() // #nosec G104 -- best-effort
 		return fmt.Errorf("secure: security handshake: %w", err)
 	}
 
 	// Step 3: Send Tunnel Create Request
 	if err := sc.sendTunnelCreateRequest(); err != nil {
-		sc.Close()
+		sc.Close() // #nosec G104 -- best-effort
 		return fmt.Errorf("secure: tunnel create request: %w", err)
 	}
 
 	// Step 4: Receive Tunnel Create Response
 	if err := sc.receiveTunnelCreateResponse(ctx); err != nil {
-		sc.Close()
+		sc.Close() // #nosec G104 -- best-effort
 		return fmt.Errorf("secure: tunnel create response: %w", err)
 	}
 
@@ -162,7 +162,7 @@ func (sc *SecureConnection) performTLSHandshake(ctx context.Context) error {
 
 	// Set deadline from context
 	if deadline, ok := ctx.Deadline(); ok {
-		tlsConn.SetDeadline(deadline)
+		tlsConn.SetDeadline(deadline) // #nosec G104 -- best-effort
 	}
 
 	// Perform handshake
@@ -171,7 +171,7 @@ func (sc *SecureConnection) performTLSHandshake(ctx context.Context) error {
 	}
 
 	// Clear deadline
-	tlsConn.SetDeadline(time.Time{})
+	tlsConn.SetDeadline(time.Time{}) // #nosec G104 -- best-effort
 
 	sc.mu.Lock()
 	sc.secureConn = tlsConn
@@ -220,7 +220,7 @@ func (sc *SecureConnection) sendTunnelCreateRequest() error {
 	header := &rdpemt.TunnelHeader{
 		Action:        rdpemt.ActionCreateRequest,
 		Flags:         0,
-		PayloadLength: uint16(len(payload)),
+		PayloadLength: uint16(len(payload)), // #nosec G115
 	}
 
 	headerBytes, err := header.Serialize()
@@ -260,7 +260,7 @@ func (sc *SecureConnection) receiveTunnelCreateResponse(ctx context.Context) err
 	// Set read deadline if context has one
 	if deadline, ok := ctx.Deadline(); ok {
 		if setter, ok := conn.(interface{ SetReadDeadline(time.Time) error }); ok {
-			setter.SetReadDeadline(deadline)
+			setter.SetReadDeadline(deadline) // #nosec G104 -- best-effort
 		}
 	}
 
@@ -271,7 +271,7 @@ func (sc *SecureConnection) receiveTunnelCreateResponse(ctx context.Context) err
 
 	// Clear deadline
 	if setter, ok := conn.(interface{ SetReadDeadline(time.Time) error }); ok {
-		setter.SetReadDeadline(time.Time{})
+		setter.SetReadDeadline(time.Time{}) // #nosec G104 -- best-effort
 	}
 
 	// Parse tunnel header

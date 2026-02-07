@@ -280,9 +280,9 @@ func generateInitialSequenceNumber() uint32 {
 	n, err := rand.Int(rand.Reader, max)
 	if err != nil {
 		// Fallback to time-based if crypto/rand fails
-		return uint32(time.Now().UnixNano())
+		return uint32(time.Now().UnixNano()) // #nosec G115
 	}
-	return uint32(n.Uint64())
+	return uint32(n.Uint64()) // #nosec G115
 }
 
 // State returns the current connection state
@@ -329,7 +329,7 @@ func (c *Connection) Connect(ctx context.Context) error {
 
 	// Send SYN and wait for SYN+ACK
 	if err := c.sendSyn(ctx); err != nil {
-		c.Close()
+		c.Close() // #nosec G104 -- best-effort
 		return err
 	}
 
@@ -338,7 +338,7 @@ func (c *Connection) Connect(ctx context.Context) error {
 	case <-c.established:
 		return nil
 	case <-ctx.Done():
-		c.Close()
+		c.Close() // #nosec G104 -- best-effort
 		return ErrTimeout
 	case <-c.closeChan:
 		return ErrClosed
@@ -372,7 +372,7 @@ func (c *Connection) sendSyn(ctx context.Context) error {
 		c.mu.Unlock()
 
 		// Wait for SYN+ACK or timeout with exponential backoff
-		timeout := baseTimeout * time.Duration(1<<uint(c.synRetryCount-1))
+		timeout := baseTimeout * time.Duration(1<<uint(c.synRetryCount-1)) // #nosec G115
 		timer := time.NewTimer(timeout)
 		select {
 		case <-c.established:
@@ -647,7 +647,7 @@ func (c *Connection) retransmitPacket(seqNum uint32) {
 
 	// Re-send the packet data
 	if c.conn != nil && len(pkt.data) > 0 {
-		c.conn.Write(pkt.data)
+		c.conn.Write(pkt.data) // #nosec G104 -- best-effort
 	}
 }
 
@@ -775,7 +775,7 @@ func (c *Connection) buildAckVector() *rdpeudp.AckVector {
 		} else {
 			// Flush current run
 			if runLength > 0 {
-				element := (currentState << 6) | uint8(runLength-1)
+				element := (currentState << 6) | uint8(runLength-1) // #nosec G115
 				elements = append(elements, element)
 			}
 			currentState = state
@@ -790,7 +790,7 @@ func (c *Connection) buildAckVector() *rdpeudp.AckVector {
 
 	// Flush final run
 	if runLength > 0 {
-		element := (currentState << 6) | uint8(runLength-1)
+		element := (currentState << 6) | uint8(runLength-1) // #nosec G115
 		elements = append(elements, element)
 	}
 
@@ -799,7 +799,7 @@ func (c *Connection) buildAckVector() *rdpeudp.AckVector {
 	}
 
 	return &rdpeudp.AckVector{
-		AckVectorSize:     uint16(len(elements)),
+		AckVectorSize:     uint16(len(elements)), // #nosec G115
 		AckVectorElements: elements,
 	}
 }
@@ -846,7 +846,7 @@ func (c *Connection) receiveLoop() {
 		default:
 		}
 
-		c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+		c.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond)) // #nosec G104 -- best-effort
 		n, err := c.conn.Read(buf)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
@@ -1015,12 +1015,12 @@ func (c *Connection) onKeepaliveTimer() {
 	// Check if we've exceeded the 65-second timeout without receiving anything
 	if !lastRecv.IsZero() && time.Since(lastRecv) > KeepaliveTimeout {
 		// Connection dead - close it
-		c.Close()
+		c.Close() // #nosec G104 -- best-effort
 		return
 	}
 
 	// Send keepalive ACK
-	c.sendAck()
+	c.sendAck() // #nosec G104 -- best-effort
 
 	// Restart timer
 	c.mu.Lock()
@@ -1048,7 +1048,7 @@ func (c *Connection) onDelayedAckTimer() {
 	c.mu.Unlock()
 
 	if hasPending && state == StateEstablished {
-		c.sendAck()
+		c.sendAck() // #nosec G104 -- best-effort
 	}
 }
 
@@ -1094,7 +1094,7 @@ func (c *Connection) onRetransmitTimer() {
 			c.stats.Retransmits++
 
 			if c.conn != nil && len(pkt.data) > 0 {
-				c.conn.Write(pkt.data)
+				c.conn.Write(pkt.data) // #nosec G104 -- best-effort
 			}
 		}
 

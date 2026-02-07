@@ -371,7 +371,7 @@ func (tm *TunnelManager) closeTunnel(tunnel *Tunnel, err error) {
 
 	tunnel.state = TunnelStateClosed
 	if tunnel.secureConn != nil {
-		tunnel.secureConn.Close()
+		tunnel.secureConn.Close() // #nosec G104 -- best-effort
 	}
 	close(tunnel.closeCh)
 	tunnel.mu.Unlock()

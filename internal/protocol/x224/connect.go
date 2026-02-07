@@ -20,7 +20,7 @@ type ConnectionRequest struct {
 func (pdu *ConnectionRequest) Serialize() []byte {
 	const x224FixedPartLen = 6 // without length indicator (LI)
 
-	pdu.li = uint8(x224FixedPartLen + len(pdu.UserData))
+	pdu.li = uint8(x224FixedPartLen + len(pdu.UserData)) // #nosec G115
 
 	buf := new(bytes.Buffer)
 

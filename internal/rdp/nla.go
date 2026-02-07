@@ -247,7 +247,7 @@ func (c *Client) startTLSForNLA() error {
 	// Windows RDP servers typically only support TLS 1.0-1.2, not TLS 1.3
 	// Use TLS 1.2 max for better compatibility
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: insecureSkipVerify, // RDP servers use self-signed certs
+		InsecureSkipVerify: insecureSkipVerify, // #nosec G402 -- RDP servers commonly use self-signed certificates
 		MinVersion:         tls.VersionTLS10,
 		MaxVersion:         tls.VersionTLS12, // Windows RDP doesn't support TLS 1.3
 		ServerName:         serverName,

@@ -67,10 +67,10 @@ func (r *MultitransportRequest) Deserialize(data []byte) error {
 	}
 
 	buf := bytes.NewReader(data)
-	binary.Read(buf, binary.LittleEndian, &r.RequestID)
-	binary.Read(buf, binary.LittleEndian, &r.RequestedProtocol)
-	binary.Read(buf, binary.LittleEndian, &r.Reserved)
-	buf.Read(r.SecurityCookie[:])
+	binary.Read(buf, binary.LittleEndian, &r.RequestID)         // #nosec G104 -- in-memory buffer
+	binary.Read(buf, binary.LittleEndian, &r.RequestedProtocol) // #nosec G104 -- in-memory buffer
+	binary.Read(buf, binary.LittleEndian, &r.Reserved)          // #nosec G104 -- in-memory buffer
+	buf.Read(r.SecurityCookie[:])                               // #nosec G104 -- in-memory buffer
 
 	return nil
 }
@@ -78,9 +78,9 @@ func (r *MultitransportRequest) Deserialize(data []byte) error {
 // Serialize encodes a MultitransportRequest to bytes.
 func (r *MultitransportRequest) Serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, MinRequestSize))
-	binary.Write(buf, binary.LittleEndian, r.RequestID)
-	binary.Write(buf, binary.LittleEndian, r.RequestedProtocol)
-	binary.Write(buf, binary.LittleEndian, r.Reserved)
+	binary.Write(buf, binary.LittleEndian, r.RequestID)         // #nosec G104 -- in-memory buffer
+	binary.Write(buf, binary.LittleEndian, r.RequestedProtocol) // #nosec G104 -- in-memory buffer
+	binary.Write(buf, binary.LittleEndian, r.Reserved)          // #nosec G104 -- in-memory buffer
 	buf.Write(r.SecurityCookie[:])
 	return buf.Bytes(), nil
 }
@@ -109,16 +109,16 @@ func (r *MultitransportResponse) Deserialize(data []byte) error {
 	}
 
 	buf := bytes.NewReader(data)
-	binary.Read(buf, binary.LittleEndian, &r.RequestID)
-	binary.Read(buf, binary.LittleEndian, &r.HResult)
+	binary.Read(buf, binary.LittleEndian, &r.RequestID) // #nosec G104 -- in-memory buffer
+	binary.Read(buf, binary.LittleEndian, &r.HResult)   // #nosec G104 -- in-memory buffer
 	return nil
 }
 
 // Serialize encodes a MultitransportResponse to bytes.
 func (r *MultitransportResponse) Serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, MinResponseSize))
-	binary.Write(buf, binary.LittleEndian, r.RequestID)
-	binary.Write(buf, binary.LittleEndian, r.HResult)
+	binary.Write(buf, binary.LittleEndian, r.RequestID) // #nosec G104 -- in-memory buffer
+	binary.Write(buf, binary.LittleEndian, r.HResult)   // #nosec G104 -- in-memory buffer
 	return buf.Bytes(), nil
 }
 
@@ -210,7 +210,7 @@ func (h *TunnelHeader) Serialize() ([]byte, error) {
 	// Byte 0: Action (low nibble) + Flags (high nibble)
 	buf[0] = (h.Flags << 4) | (h.Action & 0x0F)
 	binary.LittleEndian.PutUint16(buf[1:3], h.PayloadLength)
-	buf[3] = uint8(headerLen)
+	buf[3] = uint8(headerLen) // #nosec G115
 
 	// Copy SubHeaders if present
 	if len(h.SubHeaders) > 0 {
@@ -240,17 +240,17 @@ func (r *TunnelCreateRequest) Deserialize(data []byte) error {
 	}
 
 	buf := bytes.NewReader(data)
-	binary.Read(buf, binary.LittleEndian, &r.RequestID)
-	binary.Read(buf, binary.LittleEndian, &r.Reserved)
-	buf.Read(r.SecurityCookie[:])
+	binary.Read(buf, binary.LittleEndian, &r.RequestID) // #nosec G104 -- in-memory buffer
+	binary.Read(buf, binary.LittleEndian, &r.Reserved)  // #nosec G104 -- in-memory buffer
+	buf.Read(r.SecurityCookie[:])                        // #nosec G104 -- in-memory buffer
 	return nil
 }
 
 // Serialize encodes a TunnelCreateRequest to bytes.
 func (r *TunnelCreateRequest) Serialize() ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, r.Size()))
-	binary.Write(buf, binary.LittleEndian, r.RequestID)
-	binary.Write(buf, binary.LittleEndian, r.Reserved)
+	binary.Write(buf, binary.LittleEndian, r.RequestID) // #nosec G104 -- in-memory buffer
+	binary.Write(buf, binary.LittleEndian, r.Reserved)  // #nosec G104 -- in-memory buffer
 	buf.Write(r.SecurityCookie[:])
 	return buf.Bytes(), nil
 }
@@ -316,7 +316,7 @@ func (p *TunnelDataPDU) Deserialize(data []byte) error {
 func (p *TunnelDataPDU) Serialize() ([]byte, error) {
 	p.Header.Action = ActionData
 	p.Header.Flags = 0 // Must be zero per spec
-	p.Header.PayloadLength = uint16(len(p.Data))
+	p.Header.PayloadLength = uint16(len(p.Data)) // #nosec G115
 
 	headerBytes, err := p.Header.Serialize()
 	if err != nil {

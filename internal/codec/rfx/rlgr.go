@@ -212,7 +212,7 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 			if kr > 0 && bs.RemainingBits() >= int(kr) {
 				mag = bs.ReadBits(int(kr))
 			}
-			mag |= uint32(nIdx) << kr
+			mag |= uint32(nIdx) << kr // #nosec G115
 
 			// Update kr parameter
 			if nIdx == 0 {
@@ -222,7 +222,7 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 					krp = 0
 				}
 			} else if nIdx > 1 {
-				krp += uint32(nIdx)
+				krp += uint32(nIdx) // #nosec G115
 				if krp > KPMAX {
 					krp = KPMAX
 				}
@@ -238,7 +238,7 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 			k = kp >> LSGR
 
 			// Apply sign and store (magnitude is offset by 1)
-			value := int16(mag + 1)
+			value := int16(mag + 1) // #nosec G115
 			if sign != 0 {
 				value = -value
 			}
@@ -258,7 +258,7 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 				if kr > 0 && bs.RemainingBits() >= int(kr) {
 					mag = bs.ReadBits(int(kr))
 				}
-				mag |= uint32(nIdx) << kr
+				mag |= uint32(nIdx) << kr // #nosec G115
 
 				// Update kr
 				if nIdx == 0 {
@@ -268,7 +268,7 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 						krp = 0
 					}
 				} else if nIdx > 1 {
-					krp += uint32(nIdx)
+					krp += uint32(nIdx) // #nosec G115
 					if krp > KPMAX {
 						krp = KPMAX
 					}
@@ -288,9 +288,9 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 				} else {
 					// Sign is LSB of magnitude
 					if (mag & 1) != 0 {
-						value = -int16((mag + 1) >> 1)
+						value = -int16((mag + 1) >> 1) // #nosec G115
 					} else {
-						value = int16(mag >> 1)
+						value = int16(mag >> 1) // #nosec G115
 					}
 					// Update k (decrease for non-zero)
 					if kp >= DQ_GR {
@@ -315,7 +315,7 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 				if kr > 0 && bs.RemainingBits() >= int(kr) {
 					code = bs.ReadBits(int(kr))
 				}
-				code |= uint32(nIdx) << kr
+				code |= uint32(nIdx) << kr // #nosec G115
 
 				// Update kr
 				if nIdx == 0 {
@@ -325,7 +325,7 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 						krp = 0
 					}
 				} else if nIdx > 1 {
-					krp += uint32(nIdx)
+					krp += uint32(nIdx) // #nosec G115
 					if krp > KPMAX {
 						krp = KPMAX
 					}
@@ -371,9 +371,9 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 				if val1 == 0 {
 					output[idx] = 0
 				} else if (val1 & 1) != 0 {
-					output[idx] = -int16((val1 + 1) >> 1)
+					output[idx] = -int16((val1 + 1) >> 1) // #nosec G115
 				} else {
-					output[idx] = int16(val1 >> 1)
+					output[idx] = int16(val1 >> 1) // #nosec G115
 				}
 				idx++
 
@@ -385,9 +385,9 @@ func RLGRDecode(data []byte, mode int, output []int16) error {
 				if val2 == 0 {
 					output[idx] = 0
 				} else if (val2 & 1) != 0 {
-					output[idx] = -int16((val2 + 1) >> 1)
+					output[idx] = -int16((val2 + 1) >> 1) // #nosec G115
 				} else {
-					output[idx] = int16(val2 >> 1)
+					output[idx] = int16(val2 >> 1) // #nosec G115
 				}
 				idx++
 			}

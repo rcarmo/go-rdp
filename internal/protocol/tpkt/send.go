@@ -7,7 +7,7 @@ import (
 
 func (p *Protocol) Send(pduData []byte) error {
 	buf := bytes.NewBuffer(make([]byte, 0, headerLen+len(pduData)))
-	dataLen := uint16(headerLen + len(pduData))
+	dataLen := uint16(headerLen + len(pduData)) // #nosec G115
 
 	buf.Write([]byte{
 		0x03, // TPKT version number

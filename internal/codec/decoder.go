@@ -56,10 +56,11 @@ func ParseBitmapStream(data []byte) (*BitmapStream, error) {
 	}
 
 	offset := uint32(20) // Header size
+	dataLen := uint32(len(data)) // #nosec G115
 
 	// Parse luma plane
 	if stream.LumaPlaneByteCount > 0 {
-		if uint32(len(data)) < offset+stream.LumaPlaneByteCount {
+		if dataLen < offset+stream.LumaPlaneByteCount {
 			return nil, ErrInvalidPlaneSize
 		}
 		stream.LumaPlane = data[offset : offset+stream.LumaPlaneByteCount]
@@ -68,7 +69,7 @@ func ParseBitmapStream(data []byte) (*BitmapStream, error) {
 
 	// Parse orange chroma plane
 	if stream.OrangeChromaPlaneByteCount > 0 {
-		if uint32(len(data)) < offset+stream.OrangeChromaPlaneByteCount {
+		if dataLen < offset+stream.OrangeChromaPlaneByteCount {
 			return nil, ErrInvalidPlaneSize
 		}
 		stream.OrangeChromaPlane = data[offset : offset+stream.OrangeChromaPlaneByteCount]
@@ -77,7 +78,7 @@ func ParseBitmapStream(data []byte) (*BitmapStream, error) {
 
 	// Parse green chroma plane
 	if stream.GreenChromaPlaneByteCount > 0 {
-		if uint32(len(data)) < offset+stream.GreenChromaPlaneByteCount {
+		if dataLen < offset+stream.GreenChromaPlaneByteCount {
 			return nil, ErrInvalidPlaneSize
 		}
 		stream.GreenChromaPlane = data[offset : offset+stream.GreenChromaPlaneByteCount]
@@ -86,7 +87,7 @@ func ParseBitmapStream(data []byte) (*BitmapStream, error) {
 
 	// Parse alpha plane (optional)
 	if stream.AlphaPlaneByteCount > 0 {
-		if uint32(len(data)) < offset+stream.AlphaPlaneByteCount {
+		if dataLen < offset+stream.AlphaPlaneByteCount {
 			return nil, ErrInvalidPlaneSize
 		}
 		stream.AlphaPlane = data[offset : offset+stream.AlphaPlaneByteCount]

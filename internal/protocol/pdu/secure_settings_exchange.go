@@ -126,27 +126,27 @@ func (p *ClientInfoPacket) Serialize() []byte {
 
 	if len(p.Domain) > 0 {
 		domain = codec.Encode(strings.Trim(p.Domain, " ") + "\x00")
-		cbDomain = uint16(len(domain) - 2)
+		cbDomain = uint16(len(domain) - 2) // #nosec G115
 	}
 
 	if len(p.Username) > 0 {
 		username = codec.Encode(strings.Trim(p.Username, " ") + "\x00")
-		cbUserName = uint16(len(username) - 2)
+		cbUserName = uint16(len(username) - 2) // #nosec G115
 	}
 
 	if len(p.Password) > 0 {
 		password = codec.Encode(strings.Trim(p.Password, " ") + "\x00")
-		cbPassword = uint16(len(password) - 2)
+		cbPassword = uint16(len(password) - 2) // #nosec G115
 	}
 
 	if len(p.AlternateShell) > 0 {
 		alternateShell = codec.Encode(strings.Trim(p.AlternateShell, " ") + "\x00")
-		cbAlternateShell = uint16(len(alternateShell) - 2)
+		cbAlternateShell = uint16(len(alternateShell) - 2) // #nosec G115
 	}
 
 	if len(p.WorkingDir) > 0 {
 		workingDir = codec.Encode(strings.Trim(p.WorkingDir, " ") + "\x00")
-		cbWorkingDir = uint16(len(workingDir) - 2)
+		cbWorkingDir = uint16(len(workingDir) - 2) // #nosec G115
 	}
 
 	buf := new(bytes.Buffer)

@@ -188,7 +188,7 @@ func (set *CapabilitySet) Serialize() []byte {
 
 	buf := new(bytes.Buffer)
 
-	lengthCapability := uint16(4 + len(data))
+	lengthCapability := uint16(4 + len(data)) // #nosec G115
 
 	_ = binary.Write(buf, binary.LittleEndian, set.CapabilitySetType)
 	_ = binary.Write(buf, binary.LittleEndian, lengthCapability)
@@ -486,8 +486,8 @@ func (pdu *ClientConfirmActive) Serialize() []byte {
 		capBuf.Write(set.Serialize())
 	}
 
-	lengthSourceDescriptor := uint16(len(pdu.SourceDescriptor))
-	lengthCombinedCapabilities := uint16(4 + capBuf.Len())
+	lengthSourceDescriptor := uint16(len(pdu.SourceDescriptor))         // #nosec G115
+	lengthCombinedCapabilities := uint16(4 + capBuf.Len()) // #nosec G115
 
 	pdu.ShareControlHeader.PDUType = TypeConfirmActive
 	pdu.ShareControlHeader.TotalLength = 6 + 4 + 2 + 2 + 2 + lengthSourceDescriptor + lengthCombinedCapabilities
@@ -502,7 +502,7 @@ func (pdu *ClientConfirmActive) Serialize() []byte {
 
 	buf.Write(pdu.SourceDescriptor)
 
-	_ = binary.Write(buf, binary.LittleEndian, uint16(len(pdu.CapabilitySets)))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(len(pdu.CapabilitySets))) // #nosec G115
 	_ = binary.Write(buf, binary.LittleEndian, uint16(0)) // padding
 
 	buf.Write(capBuf.Bytes())

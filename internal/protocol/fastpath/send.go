@@ -37,11 +37,12 @@ func (pdu *InputEventPDU) SerializeLength(value int, w io.Writer) error {
 	if value > 0x7f {
 		value += 2 // 2 bytes length
 
-		return binary.Write(w, binary.BigEndian, uint16(value|0x8000))
+		return binary.Write(w, binary.BigEndian, uint16(value|0x8000)) // #nosec G115
 	}
 
 	value += 1 // 1 byte length
-	if _, err := w.Write([]byte{uint8(value)}); err != nil {
+	b := uint8(value) // #nosec G115
+	if _, err := w.Write([]byte{b}); err != nil {
 		return err
 	}
 

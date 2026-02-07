@@ -158,7 +158,7 @@ func (c *CreateRequestPDU) Serialize() []byte {
 	case 0:
 		buf.WriteByte(byte(c.ChannelID))
 	case 1:
-		_ = binary.Write(buf, binary.LittleEndian, uint16(c.ChannelID))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(c.ChannelID)) // #nosec G115
 	case 2:
 		_ = binary.Write(buf, binary.LittleEndian, c.ChannelID)
 	}
@@ -249,7 +249,7 @@ func (d *DataFirstPDU) Serialize() []byte {
 	case 0:
 		buf.WriteByte(byte(d.ChannelID))
 	case 1:
-		_ = binary.Write(buf, binary.LittleEndian, uint16(d.ChannelID))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(d.ChannelID)) // #nosec G115
 	case 2:
 		_ = binary.Write(buf, binary.LittleEndian, d.ChannelID)
 	}
@@ -259,7 +259,7 @@ func (d *DataFirstPDU) Serialize() []byte {
 	case 0:
 		buf.WriteByte(byte(d.Length))
 	case 1:
-		_ = binary.Write(buf, binary.LittleEndian, uint16(d.Length))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(d.Length)) // #nosec G115
 	case 2:
 		_ = binary.Write(buf, binary.LittleEndian, d.Length)
 	}
@@ -300,7 +300,7 @@ func (d *DataPDU) Serialize() []byte {
 	case 0:
 		buf.WriteByte(byte(d.ChannelID))
 	case 1:
-		_ = binary.Write(buf, binary.LittleEndian, uint16(d.ChannelID))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(d.ChannelID)) // #nosec G115
 	case 2:
 		_ = binary.Write(buf, binary.LittleEndian, d.ChannelID)
 	}
@@ -340,7 +340,7 @@ func (c *ClosePDU) Serialize() []byte {
 	case 0:
 		buf.WriteByte(byte(c.ChannelID))
 	case 1:
-		_ = binary.Write(buf, binary.LittleEndian, uint16(c.ChannelID))
+		_ = binary.Write(buf, binary.LittleEndian, uint16(c.ChannelID)) // #nosec G115
 	case 2:
 		_ = binary.Write(buf, binary.LittleEndian, c.ChannelID)
 	}

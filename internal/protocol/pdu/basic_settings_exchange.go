@@ -299,7 +299,7 @@ func (s ChannelDefinitionStructure) Serialize() []byte {
 
 func newClientNetworkData(channelNames []string) *ClientNetworkData {
 	data := ClientNetworkData{
-		ChannelCount: uint32(len(channelNames)),
+		ChannelCount: uint32(len(channelNames)), // #nosec G115
 	}
 
 	if data.ChannelCount == 0 {
@@ -329,7 +329,8 @@ func (data ClientNetworkData) Serialize() []byte {
 	buf := new(bytes.Buffer)
 
 	_ = binary.Write(buf, binary.LittleEndian, uint16(0xC003))                // header type CS_NET
-	_ = binary.Write(buf, binary.LittleEndian, uint16(headerLen+chBuf.Len())) // packet size
+	pktSize := uint16(headerLen + chBuf.Len())                               // #nosec G115
+	_ = binary.Write(buf, binary.LittleEndian, pktSize)
 
 	_ = binary.Write(buf, binary.LittleEndian, data.ChannelCount)
 
