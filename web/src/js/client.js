@@ -354,6 +354,11 @@ Client.prototype.deinitialize = function() {
     
     window.removeEventListener('resize', this.handleResize);
 
+    // Clean up any document-level listeners left from in-progress drags
+    document.removeEventListener('mousemove', this.handleMouseMove);
+    document.removeEventListener('mouseup', this.handleMouseUp);
+    this.isDragging = false;
+
     this.clearAllTimeouts();
     this.clearBitmapCache();
     this.disableAudio();
@@ -377,7 +382,7 @@ Client.prototype.deinitialize = function() {
         }
     });
     this.pointerCache = {};
-    this.canvas.classList = [];
+    this.canvas.className = '';
 };
 
 /**

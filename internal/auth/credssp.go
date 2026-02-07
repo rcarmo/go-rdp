@@ -259,8 +259,19 @@ func encodeInteger(val int) []byte {
 		buf.WriteByte(2)
 		buf.WriteByte(0)
 		buf.WriteByte(byte(val))
-	} else {
+	} else if val < 65536 {
 		buf.WriteByte(2)
+		buf.WriteByte(byte(val >> 8))
+		buf.WriteByte(byte(val))
+	} else if val < 16777216 {
+		buf.WriteByte(3)
+		buf.WriteByte(byte(val >> 16))
+		buf.WriteByte(byte(val >> 8))
+		buf.WriteByte(byte(val))
+	} else {
+		buf.WriteByte(4)
+		buf.WriteByte(byte(val >> 24))
+		buf.WriteByte(byte(val >> 16))
 		buf.WriteByte(byte(val >> 8))
 		buf.WriteByte(byte(val))
 	}

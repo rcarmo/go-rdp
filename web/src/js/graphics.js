@@ -130,7 +130,10 @@ export const GraphicsMixin = {
             this.renderer.setMetricsEnabled(true);
         }
         
-        // Log stats every 10 seconds
+        // Log stats every 10 seconds (clear any existing interval first)
+        if (this._statsInterval) {
+            clearInterval(this._statsInterval);
+        }
         this._statsInterval = setInterval(() => {
             this.logPerfStats();
         }, 10000);

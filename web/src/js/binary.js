@@ -77,19 +77,28 @@ export function BinaryWriter(array) {
     this.dv = new DataView(this.array);
 }
 
+BinaryWriter.prototype._checkBounds = function(bytes) {
+    if (this.offset + bytes > this.array.byteLength) {
+        throw new RangeError(`BinaryWriter: write of ${bytes} bytes at offset ${this.offset} exceeds buffer length ${this.array.byteLength}`);
+    }
+};
+
 BinaryWriter.prototype.uint8 = function (value) {
+    this._checkBounds(1);
     this.dv.setUint8(this.offset, value)
 
     this.offset += 1;
 };
 
 BinaryWriter.prototype.uint16 = function (value, littleEndian) {
+    this._checkBounds(2);
     this.dv.setUint16(this.offset, value, littleEndian);
 
     this.offset += 2;
 };
 
 BinaryWriter.prototype.uint32 = function (value, littleEndian) {
+    this._checkBounds(4);
     this.dv.setUint32(this.offset, value, littleEndian);
 
     this.offset += 4;
@@ -97,6 +106,7 @@ BinaryWriter.prototype.uint32 = function (value, littleEndian) {
 
 BinaryWriter.prototype.bytes = function (bytes) {
     const arr = new Uint8Array(bytes);
+    this._checkBounds(arr.length);
 
     for (let i = 0; i < arr.length; i++) {
         this.dv.setUint8(this.offset, arr[i]);
@@ -105,5 +115,6 @@ BinaryWriter.prototype.bytes = function (bytes) {
 }
 
 BinaryWriter.prototype.skip = function(length) {
+    this._checkBounds(length);
     this.offset += length;
 };

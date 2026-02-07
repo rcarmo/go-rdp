@@ -181,6 +181,11 @@ const AudioMixin = {
             return;
         }
 
+        if (this.audioChannels < 1) {
+            Logger.warn('Audio', 'Invalid channel count, skipping PCM audio');
+            return;
+        }
+
         // Create audio buffer
         const frameCount = Math.floor(samples.length / this.audioChannels);
         if (frameCount === 0) {
@@ -233,6 +238,10 @@ const AudioMixin = {
 
         this.audioContext.decodeAudioData(arrayBuffer)
             .then((audioBuffer) => {
+                // Check context is still valid after async decode
+                if (!this.audioEnabled || !this.audioContext || this.audioContext.state === 'closed') {
+                    return;
+                }
                 Logger.debug('Audio', `MP3 decoded: ${audioBuffer.length} frames, ${audioBuffer.numberOfChannels}ch`);
                 
                 // Queue the decoded buffer

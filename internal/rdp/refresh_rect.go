@@ -24,10 +24,18 @@ func (c *Client) sendRefreshRect() error {
 	_ = binary.Write(refreshData, binary.LittleEndian, uint16(0))
 	// top (2 bytes)
 	_ = binary.Write(refreshData, binary.LittleEndian, uint16(0))
-	// right (2 bytes) - inclusive, so width-1
-	_ = binary.Write(refreshData, binary.LittleEndian, uint16(c.desktopWidth-1))
-	// bottom (2 bytes) - inclusive, so height-1
-	_ = binary.Write(refreshData, binary.LittleEndian, uint16(c.desktopHeight-1))
+	// right (2 bytes) - inclusive, so width-1; clamp to 0 if width is 0
+	right := c.desktopWidth
+	if right > 0 {
+		right--
+	}
+	_ = binary.Write(refreshData, binary.LittleEndian, uint16(right))
+	// bottom (2 bytes) - inclusive, so height-1; clamp to 0 if height is 0
+	bottom := c.desktopHeight
+	if bottom > 0 {
+		bottom--
+	}
+	_ = binary.Write(refreshData, binary.LittleEndian, uint16(bottom))
 
 	// Build the Share Data Header
 	// PDUTYPE_DATAPDU (0x0007)

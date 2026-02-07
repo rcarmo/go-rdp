@@ -152,7 +152,6 @@ func (h *MultitransportHandler) HandleRequest(data []byte) error {
 	h.mu.Lock()
 	enabled := h.udpEnabled
 	callback := h.onUDPReady
-	softSync := h.softSyncSupported
 	tunnelMgr := h.tunnelMgr
 
 	if !enabled {
@@ -176,11 +175,7 @@ func (h *MultitransportHandler) HandleRequest(data []byte) error {
 			h.mu.Lock()
 			delete(h.pendingRequests, req.RequestID)
 			h.mu.Unlock()
-			// Per spec: If unable to initiate, SHOULD send decline
-			if softSync {
-				// Soft-Sync: MUST send response regardless
-				return h.sendDecline(req.RequestID)
-			}
+			// Per spec: send decline when unable to initiate
 			return h.sendDecline(req.RequestID)
 		}
 		// Tunnel establishment continues asynchronously
