@@ -167,11 +167,6 @@ func (s *BitmapCacheCapabilitySetRev2) Deserialize(wire io.Reader) error {
 		return err
 	}
 
-	err = binary.Read(wire, binary.LittleEndian, &s.BitmapCache4CellInfo)
-	if err != nil {
-		return err
-	}
-
 	var padding2 [12]byte
 	err = binary.Read(wire, binary.LittleEndian, &padding2)
 	if err != nil {

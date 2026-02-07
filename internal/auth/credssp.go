@@ -222,7 +222,10 @@ func encodeLength(length int) []byte {
 	if length < 65536 {
 		return []byte{0x82, byte(length >> 8), byte(length)}
 	}
-	return []byte{0x83, byte(length >> 16), byte(length >> 8), byte(length)}
+	if length < 16777216 {
+		return []byte{0x83, byte(length >> 16), byte(length >> 8), byte(length)}
+	}
+	return []byte{0x84, byte(length >> 24), byte(length >> 16), byte(length >> 8), byte(length)}
 }
 
 func encodeSequence(data []byte) []byte {

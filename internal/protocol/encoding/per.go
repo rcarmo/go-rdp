@@ -247,7 +247,7 @@ func PerWriteInteger(value int, w io.Writer) {
 		return
 	}
 
-	if value < 0xffff {
+	if value <= 0xffff {
 		PerWriteLength(2, w)
 		_ = binary.Write(w, binary.BigEndian, uint16(value))
 

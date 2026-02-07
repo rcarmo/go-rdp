@@ -250,6 +250,7 @@ const (
 func NewClientInfo(domain, username, password string) *ClientInfo {
 	return &ClientInfo{
 		InfoPacket: ClientInfoPacket{
+			CodePage: 0x0409, // US English language identifier (used when INFO_UNICODE is set, per MS-RDPBCGR 2.2.1.11.1.1)
 			// Match FreeRDP's default flags for maximum compatibility
 			// INFO_AUTOLOGON is REQUIRED for automatic login without showing the login dialog
 			Flags: InfoFlagMouse | InfoFlagUnicode | InfoFlagDisableCtrlAltDel | InfoFlagEnableWindowsKey |

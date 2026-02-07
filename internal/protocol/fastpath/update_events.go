@@ -70,6 +70,7 @@ func (d *paletteUpdateData) Deserialize(wire io.Reader) error {
 }
 
 type CompressedDataHeader struct {
+	CbCompFirstRowSize uint16
 	CbCompMainBodySize uint16
 	CbScanWidth        uint16
 	CbUncompressedSize uint16
@@ -78,8 +79,7 @@ type CompressedDataHeader struct {
 func (h *CompressedDataHeader) Deserialize(wire io.Reader) error {
 	var err error
 
-	var cbCompFirstRowSize uint16
-	err = binary.Read(wire, binary.LittleEndian, &cbCompFirstRowSize)
+	err = binary.Read(wire, binary.LittleEndian, &h.CbCompFirstRowSize)
 	if err != nil {
 		return err
 	}

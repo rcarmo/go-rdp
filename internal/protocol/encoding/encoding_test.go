@@ -681,7 +681,7 @@ func TestPerWriteInteger(t *testing.T) {
 		{name: "255", value: 255, want: []byte{0x01, 0xFF}},
 		{name: "256", value: 256, want: []byte{0x02, 0x01, 0x00}},
 		{name: "0xFFFE", value: 0xFFFE, want: []byte{0x02, 0xFF, 0xFE}},
-		{name: "0xFFFF", value: 0xFFFF, want: []byte{0x04, 0x00, 0x00, 0xFF, 0xFF}},
+		{name: "0xFFFF", value: 0xFFFF, want: []byte{0x02, 0xFF, 0xFF}},
 		{name: "0x10000", value: 0x10000, want: []byte{0x04, 0x00, 0x01, 0x00, 0x00}},
 	}
 
@@ -1167,7 +1167,7 @@ func TestPerIntegerBoundaryValues(t *testing.T) {
 		{0xFF, 2},    // length + 1 byte
 		{0x100, 3},   // length + 2 bytes
 		{0xFFFE, 3},  // length + 2 bytes
-		{0xFFFF, 5},  // length + 4 bytes
+		{0xFFFF, 3},  // length + 2 bytes
 		{0x10000, 5}, // length + 4 bytes
 	}
 
