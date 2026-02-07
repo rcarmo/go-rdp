@@ -8,51 +8,47 @@ on:
   pull_request:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+
 env:
   GO_VERSION: '1.22'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         go-version: ['1.21', '1.22', '1.23']
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
-        
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ matrix.go-version }}-
-          
+
     - name: Install dependencies
       run: make deps
-      
+
     - name: Run code quality checks
       run: make check
-      
+
     - name: Run tests
       run: make test
-        
+
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
         flags: unittests
         name: codecov-umbrella
-        
 
   security:
     name: Security Scan
@@ -63,17 +59,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
 
     - name: Download Go deps
       run: go mod download
@@ -93,7 +81,7 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
 
@@ -101,45 +89,37 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [test]
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-        
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        
+
     - name: Install TinyGo
       uses: acifani/setup-tinygo@v2
       with:
         tinygo-version: '0.34.0'
-        
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
-          
+
     - name: Build all platforms
       run: make build-all
-        
+
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: rdp-html5-binaries
         path: bin/
-        
+
     - name: Upload frontend assets
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: frontend-assets
         path: |
@@ -147,47 +127,21 @@ jobs:
           web/dist/js/rle/wasm_exec.js
           web/dist/js/client.bundle.min.js
 
-  docker-arm-smoke:
-    name: Docker smoke test (ARM runner)
-    runs-on: ubuntu-24.04-arm
+  # Build AMD64 Docker image on native Intel runner
+  docker-amd64:
+    name: Build AMD64 image
+    runs-on: ubuntu-24.04
     needs: [test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Smoke build (arm64)
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: Dockerfile
-        platforms: linux/arm64
-        load: true
-        push: false
-        tags: rdp-html5:smoke-arm64
-
-    - name: Smoke run
-      run: docker run --rm rdp-html5:smoke-arm64 ./rdp-html5 -version
-
-  docker:
-    name: Build Docker Images
-    runs-on: ubuntu-latest
-    needs: [test, docker-arm-smoke]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -195,7 +149,79 @@ jobs:
     - name: Log in to GitHub Container Registry
       uses: docker/login-action@v3
       with:
-        registry: ghcr.io
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push AMD64 image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: Dockerfile
+        platforms: linux/amd64
+        push: true
+        provenance: false
+        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+        cache-from: type=gha,scope=amd64
+        cache-to: type=gha,mode=max,scope=amd64
+
+  # Build ARM64 Docker image on native ARM runner
+  docker-arm64:
+    name: Build ARM64 image
+    runs-on: ubuntu-24.04-arm
+    needs: [test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push ARM64 image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: Dockerfile
+        platforms: linux/arm64
+        push: true
+        provenance: false
+        outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+        cache-from: type=gha,scope=arm64
+        cache-to: type=gha,mode=max,scope=arm64
+
+  # Merge per-arch digests into a single multi-arch manifest
+  docker-merge:
+    name: Create multi-arch manifest
+    runs-on: ubuntu-latest
+    needs: [docker-amd64, docker-arm64]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -203,7 +229,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ghcr.io/${{ github.repository }}
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=semver,pattern={{version}}
@@ -211,44 +237,33 @@ jobs:
           type=semver,pattern={{major}}
           type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-    - name: Smoke build (amd64)
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: Dockerfile
-        platforms: linux/amd64
-        load: true
-        push: false
-        tags: rdp-html5:smoke
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    - name: Create and push multi-arch manifest
+      working-directory: /tmp
+      run: |
+        # Build tag arguments from metadata
+        TAGS=""
+        for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr '\n' ' '); do
+          TAGS="$TAGS -t $tag"
+        done
+        docker buildx imagetools create $TAGS \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.docker-amd64.outputs.digest }} \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.docker-arm64.outputs.digest }}
 
-    - name: Smoke run
-      run: docker run --rm rdp-html5:smoke ./rdp-html5 -version
+    - name: Inspect merged image
+      run: |
+        docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: Dockerfile
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        
     - name: Generate SBOM
       if: startsWith(github.ref, 'refs/tags/v')
       uses: anchore/sbom-action@v0
       with:
-        image: ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
         format: spdx-json
         output-file: sbom.json
-        
+
     - name: Upload SBOM artifact
       if: startsWith(github.ref, 'refs/tags/v')
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sbom
         path: sbom.json
@@ -256,36 +271,261 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build, docker]
+    needs: [build, docker-merge]
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: artifacts/
-        
+
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         generate_release_notes: true
         files: |
           artifacts/**/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  prune-releases:
+    name: Prune old releases
+    runs-on: ubuntu-latest
+    needs: [docker-merge]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Prune releases and tags
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const keep = 5;
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            releases.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            core.info(`Found ${releases.length} releases; keeping latest ${keep}.`);
+            const toDelete = releases.slice(keep);
+            for (const release of toDelete) {
+              core.info(`Deleting release ${release.tag_name} (id ${release.id})`);
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: release.id,
+              });
+              if (!release.tag_name) {
+                core.info(`Release ${release.id} has no tag.`);
+                continue;
+              }
+              const refs = await github.rest.git.listMatchingRefs({
+                owner,
+                repo,
+                ref: `tags/${release.tag_name}`,
+              });
+              if (refs.data.length === 0) {
+                core.info(`Tag ${release.tag_name} not found; skipping.`);
+                continue;
+              }
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `tags/${release.tag_name}`,
+              });
+            }
+
+  cleanup:
+    name: Cleanup old runs and tags
+    runs-on: ubuntu-latest
+    needs: [docker-merge]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: Cleanup old workflow runs, tags, and artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const keepCount = 5;
+            const { owner, repo } = context.repo;
+
+            // Keep only the newest workflow runs, delete the rest
+            core.info('Fetching workflow runs...');
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRunsForRepo,
+              { owner, repo, per_page: 100 }
+            );
+            const sortedRuns = runs.sort((a, b) =>
+              new Date(b.created_at) - new Date(a.created_at)
+            );
+            const runsToDelete = sortedRuns.slice(keepCount);
+            core.info(`Found ${runs.length} workflow runs, keeping ${keepCount}, deleting ${runsToDelete.length}...`);
+            for (const run of runsToDelete) {
+              try {
+                await github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: run.id });
+              } catch (error) {
+                core.warning(`Failed to delete run ${run.id}: ${error.message}`);
+              }
+            }
+
+            // Keep only the newest tags, delete the rest
+            core.info('Fetching tags...');
+            const tags = await github.paginate(
+              github.rest.repos.listTags,
+              { owner, repo, per_page: 100 }
+            );
+            const currentTag = context.ref.replace('refs/tags/', '');
+            const otherTags = tags.filter(tag => tag.name !== currentTag);
+            const tagsToDelete = otherTags.slice(keepCount);
+            core.info(`Found ${tags.length} tags, keeping ${keepCount} newest + current (${currentTag}), deleting ${tagsToDelete.length}...`);
+            for (const tag of tagsToDelete) {
+              try {
+                await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag.name}` });
+              } catch (error) {
+                core.warning(`Failed to delete tag ${tag.name}: ${error.message}`);
+              }
+            }
+
+            // Cleanup old artifacts
+            core.info('Fetching artifacts...');
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              { owner, repo, per_page: 100 }
+            );
+            const sortedArtifacts = artifacts
+              .filter(a => !a.expired)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const artifactsToDelete = sortedArtifacts.slice(keepCount);
+            core.info(`Found ${artifacts.length} artifacts, keeping ${keepCount}, deleting ${artifactsToDelete.length}...`);
+            for (const artifact of artifactsToDelete) {
+              try {
+                await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id });
+              } catch (error) {
+                core.warning(`Failed to delete artifact ${artifact.id}: ${error.message}`);
+              }
+            }
+            core.info('Cleanup completed');
+
+  cleanup-ghcr:
+    name: Cleanup old GHCR images
+    runs-on: ubuntu-latest
+    needs: [docker-merge]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      packages: write
+    steps:
+      - name: Delete old images (safe date-cutoff for untagged)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const keepCount = 5;
+            const { owner, repo } = context.repo;
+            const packageName = repo.toLowerCase();
+
+            core.info(`Cleaning Docker images for ${owner}/${packageName}`);
+
+            try {
+              const ownerInfo = await github.rest.users.getByUsername({ username: owner });
+              const isOrg = ownerInfo.data.type === 'Organization';
+              const ownerArgs = isOrg ? { org: owner } : { username: owner };
+              const listVersions = isOrg
+                ? github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg
+                : github.rest.packages.getAllPackageVersionsForPackageOwnedByUser;
+              const deleteVersion = isOrg
+                ? github.rest.packages.deletePackageVersionForOrg
+                : github.rest.packages.deletePackageVersionForUser;
+
+              const versions = await github.paginate(
+                listVersions,
+                {
+                  package_type: 'container',
+                  package_name: packageName,
+                  per_page: 100,
+                  state: 'active',
+                  ...ownerArgs,
+                }
+              );
+
+              core.info(`Found ${versions.length} package versions`);
+
+              const taggedVersions = versions.filter(v => v.metadata?.container?.tags?.length > 0);
+              const untaggedVersions = versions.filter(v => !v.metadata?.container?.tags || v.metadata.container.tags.length === 0);
+
+              core.info(`Tagged: ${taggedVersions.length}, Untagged: ${untaggedVersions.length}`);
+
+              // Sort tagged by date (newest first), keep the newest
+              const sortedTagged = taggedVersions.sort((a, b) =>
+                new Date(b.created_at) - new Date(a.created_at)
+              );
+              const taggedToDelete = sortedTagged.slice(keepCount);
+
+              // Date-cutoff: only delete untagged images OLDER than the oldest
+              // kept tagged version. This preserves per-architecture digest images
+              // that are referenced by kept multi-arch manifests.
+              const oldestKept = sortedTagged.length > 0
+                ? new Date(sortedTagged[Math.min(keepCount, sortedTagged.length) - 1].created_at)
+                : new Date();
+              core.info(`Oldest kept tag created at: ${oldestKept.toISOString()}`);
+
+              const untaggedToDelete = untaggedVersions.filter(v =>
+                new Date(v.created_at) < oldestKept
+              );
+              core.info(`Untagged to delete: ${untaggedToDelete.length} (keeping ${untaggedVersions.length - untaggedToDelete.length} that may be referenced by kept tags)`);
+              for (const version of untaggedToDelete) {
+                core.info(`Deleting untagged version ${version.id} (created: ${version.created_at})`);
+                try {
+                  await deleteVersion({
+                    package_type: 'container',
+                    package_name: packageName,
+                    package_version_id: version.id,
+                    ...ownerArgs,
+                  });
+                } catch (error) {
+                  core.warning(`Failed to delete untagged version ${version.id}: ${error.message}`);
+                }
+              }
+
+              core.info(`Keeping ${keepCount} newest tagged, deleting ${taggedToDelete.length} older...`);
+              for (const version of taggedToDelete) {
+                const tags = version.metadata?.container?.tags?.join(', ') || 'unknown';
+                core.info(`Deleting version ${version.id} with tags: ${tags}`);
+                try {
+                  await deleteVersion({
+                    package_type: 'container',
+                    package_name: packageName,
+                    package_version_id: version.id,
+                    ...ownerArgs,
+                  });
+                } catch (error) {
+                  core.warning(`Failed to delete version ${version.id}: ${error.message}`);
+                }
+              }
+
+            } catch (error) {
+              if (error.status === 404) {
+                core.info('No package found - this might be the first build');
+              } else {
+                core.setFailed(`Error managing package versions: ${error.message}`);
+              }
+            }
 
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    needs: [build, docker]
+    needs: [build, docker-merge]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     environment: production
-    
+
     steps:
     - name: Deploy to staging
       run: |
