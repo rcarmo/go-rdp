@@ -23,7 +23,7 @@ import (
 
 const (
 	appName    = "Go RDP Client"
-	appVersion = "1.0.2"
+	appVersion = "1.0.3"
 )
 
 func main() {
