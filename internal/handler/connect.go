@@ -524,11 +524,12 @@ func sendAudioDataWithMutex(wsConn *websocket.Conn, wsMu *sync.Mutex, data []byt
 	// For format messages, include format info
 	var formatInfo []byte
 	if format != nil {
-		// Format: channels (2), sampleRate (4), bitsPerSample (2)
-		formatInfo = make([]byte, 8)
+		// Format: channels (2), sampleRate (4), bitsPerSample (2), formatTag (2)
+		formatInfo = make([]byte, 10)
 		binary.LittleEndian.PutUint16(formatInfo[0:2], format.Channels)
 		binary.LittleEndian.PutUint32(formatInfo[2:6], format.SamplesPerSec)
 		binary.LittleEndian.PutUint16(formatInfo[6:8], format.BitsPerSample)
+		binary.LittleEndian.PutUint16(formatInfo[8:10], format.FormatTag)
 	}
 
 	msg := make([]byte, headerSize+len(formatInfo)+len(data))

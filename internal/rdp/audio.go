@@ -158,11 +158,6 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 	// Log negotiated format for debugging
 	logging.Info("Audio: Negotiated format: %s", serverFormats.Formats[selectedIndex].String())
 
-	if len(h.serverFormats) == 0 {
-		logging.Warn("Audio: No formats available from server")
-		return nil
-	}
-
 	h.selectedFormat = selectedIndex
 	logging.Info("Audio: Selected format %d: %s", selectedIndex, h.serverFormats[selectedIndex].String())
 

@@ -223,7 +223,7 @@ func (c *ClientAudioFormats) Serialize() []byte {
 	_ = binary.Write(&buf, binary.LittleEndian, c.Flags)
 	_ = binary.Write(&buf, binary.LittleEndian, c.Volume)
 	_ = binary.Write(&buf, binary.LittleEndian, c.Pitch)
-	_ = binary.Write(&buf, binary.BigEndian, c.DGramPort)
+	_ = binary.Write(&buf, binary.LittleEndian, c.DGramPort)
 	_ = binary.Write(&buf, binary.LittleEndian, c.NumFormats)
 	_ = binary.Write(&buf, binary.LittleEndian, c.LastBlockConfirmed)
 	_ = binary.Write(&buf, binary.LittleEndian, c.Version)
