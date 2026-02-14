@@ -169,7 +169,7 @@ func (pdu *UpdatePDU) Deserialize(wire io.Reader) error {
 		length = binary.BigEndian.Uint16([]byte{length1, length2})
 	}
 
-	if length > 0x4000 {
+	if length > 0x7FFF {
 		return errors.New("too big packet")
 	}
 

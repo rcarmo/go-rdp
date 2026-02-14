@@ -750,7 +750,7 @@ export const GraphicsMixin = {
 
     /**
      * Handle surface commands from a fastpath update.
-     * Dispatches SetSurfaceBits (with RFX data) and frame markers.
+     * Dispatches SetSurfaceBits based on codec type.
      * @param {BinaryReader} r
      */
     handleSurfaceCommands(r) {
@@ -766,9 +766,62 @@ export const GraphicsMixin = {
         const commands = parseSurfaceCommands(r);
         for (const { type, command } of commands) {
             if (type === 'surfaceBits') {
-                this.handleRFXSurface(command);
+                const data = command.bitmapData;
+                if (data && data.length >= 2) {
+                    const magic = data[0] | (data[1] << 8);
+                    // RFX block types: WBT_SYNC=0xCCC0 through WBT_EXTENSION=0xCCC7 and WBT_TILESET=0xCAC2
+                    if ((magic >= 0xCCC0 && magic <= 0xCCC7) || magic === 0xCAC2 || magic === 0xCAC3) {
+                        this.handleRFXSurface(command);
+                    } else {
+                        this.handleNSCodecSurface(command);
+                    }
+                }
             }
-            // frameMarker: currently informational (no frame-ack needed for basic RFX)
+            // frameMarker: informational
+        }
+    },
+
+    /**
+     * Handle a NSCodec-encoded surface command.
+     * @param {SetSurfaceBitsCommand} cmd
+     */
+    handleNSCodecSurface(cmd) {
+        const data = cmd.bitmapData;
+        const width = cmd.width;
+        const height = cmd.height;
+
+        if (!width || !height || !data || data.length === 0) return;
+
+        const rgba = new Uint8ClampedArray(width * height * 4);
+
+        if (WASMCodec.isReady() && cmd.bpp >= 24) {
+            // Try NSCodec decoder first
+            if (WASMCodec.decodeNSCodec(data, width, height, rgba)) {
+                this.renderer.drawRGBA(cmd.destLeft, cmd.destTop, width, height, rgba);
+                return;
+            }
+        }
+
+        // Fallback: treat as raw BGRA (codecID=0 or unknown codec)
+        if (data.length >= width * height * 4) {
+            for (let i = 0; i < width * height; i++) {
+                rgba[i * 4]     = data[i * 4 + 2]; // R←B
+                rgba[i * 4 + 1] = data[i * 4 + 1]; // G
+                rgba[i * 4 + 2] = data[i * 4];     // B←R
+                rgba[i * 4 + 3] = 255;
+            }
+            this.renderer.drawRGBA(cmd.destLeft, cmd.destTop, width, height, rgba);
+        } else if (data.length >= width * height * 3) {
+            // Raw BGR24
+            for (let i = 0; i < width * height; i++) {
+                rgba[i * 4]     = data[i * 3 + 2];
+                rgba[i * 4 + 1] = data[i * 3 + 1];
+                rgba[i * 4 + 2] = data[i * 3];
+                rgba[i * 4 + 3] = 255;
+            }
+            this.renderer.drawRGBA(cmd.destLeft, cmd.destTop, width, height, rgba);
+        } else {
+            Logger.warn("Surface", `Unknown codec data: ${data.length} bytes for ${width}x${height}`);
         }
     },
 

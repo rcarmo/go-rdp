@@ -263,13 +263,19 @@ func TestUpdatePDU_Deserialize(t *testing.T) {
 }
 
 func TestUpdatePDU_Deserialize_TooLargePacket(t *testing.T) {
-	// Create packet with length > 0x4000
+	// Create packet with length > 0x7FFF (max fastpath PDU size)
+	// 2-byte length encoding: high bit set on first byte, combined = 0x7FFF + 1 = not possible
+	// The max 2-byte value is 0x7FFF. To trigger "too big", we'd need a value above that,
+	// but the encoding caps at 15 bits. So test with a length that's within valid encoding
+	// but above our limit would require modifying the test format. Instead, verify that
+	// 0x4001 is now accepted (no error from length check) — it'll fail with EOF since
+	// no data is provided, but NOT with "too big packet".
 	buf := bytes.NewBuffer([]byte{0x00, 0xC0, 0x01}) // 2-byte length = 0x4001
 	pdu := &UpdatePDU{}
 
 	err := pdu.Deserialize(buf)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "too big packet")
+	assert.NotContains(t, err.Error(), "too big packet")
 }
 
 func TestUpdatePDU_Deserialize_WithPreallocatedData(t *testing.T) {
