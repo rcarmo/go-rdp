@@ -493,6 +493,11 @@ Client.prototype.handleMessage = function(arrayBuffer) {
         return;
     }
 
+    if (header.isSurfCMDs()) {
+        this.handleSurfaceCommands(r);
+        return;
+    }
+
     if (header.isPointer()) {
         this.handlePointer(header, r);
         return;

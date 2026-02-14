@@ -7,7 +7,7 @@
 import { Logger } from './logger.js';
 import { WASMCodec, RFXDecoder } from './wasm.js';
 import { FallbackCodec } from './codec-fallback.js';
-import { parseNewPointerUpdate, parseCachedPointerUpdate, parsePointerPositionUpdate, parseBitmapUpdate } from './protocol.js';
+import { parseNewPointerUpdate, parseCachedPointerUpdate, parsePointerPositionUpdate, parseBitmapUpdate, parseSurfaceCommands } from './protocol.js';
 import { CanvasRenderer } from './renderer.js';
 import { WebGLRenderer } from './webgl-renderer.js';
 
@@ -381,10 +381,11 @@ export const GraphicsMixin = {
             if (result) {
                 if (!this._imageEncodingLogged) {
                     this._imageEncodingLogged = true;
+                    this._activeEncoding = `${encoding} (${bpp}bpp)`;
                     console.info(
-                        '%c[RDP Session] Image encoding',
+                        '%c[RDP Session] Active codec',
                         'color: #03A9F4; font-weight: bold',
-                        `${encoding} (${bpp}bpp)`
+                        `${this._activeEncoding} via WASM`
                     );
                 }
                 this.setActiveDecoder('WASM');
@@ -416,10 +417,11 @@ export const GraphicsMixin = {
         if (fallbackResult) {
             if (!this._imageEncodingLogged) {
                 this._imageEncodingLogged = true;
+                this._activeEncoding = `${encoding} (${bpp}bpp)`;
                 console.info(
-                    '%c[RDP Session] Image encoding',
+                    '%c[RDP Session] Active codec',
                     'color: #03A9F4; font-weight: bold',
-                    `${encoding} (${bpp}bpp)`
+                    `${this._activeEncoding} via JS-Fallback`
                 );
             }
             this.setActiveDecoder('JS-Fallback');
@@ -732,22 +734,183 @@ export const GraphicsMixin = {
     // ========================================
     // RemoteFX (RFX) Support
     // ========================================
-    
+
+    // MS-RDPRFX block type constants
+    // RFX_TILESET is where tiles and quant tables live
+    _RFX_WBT_SYNC:           0xCCC0,
+    _RFX_WBT_CODEC_VERSIONS: 0xCCC1,
+    _RFX_WBT_CHANNELS:       0xCCC2,
+    _RFX_WBT_CONTEXT:        0xCCC3,
+    _RFX_WBT_FRAME_BEGIN:    0xCCC4,
+    _RFX_WBT_FRAME_END:      0xCCC5,
+    _RFX_WBT_REGION:         0xCCC6,
+    _RFX_WBT_EXTENSION:      0xCCC7,
+    _RFX_WBT_TILESET:        0xCAC2,
+    _RFX_CBT_TILE:           0xCAC3,
+
     /**
-     * Handle RemoteFX surface command
-     * @param {Uint8Array} data - Surface command data
+     * Handle surface commands from a fastpath update.
+     * Dispatches SetSurfaceBits (with RFX data) and frame markers.
+     * @param {BinaryReader} r
      */
-    handleRFXSurface(data) {
+    handleSurfaceCommands(r) {
+        if (!this.canvasShown) {
+            this.showCanvas();
+            this.canvasShown = true;
+            this.startPerfStats();
+            if (this.renderer && typeof this.renderer.resize === 'function') {
+                this.renderer.resize(this.canvas.width, this.canvas.height);
+            }
+        }
+
+        const commands = parseSurfaceCommands(r);
+        for (const { type, command } of commands) {
+            if (type === 'surfaceBits') {
+                this.handleRFXSurface(command);
+            }
+            // frameMarker: currently informational (no frame-ack needed for basic RFX)
+        }
+    },
+
+    /**
+     * Handle a single SetSurfaceBits command containing RFX data.
+     * Parses the MS-RDPRFX message blocks and decodes tiles.
+     * @param {SetSurfaceBitsCommand} cmd
+     */
+    handleRFXSurface(cmd) {
         if (!WASMCodec.isReady()) {
             Logger.error("RFX", "WASM not loaded");
             return;
         }
-        
-        // TODO: Parse surface command header and extract tiles
-        // For now, this is a placeholder for future integration
-        Logger.debug("RFX", `Surface command received, ${data.length} bytes`);
+
+        const data = cmd.bitmapData;
+        if (!data || data.length < 6) {
+            Logger.warn("RFX", "Surface command too short");
+            return;
+        }
+
+        if (!this._rfxCodecLogged) {
+            this._rfxCodecLogged = true;
+            console.info(
+                '%c[RDP Session] Active codec',
+                'color: #03A9F4; font-weight: bold',
+                'RemoteFX-Image via WASM'
+            );
+        }
+
+        const destLeft = cmd.destLeft;
+        const destTop = cmd.destTop;
+
+        // Parse RFX message blocks
+        let offset = 0;
+        let quantTables = [];
+
+        while (offset + 6 <= data.length) {
+            const blockType = data[offset] | (data[offset + 1] << 8);
+            const blockLen = data[offset + 2] | (data[offset + 3] << 8) |
+                             (data[offset + 4] << 16) | (data[offset + 5] << 24);
+
+            if (blockLen < 6 || offset + blockLen > data.length) break;
+
+            if (blockType === this._RFX_WBT_TILESET) {
+                this._parseAndRenderTileset(data, offset, blockLen, destLeft, destTop, quantTables);
+            }
+            // SYNC, CODEC_VERSIONS, CHANNELS, CONTEXT, FRAME_BEGIN, REGION, FRAME_END: skip
+
+            offset += blockLen;
+        }
     },
-    
+
+    /**
+     * Parse a TS_RFX_TILESET block and decode+render its tiles.
+     * @param {Uint8Array} data - Full RFX message
+     * @param {number} blockOffset - Offset of tileset block
+     * @param {number} blockLen - Length of tileset block
+     * @param {number} destLeft - Destination X offset from surface command
+     * @param {number} destTop - Destination Y offset from surface command
+     * @param {Array} quantTables - Output: parsed quant tables
+     */
+    _parseAndRenderTileset(data, blockOffset, blockLen, destLeft, destTop, quantTables) {
+        // TS_RFX_TILESET header: blockType(2) + blockLen(4) + subtype(2) + idx(2) + flags(2)
+        //   + numQuant(1) + tileSize(1) + numTiles(2) + tileDataSize(4)
+        const hdrSize = 22;
+        if (blockLen < hdrSize) return;
+
+        let off = blockOffset + 6; // skip block header
+        off += 2; // subtype
+        off += 2; // idx
+        off += 2; // flags
+
+        const numQuant = data[off]; off++;
+        off++; // tileSize (always 64)
+        const numTiles = data[off] | (data[off + 1] << 8); off += 2;
+        off += 4; // tileDataSize
+
+        // Parse quantization tables (5 bytes each, packed nibbles)
+        quantTables.length = 0;
+        for (let i = 0; i < numQuant && off + 5 <= blockOffset + blockLen; i++) {
+            quantTables.push(data.slice(off, off + 5));
+            off += 5;
+        }
+
+        // Parse and decode tiles
+        let decoded = 0;
+        let failed = 0;
+        const blockEnd = blockOffset + blockLen;
+
+        for (let i = 0; i < numTiles && off + 6 <= blockEnd; i++) {
+            const tileBlockType = data[off] | (data[off + 1] << 8);
+            const tileBlockLen = data[off + 2] | (data[off + 3] << 8) |
+                                 (data[off + 4] << 16) | (data[off + 5] << 24);
+
+            if (tileBlockType !== this._RFX_CBT_TILE || tileBlockLen < 13 || off + tileBlockLen > blockEnd) {
+                off += Math.max(tileBlockLen, 6);
+                failed++;
+                continue;
+            }
+
+            // Tile header after block header (6 bytes):
+            // quantIdxY(1) + quantIdxCb(1) + quantIdxCr(1) + xIdx(2) + yIdx(2) + ...
+            const quantIdxY = data[off + 6];
+            const quantIdxCb = data[off + 7];
+            const quantIdxCr = data[off + 8];
+
+            // Build 15-byte quant buffer for WASM (Y + Cb + Cr, 5 bytes each)
+            const quantBuf = new Uint8Array(15);
+            if (quantIdxY < quantTables.length) quantBuf.set(quantTables[quantIdxY], 0);
+            if (quantIdxCb < quantTables.length) quantBuf.set(quantTables[quantIdxCb], 5);
+            if (quantIdxCr < quantTables.length) quantBuf.set(quantTables[quantIdxCr], 10);
+            this.rfxDecoder.setQuantRaw(quantBuf);
+
+            // Pass the full tile block (including CBT_TILE header) to WASM decoder
+            const tileData = data.subarray(off, off + tileBlockLen);
+            const result = WASMCodec.decodeRFXTile(tileData, this.rfxDecoder.tileBuffer);
+
+            if (result) {
+                const rgba = new Uint8ClampedArray(this.rfxDecoder.tileBuffer.buffer,
+                    this.rfxDecoder.tileBuffer.byteOffset, this.rfxDecoder.tileBuffer.byteLength);
+                this.renderer.drawRGBA(
+                    destLeft + result.x,
+                    destTop + result.y,
+                    result.width,
+                    result.height,
+                    rgba
+                );
+                decoded++;
+            } else {
+                failed++;
+            }
+
+            off += tileBlockLen;
+        }
+
+        if (failed > 0) {
+            Logger.warn("RFX", `Decoded ${decoded} tiles, ${failed} failed`);
+        } else if (decoded > 0) {
+            Logger.debug("RFX", `Decoded ${decoded} tiles`);
+        }
+    },
+
     /**
      * Set RFX quantization values
      * @param {Uint8Array} quantY - 5 bytes

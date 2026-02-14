@@ -710,3 +710,73 @@ export function parsePointerPositionUpdate(r) {
     const y = r.uint16(true);
     return new PointerPositionUpdate(x, y);
 }
+
+// ============================================================================
+// Surface Commands (MS-RDPBCGR 2.2.9.1.2.1.10)
+// ============================================================================
+
+const CMDTYPE_SET_SURFACE_BITS = 0x0001;
+const CMDTYPE_FRAME_MARKER = 0x0004;
+const CMDTYPE_STREAM_SURFACE_BITS = 0x0006;
+
+const FRAME_START = 0x0000;
+const FRAME_END = 0x0001;
+
+/**
+ * Parsed SetSurfaceBits / StreamSurfaceBits command
+ */
+export class SetSurfaceBitsCommand {
+    constructor() {
+        this.destLeft = 0;
+        this.destTop = 0;
+        this.destRight = 0;
+        this.destBottom = 0;
+        this.bpp = 0;
+        this.codecID = 0;
+        this.width = 0;
+        this.height = 0;
+        this.bitmapData = null;
+    }
+}
+
+/**
+ * Parse surface commands from a fastpath update data section.
+ * @param {BinaryReader} r
+ * @returns {Array} Array of { type, command } objects
+ */
+export function parseSurfaceCommands(r) {
+    const commands = [];
+
+    while (r.offset < r.buffer.byteLength) {
+        const cmdType = r.uint16(true);
+
+        if (cmdType === CMDTYPE_SET_SURFACE_BITS || cmdType === CMDTYPE_STREAM_SURFACE_BITS) {
+            const cmd = new SetSurfaceBitsCommand();
+            cmd.destLeft = r.uint16(true);
+            cmd.destTop = r.uint16(true);
+            cmd.destRight = r.uint16(true);
+            cmd.destBottom = r.uint16(true);
+            cmd.bpp = r.uint8();
+            r.uint8(); // flags
+            r.uint8(); // reserved
+            cmd.codecID = r.uint8();
+            cmd.width = r.uint16(true);
+            cmd.height = r.uint16(true);
+            const bitmapDataLength = r.uint32(true);
+            cmd.bitmapData = new Uint8Array(r.blob(bitmapDataLength));
+            commands.push({ type: 'surfaceBits', command: cmd });
+        } else if (cmdType === CMDTYPE_FRAME_MARKER) {
+            const frameAction = r.uint16(true);
+            const frameID = r.uint32(true);
+            commands.push({
+                type: 'frameMarker',
+                command: { action: frameAction, frameID, isStart: frameAction === FRAME_START }
+            });
+        } else {
+            // Unknown command, consume remaining data
+            break;
+        }
+    }
+
+    return commands;
+}

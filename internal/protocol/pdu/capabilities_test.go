@@ -913,6 +913,20 @@ func Test_BitmapCodecsCapabilitySet_Deserialize(t *testing.T) {
 	require.Equal(t, NSCodecGUID, deserialized.BitmapCodecArray[0].CodecGUID)
 }
 
+func Test_BitmapCodecsWithRFXCapabilitySet_Deserialize(t *testing.T) {
+	set := NewBitmapCodecsWithRFXCapabilitySet()
+	serialized := set.Serialize()
+	data := serialized[4:]
+
+	var deserialized BitmapCodecsCapabilitySet
+	err := deserialized.Deserialize(bytes.NewReader(data))
+	require.NoError(t, err)
+	require.Len(t, deserialized.BitmapCodecArray, 2)
+	require.Equal(t, NSCodecGUID, deserialized.BitmapCodecArray[0].CodecGUID)
+	require.Equal(t, RemoteFXImageGUID, deserialized.BitmapCodecArray[1].CodecGUID)
+	require.Equal(t, uint8(2), deserialized.BitmapCodecArray[1].CodecID)
+}
+
 func Test_RailCapabilitySet_Serialize(t *testing.T) {
 	set := NewRailCapabilitySet()
 	serialized := set.Serialize()

@@ -312,7 +312,7 @@ func ProcessBitmap(src []byte, width, height, bpp int, isCompressed bool, rowDel
 	// Flip vertically (RDP sends bottom-up)
 	FlipVertical(raw, width, height, rawBytesPerPixel)
 
-	// Convert to RGBA
+	// Convert to RGBA based on actual decoded bytes per pixel
 	rgba := make([]byte, pixelCount*4)
 	switch bpp {
 	case 8:
@@ -321,10 +321,13 @@ func ProcessBitmap(src []byte, width, height, bpp int, isCompressed bool, rowDel
 		RGB555ToRGBA(raw, rgba)
 	case 16:
 		RGB565ToRGBA(raw, rgba)
-	case 24:
-		BGR24ToRGBA(raw, rgba)
-	case 32:
-		BGRA32ToRGBA(raw, rgba)
+	case 24, 32:
+		// Compressed 32-bit uses 24-bit RLE (3 bpp); uncompressed uses 4 bpp
+		if rawBytesPerPixel == 4 {
+			BGRA32ToRGBA(raw, rgba)
+		} else {
+			BGR24ToRGBA(raw, rgba)
+		}
 	default:
 		return nil
 	}

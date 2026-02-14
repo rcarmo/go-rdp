@@ -20,5 +20,12 @@ func (c *Client) capabilitiesExchange() error {
 
 	req := pdu.NewClientConfirmActive(resp.ShareID, c.userID, c.desktopWidth, c.desktopHeight, c.remoteApp != nil)
 
+	if c.enableRFX {
+		req.CapabilitySets = append(req.CapabilitySets,
+			pdu.NewSurfaceCommandsCapabilitySet(),
+			pdu.NewBitmapCodecsWithRFXCapabilitySet(),
+		)
+	}
+
 	return c.mcsLayer.Send(c.userID, c.channelIDMap["global"], req.Serialize())
 }

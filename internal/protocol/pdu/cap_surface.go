@@ -134,11 +134,12 @@ func (c *BitmapCodec) Deserialize(wire io.Reader) error {
 		return err
 	}
 
-	c.CodecProperties = make([]byte, codecPropertiesLength)
-
-	_, err = wire.Read(c.CodecProperties)
-	if err != nil {
-		return err
+	if codecPropertiesLength > 0 {
+		c.CodecProperties = make([]byte, codecPropertiesLength)
+		_, err = io.ReadFull(wire, c.CodecProperties)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -221,6 +222,12 @@ func (s *BitmapCodecsCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// RemoteFXImageGUID is the GUID for RemoteFX-Image (2744CCD4-9D8A-4E74-803C-0ECBEEA19C54).
+var RemoteFXImageGUID = [16]byte{
+	0xD4, 0xCC, 0x44, 0x27, 0x8A, 0x9D, 0x74, 0x4E,
+	0x80, 0x3C, 0x0E, 0xCB, 0xEE, 0xA1, 0x9C, 0x54,
+}
+
 // NewBitmapCodecsCapabilitySet creates a capability set advertising NSCodec support
 func NewBitmapCodecsCapabilitySet() CapabilitySet {
 	nscodecProps := NSCodecCapabilitySet{
@@ -237,6 +244,33 @@ func NewBitmapCodecsCapabilitySet() CapabilitySet {
 					CodecGUID:       NSCodecGUID,
 					CodecID:         1, // Will be assigned by server
 					CodecProperties: nscodecProps.Serialize(),
+				},
+			},
+		},
+	}
+}
+
+// NewBitmapCodecsWithRFXCapabilitySet creates a capability set advertising NSCodec + RemoteFX-Image.
+func NewBitmapCodecsWithRFXCapabilitySet() CapabilitySet {
+	nscodecProps := NSCodecCapabilitySet{
+		FAllowDynamicFidelity: 1,
+		FAllowSubsampling:     1,
+		ColorLossLevel:        3,
+	}
+
+	return CapabilitySet{
+		CapabilitySetType: CapabilitySetTypeBitmapCodecs,
+		BitmapCodecsCapabilitySet: &BitmapCodecsCapabilitySet{
+			BitmapCodecArray: []BitmapCodec{
+				{
+					CodecGUID:       NSCodecGUID,
+					CodecID:         1,
+					CodecProperties: nscodecProps.Serialize(),
+				},
+				{
+					CodecGUID:       RemoteFXImageGUID,
+					CodecID:         2,
+					CodecProperties: nil,
 				},
 			},
 		},

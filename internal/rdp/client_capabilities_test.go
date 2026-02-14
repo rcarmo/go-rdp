@@ -35,6 +35,21 @@ func TestCodecGUIDToName(t *testing.T) {
 			expected: "ClearCodec",
 		},
 		{
+			name:     "JPEG",
+			guid:     guidJPEG,
+			expected: "JPEG",
+		},
+		{
+			name:     "H264",
+			guid:     guidH264,
+			expected: "H264",
+		},
+		{
+			name:     "PNG",
+			guid:     guidPNG,
+			expected: "PNG",
+		},
+		{
 			name:     "unknown codec",
 			guid:     [16]byte{0x00, 0x01, 0x02, 0x03},
 			expected: "Unknown(00010203)",
@@ -98,6 +113,17 @@ func TestClient_SetUseNLA(t *testing.T) {
 			assert.Equal(t, tt.expectedProtocol, client.selectedProtocol)
 		})
 	}
+}
+
+func TestClient_SetEnableRFX(t *testing.T) {
+	client := &Client{}
+	assert.False(t, client.enableRFX)
+
+	client.SetEnableRFX(true)
+	assert.True(t, client.enableRFX)
+
+	client.SetEnableRFX(false)
+	assert.False(t, client.enableRFX)
 }
 
 func TestClient_GetServerCapabilities_Empty(t *testing.T) {
@@ -341,9 +367,12 @@ func TestGUIDConstants(t *testing.T) {
 	assert.Len(t, guidRemoteFX, 16)
 	assert.Len(t, guidImageRemoteFX, 16)
 	assert.Len(t, guidClearCodec, 16)
+	assert.Len(t, guidJPEG, 16)
+	assert.Len(t, guidH264, 16)
+	assert.Len(t, guidPNG, 16)
 
 	// Verify they're distinct
-	guids := []([16]byte){guidNSCodec, guidRemoteFX, guidImageRemoteFX, guidClearCodec}
+	guids := []([16]byte){guidNSCodec, guidRemoteFX, guidImageRemoteFX, guidClearCodec, guidJPEG, guidH264, guidPNG}
 	for i := 0; i < len(guids); i++ {
 		for j := i + 1; j < len(guids); j++ {
 			assert.NotEqual(t, guids[i], guids[j], fmt.Sprintf("GUID %d and %d should be different", i, j))

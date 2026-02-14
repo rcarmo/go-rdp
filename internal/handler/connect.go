@@ -197,6 +197,11 @@ func setupRDPClient(creds *connectionRequest, params *connectionParams) (*rdp.Cl
 		logging.Info("UDP transport enabled (experimental)")
 	}
 
+	// Enable RemoteFX-Image codec if configured
+	if cfg.RDP.EnableRFX {
+		rdpClient.SetEnableRFX(true)
+	}
+
 	return rdpClient, nil
 }
 

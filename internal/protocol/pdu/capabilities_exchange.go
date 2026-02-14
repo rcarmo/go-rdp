@@ -465,9 +465,10 @@ func NewClientConfirmActive(shareID uint32, userId, desktopWidth, desktopHeight 
 			NewSoundCapabilitySet(),
 			NewMultifragmentUpdateCapabilitySet(),
 			NewFrameAcknowledgeCapabilitySet(),
-			// Note: Do NOT add SurfaceCommands or BitmapCodecs here!
-			// Adding them causes xrdp to use GDI orders instead of bitmap updates,
-			// which we don't support. Keep capabilities identical to master branch.
+			// Note: SurfaceCommands and BitmapCodecs are added conditionally
+			// in capabilitiesExchange() when enableRFX is true.
+			// Adding them unconditionally causes xrdp to use GDI orders
+			// instead of bitmap updates. Use -no-rfx to disable.
 		},
 	}
 
