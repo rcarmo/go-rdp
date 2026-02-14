@@ -21,6 +21,13 @@ func (c *Client) capabilitiesExchange() error {
 	req := pdu.NewClientConfirmActive(resp.ShareID, c.userID, c.desktopWidth, c.desktopHeight, c.remoteApp != nil)
 
 	if c.enableRFX {
+		// Set MultifragmentUpdate MaxRequestSize large enough for RFX tiles
+		for i, cap := range req.CapabilitySets {
+			if cap.MultifragmentUpdateCapabilitySet != nil {
+				req.CapabilitySets[i].MultifragmentUpdateCapabilitySet.MaxRequestSize = 0x200000 // 2MB
+				break
+			}
+		}
 		req.CapabilitySets = append(req.CapabilitySets,
 			pdu.NewSurfaceCommandsCapabilitySet(),
 			pdu.NewBitmapCodecsWithRFXCapabilitySet(),

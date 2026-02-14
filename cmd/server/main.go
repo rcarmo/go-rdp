@@ -21,9 +21,9 @@ import (
 	"github.com/rcarmo/go-rdp/web"
 )
 
-const (
+var (
 	appName    = "Go RDP Client"
-	appVersion = "1.0.3"
+	appVersion = "dev" // injected at build time via -ldflags
 )
 
 func main() {

@@ -6,7 +6,8 @@ BINARY_NAME=rdp-html5
 BUILD_DIR=bin
 GO_VERSION=1.22
 LINTER=golangci-lint
-VERSION_FILE=cmd/server/main.go
+VERSION=$(shell cat VERSION)
+LDFLAGS=-s -w -X main.appVersion=$(VERSION)
 
 .PHONY: help
 help: ## Show this help
@@ -115,9 +116,9 @@ build: build-frontend build-backend ## Build frontend (WASM+JS) and backend
 
 .PHONY: build-backend
 build-backend: ## Build Go backend only
-	@echo "Building Go backend binary..."
+	@echo "Building Go backend binary (version $(VERSION))..."
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME) cmd/server/main.go
+	CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) cmd/server/main.go
 	@ls -lh $(BUILD_DIR)/$(BINARY_NAME)
 
 .PHONY: build-frontend
@@ -140,19 +141,19 @@ build-all: build-frontend ## Build binaries for common platforms
 	@mkdir -p $(BUILD_DIR)
 	
 	# Linux AMD64
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 cmd/server/main.go
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 cmd/server/main.go
 	
 	# Linux ARM64
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 cmd/server/main.go
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 cmd/server/main.go
 	
 	# Windows AMD64
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe cmd/server/main.go
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe cmd/server/main.go
 	
 	# macOS AMD64
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 cmd/server/main.go
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-amd64 cmd/server/main.go
 	
 	# macOS ARM64 (Apple Silicon)
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 cmd/server/main.go
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME)-darwin-arm64 cmd/server/main.go
 	
 	@echo "All binaries built in $(BUILD_DIR)/"
 	@ls -la $(BUILD_DIR)/
@@ -307,6 +308,7 @@ check-go: ## Validate minimum Go version
 .PHONY: config
 config: ## Show build configuration
 	@echo "Build configuration:"
+	@echo "  Version: $(VERSION)"
 	@echo "  Go Version: $(GO_VERSION)"
 	@echo "  Binary Name: $(BINARY_NAME)"
 	@echo "  Build Directory: $(BUILD_DIR)"
@@ -320,13 +322,13 @@ ci: deps check security test build ## Run full CI pipeline
 # Release helpers
 .PHONY: bump-patch
 bump-patch: ## Bump patch version and create git tag
-	@OLD=$$(grep -Po '(?<=appVersion = ")[^"]+' $(VERSION_FILE)); \
+	@OLD=$$(cat VERSION); \
 	MAJOR=$$(echo $$OLD | cut -d. -f1); \
 	MINOR=$$(echo $$OLD | cut -d. -f2); \
 	PATCH=$$(echo $$OLD | cut -d. -f3); \
 	NEW="$$MAJOR.$$MINOR.$$((PATCH + 1))"; \
-	sed -i "s/appVersion = \"$$OLD\"/appVersion = \"$$NEW\"/" $(VERSION_FILE); \
-	git add $(VERSION_FILE); \
+	echo "$$NEW" > VERSION; \
+	git add VERSION; \
 	git commit -m "Bump version to $$NEW"; \
 	git tag "v$$NEW"; \
 	echo "Bumped version: $$OLD -> $$NEW (tagged v$$NEW)"

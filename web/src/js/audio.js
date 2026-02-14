@@ -23,6 +23,9 @@ const AudioMixin = {
         this.audioChannels = 2;
         this.audioBitsPerSample = 16;
         this.audioFormatTag = WAVE_FORMAT_PCM; // Default to PCM
+        
+        // Gapless playback scheduling
+        this.audioNextTime = 0;
     },
 
     enableAudio() {
@@ -56,6 +59,7 @@ const AudioMixin = {
         }
         this.audioEnabled = false;
         this.audioQueue = [];
+        this.audioNextTime = 0;
         Logger.debug('Audio', 'Disabled');
     },
 
@@ -308,13 +312,36 @@ const AudioMixin = {
         source.buffer = item.buffer;
         source.connect(this.audioGain);
 
+        // Schedule gaplessly: each buffer starts exactly when the previous one ends.
+        // If we've fallen behind (audioNextTime < now), reset to now with a small
+        // lookahead to avoid underruns.
+        const now = this.audioContext.currentTime;
+        if (this.audioNextTime < now) {
+            this.audioNextTime = now + 0.01; // 10ms lookahead to avoid immediate underrun
+        }
+        source.start(this.audioNextTime);
+        this.audioNextTime += item.buffer.duration;
+
         source.onended = () => {
             this.playNextAudio();
         };
 
-        // Play immediately or with minimal delay
-        const startTime = this.audioContext.currentTime;
-        source.start(startTime);
+        // Drain additional queued buffers that can be pre-scheduled
+        while (this.audioQueue.length > 0) {
+            const next = this.audioQueue.shift();
+            const src = this.audioContext.createBufferSource();
+            src.buffer = next.buffer;
+            src.connect(this.audioGain);
+            src.start(this.audioNextTime);
+            this.audioNextTime += next.buffer.duration;
+            src.onended = () => {
+                if (this.audioQueue.length > 0) {
+                    this.playNextAudio();
+                } else {
+                    this.audioPlaying = false;
+                }
+            };
+        }
     },
 
     // Resume audio context after user interaction (required by browsers)
