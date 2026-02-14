@@ -569,6 +569,9 @@ export const GraphicsMixin = {
             if (header.isPTRNew()) {
                 const newPointerUpdate = parseNewPointerUpdate(r);
                 Logger.debug("Cursor", `New cursor: cache=${newPointerUpdate.cacheIndex}, hotspot=(${newPointerUpdate.x},${newPointerUpdate.y}), size=${newPointerUpdate.width}x${newPointerUpdate.height}`);
+                // Resize canvas to match cursor dimensions (also clears it)
+                this.pointerCacheCanvas.width = newPointerUpdate.width;
+                this.pointerCacheCanvas.height = newPointerUpdate.height;
                 this.pointerCacheCanvasCtx.putImageData(newPointerUpdate.getImageData(this.pointerCacheCanvasCtx), 0, 0);
 
                 const url = this.pointerCacheCanvas.toDataURL('image/png');

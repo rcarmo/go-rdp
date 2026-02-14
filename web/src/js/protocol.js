@@ -585,8 +585,22 @@ export class NewPointerUpdate {
         const data = imageData.data;
 
         const bytesPerPixel = this.xorBpp / 8;
-        const xorRowBytes = Math.ceil((this.width * this.xorBpp) / 8);
-        const andRowBytes = Math.ceil(this.width / 8);
+        // Scanlines are padded to 2-byte boundaries per MS-RDPBCGR
+        const xorRowBytesRaw = Math.ceil((this.width * this.xorBpp) / 8);
+        const xorRowBytes = xorRowBytesRaw + (xorRowBytesRaw % 2);
+        const andRowBytesRaw = Math.ceil(this.width / 8);
+        const andRowBytes = andRowBytesRaw + (andRowBytesRaw % 2);
+
+        // For 32-bit cursors, check if XOR mask contains per-pixel alpha
+        let useXorAlpha = false;
+        if (bytesPerPixel === 4) {
+            for (let i = 3; i < this.xorMask.length; i += 4) {
+                if (this.xorMask[i] !== 0) {
+                    useXorAlpha = true;
+                    break;
+                }
+            }
+        }
 
         for (let y = 0; y < this.height; y++) {
             const srcY = this.height - 1 - y;
@@ -599,7 +613,14 @@ export class NewPointerUpdate {
 
                 const xorByteIdx = srcY * xorRowBytes + x * bytesPerPixel;
 
-                if (bytesPerPixel >= 3) {
+                if (bytesPerPixel === 4) {
+                    data[dstIdx] = this.xorMask[xorByteIdx + 2];
+                    data[dstIdx + 1] = this.xorMask[xorByteIdx + 1];
+                    data[dstIdx + 2] = this.xorMask[xorByteIdx];
+                    data[dstIdx + 3] = useXorAlpha
+                        ? this.xorMask[xorByteIdx + 3]
+                        : (andBit ? 0 : 255);
+                } else if (bytesPerPixel === 3) {
                     data[dstIdx] = this.xorMask[xorByteIdx + 2];
                     data[dstIdx + 1] = this.xorMask[xorByteIdx + 1];
                     data[dstIdx + 2] = this.xorMask[xorByteIdx];

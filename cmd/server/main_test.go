@@ -340,7 +340,7 @@ func TestShowVersion(t *testing.T) {
 
 	// Verify version contains expected content
 	captured := string(output[:n])
-	assert.Contains(t, captured, "Go RDP Client 1.0.1")
+	assert.Contains(t, captured, "Go RDP Client "+appVersion)
 	assert.Contains(t, captured, "Built with Go")
 	assert.Contains(t, captured, "Protocol: RDP 10.x")
 }

@@ -113,12 +113,12 @@ func (c *Client) StartTLS() error {
 
 		// Suggest skipping validation for common certificate issues
 		if strings.Contains(err.Error(), "certificate") || strings.Contains(err.Error(), "x509") {
-			return fmt.Errorf("TLS certificate verification failed: %w. Consider using --skip-tls-validation for development environments", err)
+			return fmt.Errorf("TLS certificate verification failed: %w. Consider using -tls-skip-verify for development environments", err)
 		}
 
 		// Handle the specific case where ServerName is missing
 		if strings.Contains(err.Error(), "either ServerName or InsecureSkipVerify") {
-			return fmt.Errorf("TLS configuration error: %w. When using IP addresses, either specify --tls-server-name or use --skip-tls-validation", err)
+			return fmt.Errorf("TLS configuration error: %w. When using IP addresses, either specify -tls-server-name or use -tls-skip-verify", err)
 		}
 
 		return fmt.Errorf("TLS handshake failed: %w", err)

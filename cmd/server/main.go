@@ -337,7 +337,7 @@ func startServer(server *http.Server, _ *config.Config) error {
 
 func showHelp() {
 	fmt.Println(appName)
-	fmt.Println("USAGE: go-rdp [options]")
+	fmt.Println("USAGE: rdp-html5 [options]")
 	fmt.Println("OPTIONS:")
 	fmt.Println("  -host               Set server listen host (default 0.0.0.0)")
 	fmt.Println("  -port               Set server listen port (default 8080)")
@@ -350,7 +350,7 @@ func showHelp() {
 	fmt.Println("  -udp                Enable UDP transport (experimental)")
 	fmt.Println("  -version            Show version information")
 	fmt.Println("  -help               Show this help message")
-	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, TLS_SKIP_VERIFY, TLS_SERVER_NAME, TLS_ALLOW_ANY_SERVER_NAME, RDP_ENABLE_RFX, RDP_ENABLE_UDP")
+	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, TLS_SKIP_VERIFY, TLS_SERVER_NAME, TLS_ALLOW_ANY_SERVER_NAME, USE_NLA, RDP_ENABLE_RFX, RDP_ENABLE_UDP")
 	fmt.Println("EXAMPLES: rdp-html5 -host 0.0.0.0 -port 8080")
 }
 
