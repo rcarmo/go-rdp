@@ -1850,11 +1850,11 @@
                 toast.className = `toast ${type}`;
                 
                 let content = '';
+                content += `<button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
                 if (title) {
                     content += `<div class="toast-title">${title}</div>`;
                 }
                 content += `<div class="toast-message">${message}</div>`;
-                content += `<button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
                 
                 toast.innerHTML = content;
                 container.appendChild(toast);
