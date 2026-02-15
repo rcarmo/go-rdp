@@ -17,6 +17,7 @@ type AudioHandler struct {
 	callback         AudioCallback
 	enabled          bool
 	serverFormats    []audio.AudioFormat
+	clientFormats    []audio.AudioFormat // formats we sent back to server (FormatNo indexes this)
 	selectedFormat   int
 	defragmenter     audio.ChannelDefragmenter
 	pendingWaveInfo  *audio.WaveInfoPDU
@@ -52,6 +53,11 @@ func (h *AudioHandler) IsEnabled() bool {
 
 // GetSelectedFormat returns the currently negotiated audio format
 func (h *AudioHandler) GetSelectedFormat() *audio.AudioFormat {
+	// Prefer clientFormats (correct for FormatNo lookup after format exchange)
+	if h.selectedFormat >= 0 && h.selectedFormat < len(h.clientFormats) {
+		return &h.clientFormats[h.selectedFormat]
+	}
+	// Fall back to serverFormats (before format exchange completes)
 	if h.selectedFormat >= 0 && h.selectedFormat < len(h.serverFormats) {
 		return &h.serverFormats[h.selectedFormat]
 	}
@@ -183,6 +189,23 @@ func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version ui
 		return nil
 	}
 
+	// Store the client format list — Wave PDU FormatNo indexes into this list
+	h.clientFormats = supportedFormats
+
+	// Find selected format in the client list
+	if h.selectedFormat >= 0 && h.selectedFormat < len(h.serverFormats) {
+		selectedServerFmt := h.serverFormats[h.selectedFormat]
+		for i, f := range h.clientFormats {
+			if f.FormatTag == selectedServerFmt.FormatTag &&
+				f.Channels == selectedServerFmt.Channels &&
+				f.SamplesPerSec == selectedServerFmt.SamplesPerSec &&
+				f.BitsPerSample == selectedServerFmt.BitsPerSample {
+				h.selectedFormat = i
+				break
+			}
+		}
+	}
+
 	clientFormats := audio.ClientAudioFormats{
 		Flags:              audio.TSSNDCAPS_ALIVE,
 		Volume:             0xFFFFFFFF,
@@ -253,7 +276,10 @@ func (h *AudioHandler) handleWave(body []byte) error {
 
 	if h.callback != nil && len(fullData) > 0 {
 		var format *audio.AudioFormat
-		if int(waveInfo.FormatNo) < len(h.serverFormats) {
+		// FormatNo indexes into the client's format list (sent in our SNDC_FORMATS response)
+		if int(waveInfo.FormatNo) < len(h.clientFormats) {
+			format = &h.clientFormats[waveInfo.FormatNo]
+		} else if int(waveInfo.FormatNo) < len(h.serverFormats) {
 			format = &h.serverFormats[waveInfo.FormatNo]
 		}
 		if format != nil {
@@ -275,7 +301,10 @@ func (h *AudioHandler) handleWave2(body []byte) error {
 
 	if h.callback != nil && len(wave2.Data) > 0 {
 		var format *audio.AudioFormat
-		if int(wave2.FormatNo) < len(h.serverFormats) {
+		// FormatNo indexes into the client's format list (sent in our SNDC_FORMATS response)
+		if int(wave2.FormatNo) < len(h.clientFormats) {
+			format = &h.clientFormats[wave2.FormatNo]
+		} else if int(wave2.FormatNo) < len(h.serverFormats) {
 			format = &h.serverFormats[wave2.FormatNo]
 		}
 		if format != nil {
