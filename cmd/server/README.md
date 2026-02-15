@@ -16,16 +16,33 @@ This package contains the main entry point for the RDP-to-WebSocket gateway serv
 ## Command-Line Flags
 
 ```
--host            Server listen host (default: 0.0.0.0)
--port            Server listen port (default: 8080)
--log-level       Log level: debug, info, warn, error
--tls-skip-verify           Skip TLS certificate validation for RDP connections
--tls-server-name           Override TLS server name for RDP connections (SNI)
--tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)
--nla             Enable Network Level Authentication (CredSSP)
--help            Show help message
--version         Show version information
+Server:
+  -host <addr>               Server listen host (default: 0.0.0.0)
+  -port <port>               Server listen port (default: 8080)
+
+Logging:
+  -log-level <level>         Log level: debug, info, warn, error (default: info)
+
+TLS/Security:
+  -tls-skip-verify           Skip TLS certificate validation for RDP connections
+  -tls-server-name <name>    Override TLS server name for RDP connections (SNI)
+  -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)
+
+RDP Protocol:
+  -nla                       Enable Network Level Authentication (CredSSP)
+  -no-rfx                    Disable RemoteFX codec support
+  -udp                       Enable UDP transport (experimental)
+
+Audio:
+  -prefer-pcm-audio          Prefer PCM audio (best quality, ~1.4 Mbps)
+                             Default: prefer AAC/MP3 (~128-192 kbps)
+
+Info:
+  -version                   Show version information
+  -help                      Show help message
 ```
+
+For detailed flag descriptions, see [docs/configuration.md](../../docs/configuration.md).
 
 ## Architecture
 
@@ -91,8 +108,11 @@ go run ./cmd/server
 # Production with custom port
 go run ./cmd/server -port 443 -host 0.0.0.0
 
-# With NLA authentication
-go run ./cmd/server -nla -skip-tls-verify
+# With NLA authentication and self-signed cert
+go run ./cmd/server -nla -tls-skip-verify
+
+# With PCM audio for high-bandwidth LAN
+go run ./cmd/server -prefer-pcm-audio
 
 # Build and run
 make build

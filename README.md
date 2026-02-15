@@ -41,12 +41,12 @@ docker-compose up -d
 ```bash
 # Clone and build
 git clone https://github.com/rcarmo/go-rdp.git
-cd rdp-html5
+cd go-rdp
 make deps    # Install dependencies
 make build   # Build everything (WASM + JS + binary)
 
 # Run
-./bin/go-rdp
+./bin/rdp-html5
 ```
 
 ## Configuration
@@ -64,6 +64,7 @@ Environment variables:
 | `TLS_KEY_FILE` | - | Path to TLS private key |
 | `RDP_ENABLE_RFX` | `true` | Enable RemoteFX codec support |
 | `RDP_ENABLE_UDP` | `false` | Enable UDP transport (experimental) |
+| `RDP_PREFER_PCM_AUDIO` | `false` | Prefer PCM audio (best quality, high bandwidth) |
 
 Command-line flags:
 
@@ -78,6 +79,9 @@ Command-line flags:
 | `-nla` | Enable Network Level Authentication |
 | `-no-rfx` | Disable RemoteFX codec support |
 | `-udp` | Enable UDP transport (experimental) |
+| `-prefer-pcm-audio` | Prefer PCM audio (best quality, high bandwidth) |
+| `-version` | Show version information |
+| `-help` | Show help message |
 
 See [docs/configuration.md](docs/configuration.md) for full configuration options.
 
@@ -114,7 +118,7 @@ This implementation follows Microsoft's open protocol specifications:
 - **TLS Support** - TLS 1.2+ encryption for RDP connections
 - **NLA Authentication** - Network Level Authentication (with limitations)
 - **Clipboard** - Bidirectional text clipboard
-- **Audio** - Audio redirection with PCM and MP3 support
+- **Audio** - Audio redirection with PCM, AAC, and MP3 support
 - **WebAssembly** - RLE/NSCodec/RemoteFX decoding via WASM
 - **Configurable** - Environment-based configuration
 

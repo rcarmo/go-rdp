@@ -84,6 +84,11 @@ export RDP_ENABLE_RFX=true
 # Enable UDP transport (experimental, default: false)
 # When enabled, the client will attempt to use UDP for data transfer
 export RDP_ENABLE_UDP=false
+
+# Prefer PCM audio for best quality (default: false)
+# When false (default), prefer compressed audio (AAC/MP3) to minimize bandwidth (~128-192 kbps)
+# When true, prefer PCM for lowest latency and best quality (requires ~1.4 Mbps)
+export RDP_PREFER_PCM_AUDIO=false
 ```
 
 ## Command-Line Flags
@@ -94,23 +99,102 @@ The server also accepts command-line flags that override environment variables:
 ./rdp-html5 [options]
 
 Options:
-  -host              Server listen host (default: 0.0.0.0)
-  -port              Server listen port (default: 8080)
-  -log-level         Log level: debug, info, warn, error
+  -host                      Server listen host (default: 0.0.0.0)
+  -port                      Server listen port (default: 8080)
+  -log-level                 Log level: debug, info, warn, error
   -tls-skip-verify           Skip TLS certificate validation
   -tls-server-name           Override TLS server name (SNI)
   -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)
-  -nla               Enable Network Level Authentication
-  -no-rfx            Disable RemoteFX codec support
-  -udp               Enable UDP transport (experimental)
-  -help              Show help message
-  -version           Show version information
+  -nla                       Enable Network Level Authentication
+  -no-rfx                    Disable RemoteFX codec support
+  -udp                       Enable UDP transport (experimental)
+  -prefer-pcm-audio          Prefer PCM audio (best quality, high bandwidth)
+  -version                   Show version information
+  -help                      Show help message
 ```
+
+### Flag Reference
+
+#### Server Options
+
+- **`-host`** - Server listen address
+  - Default: `0.0.0.0` (all interfaces)
+  - Override: `SERVER_HOST` environment variable
+  - Example: `-host 127.0.0.1` (localhost only)
+
+- **`-port`** - Server listen port
+  - Default: `8080`
+  - Override: `SERVER_PORT` environment variable
+  - Example: `-port 3000`
+
+#### Logging
+
+- **`-log-level`** - Controls logging verbosity
+  - Values: `debug`, `info`, `warn`, `error`
+  - Default: `info`
+  - Override: `LOG_LEVEL` environment variable
+  - Note: Automatically synchronized to browser client on connection
+
+#### TLS/Security
+
+- **`-tls-skip-verify`** - Skip TLS certificate validation when connecting to RDP servers
+  - Use for self-signed certificates or testing
+  - **WARNING**: Not recommended for production (vulnerable to MITM attacks)
+  - Override: `TLS_SKIP_VERIFY=true` environment variable
+
+- **`-tls-server-name`** - Override TLS server name for certificate validation
+  - Use when RDP server's certificate doesn't match its hostname/IP
+  - Provides explicit Server Name Indication (SNI) value
+  - Override: `TLS_SERVER_NAME` environment variable
+  - Example: `-tls-server-name rdp.example.com`
+
+- **`-tls-allow-any-server-name`** - Allow connecting without enforcing SNI
+  - Disables server name validation entirely
+  - **LAB/TESTING ONLY** - do not use in production
+  - Override: `TLS_ALLOW_ANY_SERVER_NAME=true` environment variable
+
+#### RDP Protocol
+
+- **`-nla`** - Enable Network Level Authentication (NLA/CredSSP)
+  - Required by most modern Windows servers
+  - Override: `USE_NLA=true` environment variable
+  - Note: Default behavior depends on server requirements
+
+- **`-no-rfx`** - Disable RemoteFX codec support
+  - Use for testing simpler codecs (RLE, NSCodec)
+  - RemoteFX provides better compression but higher CPU usage
+  - Override: `RDP_ENABLE_RFX=false` environment variable
+
+- **`-udp`** - Enable UDP transport (experimental)
+  - Uses UDP for lossy graphics/audio data
+  - Reduces latency over high-latency links
+  - **EXPERIMENTAL**: May not work with all servers/networks
+  - Override: `RDP_ENABLE_UDP=true` environment variable
+
+#### Audio
+
+- **`-prefer-pcm-audio`** - Prefer PCM audio over compressed formats
+  - **Default (flag not set)**: Prioritize AAC → MP3 → PCM (~128-192 kbps bandwidth)
+  - **Flag set**: Prioritize PCM → AAC → MP3 (lowest latency, ~1.4 Mbps bandwidth)
+  - Use for high-bandwidth LANs where audio quality is critical
+  - Override: `RDP_PREFER_PCM_AUDIO=true` environment variable
 
 Example:
 ```bash
 # Run with RFX disabled for testing
 ./rdp-html5 -port 8080 -no-rfx -log-level debug
+
+# Run with PCM audio for best quality in high-bandwidth LAN
+./rdp-html5 -prefer-pcm-audio
+
+# Run with UDP transport (experimental)
+./rdp-html5 -udp -log-level debug
+
+# Run with self-signed cert and debug logging
+./rdp-html5 -tls-skip-verify -log-level debug
+
+# Run with custom TLS server name
+./rdp-html5 -tls-server-name rdp.example.com
 ```
 
 ## Docker Configuration
