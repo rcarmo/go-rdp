@@ -267,7 +267,7 @@ func TestProcessBitmap_Uncompressed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ProcessBitmap(tt.src, tt.width, tt.height, tt.bpp, false, 0)
+			result := ProcessBitmap(tt.src, tt.width, tt.height, tt.bpp, false, 0, false)
 			if result == nil {
 				t.Error("ProcessBitmap() returned nil")
 			}
@@ -281,7 +281,7 @@ func TestProcessBitmap_Uncompressed(t *testing.T) {
 
 func TestProcessBitmap_UnsupportedBpp(t *testing.T) {
 	src := []byte{0x00}
-	result := ProcessBitmap(src, 1, 1, 7, false, 0)
+	result := ProcessBitmap(src, 1, 1, 7, false, 0, false)
 	if result != nil {
 		t.Error("ProcessBitmap() should return nil for unsupported bpp")
 	}
@@ -290,7 +290,7 @@ func TestProcessBitmap_UnsupportedBpp(t *testing.T) {
 func TestProcessBitmap_15bit(t *testing.T) {
 	// Test 15-bit color depth (RGB555)
 	src := []byte{0xFF, 0x7F} // White in RGB555
-	result := ProcessBitmap(src, 1, 1, 15, false, 0)
+	result := ProcessBitmap(src, 1, 1, 15, false, 0, false)
 	if result == nil {
 		t.Fatal("ProcessBitmap() returned nil for 15-bit")
 	}

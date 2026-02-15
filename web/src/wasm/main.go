@@ -139,11 +139,17 @@ func jsProcessBitmap(this js.Value, args []js.Value) interface{} {
 	dstArray := args[5]
 	rowDelta := args[6].Int()
 
+	// 8th arg: NO_BITMAP_COMPRESSION_HDR flag (RDP6/Planar for 32bpp)
+	noHdr := false
+	if len(args) >= 8 {
+		noHdr = args[7].Bool()
+	}
+
 	srcLen := srcArray.Get("length").Int()
 	src := make([]byte, srcLen)
 	js.CopyBytesToGo(src, srcArray)
 
-	rgba := codec.ProcessBitmap(src, width, height, bpp, isCompressed, rowDelta)
+	rgba := codec.ProcessBitmap(src, width, height, bpp, isCompressed, rowDelta, noHdr)
 	if rgba == nil {
 		return false
 	}

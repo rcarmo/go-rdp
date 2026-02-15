@@ -2,22 +2,30 @@ package codec
 
 // NSCodecRLEDecompress decompresses NSCodec RLE data for a single plane.
 // This is different from bitmap RLE - NSCodec uses a simpler format with
-// run segments and literal segments.
+// run segments and literal segments. The last 4 bytes of compressed data
+// are raw (not RLE-encoded) and appended directly to the output.
 func NSCodecRLEDecompress(data []byte, expectedSize int) []byte {
 	if len(data) == expectedSize {
 		// Raw data, no decompression needed
 		return data
 	}
 
-	if len(data) > expectedSize || len(data) < 4 {
+	if len(data) > expectedSize || len(data) < 2 {
 		return nil
 	}
 
+	// The last min(4, len(data)) bytes are raw "end data"
+	endSize := 4
+	if endSize > len(data) {
+		endSize = len(data)
+	}
+	rleLen := len(data) - endSize
+	targetRLE := expectedSize - endSize
+
 	result := make([]byte, 0, expectedSize)
 	offset := 0
-	dataLen := len(data) - 4 // Exclude EndData
 
-	for offset < dataLen && len(result) < expectedSize-4 {
+	for offset < rleLen && len(result) < targetRLE {
 		header := data[offset]
 		offset++
 
@@ -25,38 +33,38 @@ func NSCodecRLEDecompress(data []byte, expectedSize int) []byte {
 			// Run segment: repeat single byte
 			runLength := int(header & 0x7F)
 			if runLength == 0 {
-				if offset >= dataLen {
+				if offset >= rleLen {
 					return nil
 				}
 				runLength = int(data[offset]) + 128
 				offset++
 			}
-			if offset >= dataLen {
+			if offset >= rleLen {
 				return nil
 			}
 			runValue := data[offset]
 			offset++
 
-			for i := 0; i < runLength && len(result) < expectedSize-4; i++ {
+			for i := 0; i < runLength && len(result) < targetRLE; i++ {
 				result = append(result, runValue)
 			}
 		} else {
 			// Literal segment: copy raw bytes
 			literalLength := int(header)
 			if literalLength == 0 {
-				if offset >= dataLen {
+				if offset >= rleLen {
 					return nil
 				}
 				literalLength = int(data[offset]) + 128
 				offset++
 			}
 
-			if offset+literalLength > dataLen {
+			if offset+literalLength > rleLen {
 				return nil
 			}
 
 			for _, b := range data[offset : offset+literalLength] {
-				if len(result) >= expectedSize-4 {
+				if len(result) >= targetRLE {
 					break
 				}
 				result = append(result, b)
@@ -65,17 +73,14 @@ func NSCodecRLEDecompress(data []byte, expectedSize int) []byte {
 		}
 	}
 
-	if len(result) < expectedSize-4 || offset != dataLen {
+	if len(result) < targetRLE {
 		return nil
 	}
 
-	// Append EndData (last 4 bytes)
-	endData := data[len(data)-4:]
-	for _, b := range endData {
-		if len(result) >= expectedSize {
-			break
-		}
-		result = append(result, b)
+	// Append raw end data
+	result = append(result, data[rleLen:]...)
+	if len(result) < expectedSize {
+		return nil
 	}
 
 	return result[:expectedSize]

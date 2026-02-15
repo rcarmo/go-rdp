@@ -39,7 +39,10 @@ const AudioMixin = {
     enableAudio() {
         if (this.audioContext) return;
         try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // Create context — will be recreated with correct sampleRate once format is known
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: this.audioSampleRate
+            });
             this.audioGain = this.audioContext.createGain();
             this.audioGain.connect(this.audioContext.destination);
             this.audioGain.gain.value = this.audioVolume;
@@ -106,6 +109,24 @@ const AudioMixin = {
             if (this.audioChannels !== channels || this.audioSampleRate !== sampleRate ||
                 this.audioBitsPerSample !== bitsPerSample || this.audioFormatTag !== formatTag) {
                 this._flushPCMBuffer();
+
+                // Recreate AudioContext at the correct sample rate to avoid resampling
+                if (this.audioContext && this.audioContext.sampleRate !== sampleRate) {
+                    this.audioContext.close();
+                    try {
+                        this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                            sampleRate: sampleRate
+                        });
+                        this.audioGain = this.audioContext.createGain();
+                        this.audioGain.connect(this.audioContext.destination);
+                        this.audioGain.gain.value = this.audioVolume;
+                        this.audioNextTime = 0;
+                        this._scheduledCount = 0;
+                        Logger.debug('Audio', `Recreated context at ${sampleRate}Hz`);
+                    } catch (e) {
+                        Logger.error('Audio', `Failed to recreate context: ${e.message}`);
+                    }
+                }
             }
 
             this.audioChannels = channels;

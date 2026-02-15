@@ -34,7 +34,7 @@ func TestProcessBitmapUncompressed(t *testing.T) {
 				src[i] = byte(i % 256)
 			}
 
-			result := ProcessBitmap(src, tt.width, tt.height, tt.bpp, false, 0)
+			result := ProcessBitmap(src, tt.width, tt.height, tt.bpp, false, 0, false)
 
 			expectedLen := tt.width * tt.height * 4 // RGBA output
 			if len(result) != expectedLen {
@@ -51,7 +51,7 @@ func TestProcessBitmapCompressed8bpp(t *testing.T) {
 	// 0x04 = BG_RUN with length 4
 	src := []byte{0x04} // REGULAR_BG_RUN length 4
 
-	result := ProcessBitmap(src, 2, 2, 8, true, 0)
+	result := ProcessBitmap(src, 2, 2, 8, true, 0, false)
 
 	// Should produce 4x4=16 bytes RGBA (2x2 image)
 	if result == nil {
@@ -64,7 +64,7 @@ func TestProcessBitmapCompressed15bpp(t *testing.T) {
 	// Simple RLE data for 15bpp
 	src := []byte{0x04} // REGULAR_BG_RUN length 4
 
-	result := ProcessBitmap(src, 2, 2, 15, true, 0)
+	result := ProcessBitmap(src, 2, 2, 15, true, 0, false)
 
 	if result == nil {
 		t.Error("ProcessBitmap returned nil for 15bpp compressed")
@@ -76,7 +76,7 @@ func TestProcessBitmapCompressed16bpp(t *testing.T) {
 	// Simple RLE data for 16bpp
 	src := []byte{0x04}
 
-	result := ProcessBitmap(src, 2, 2, 16, true, 0)
+	result := ProcessBitmap(src, 2, 2, 16, true, 0, false)
 
 	if result == nil {
 		t.Error("ProcessBitmap returned nil for 16bpp compressed")
@@ -88,7 +88,7 @@ func TestProcessBitmapCompressed24bpp(t *testing.T) {
 	// Simple RLE data for 24bpp
 	src := []byte{0x04}
 
-	result := ProcessBitmap(src, 2, 2, 24, true, 0)
+	result := ProcessBitmap(src, 2, 2, 24, true, 0, false)
 
 	if result == nil {
 		t.Error("ProcessBitmap returned nil for 24bpp compressed")
@@ -101,7 +101,7 @@ func TestProcessBitmapCompressed32bpp(t *testing.T) {
 	// Start with non-planar header to test RLE fallback
 	src := []byte{0xC4} // High bits set = not planar
 
-	result := ProcessBitmap(src, 2, 2, 32, true, 0)
+	result := ProcessBitmap(src, 2, 2, 32, true, 0, false)
 	// May return nil if RLE fails, which is acceptable
 	_ = result
 }
@@ -121,7 +121,7 @@ func TestProcessBitmapCompressed32bpp_NonPlanar(t *testing.T) {
 	// then compare with isCompressed=false at 32bpp using 4-byte pixels.
 
 	// Baseline: 24-bit uncompressed (known correct path)
-	result24 := ProcessBitmap(bgrData, 2, 1, 24, false, 6)
+	result24 := ProcessBitmap(bgrData, 2, 1, 24, false, 6, false)
 	if result24 == nil {
 		t.Fatal("ProcessBitmap 24bpp returned nil")
 	}
@@ -131,7 +131,7 @@ func TestProcessBitmapCompressed32bpp_NonPlanar(t *testing.T) {
 		0x00, 0x00, 0xFF, 0xFF, // red
 		0xFF, 0x00, 0x00, 0xFF, // blue
 	}
-	result32 := ProcessBitmap(bgraData, 2, 1, 32, false, 8)
+	result32 := ProcessBitmap(bgraData, 2, 1, 32, false, 8, false)
 	if result32 == nil {
 		t.Fatal("ProcessBitmap 32bpp uncompressed returned nil")
 	}
@@ -162,7 +162,7 @@ func TestProcessBitmapCompressed32bpp_NonPlanar(t *testing.T) {
 func TestProcessBitmapInvalidBpp(t *testing.T) {
 	src := []byte{0x00, 0x00, 0x00, 0x00}
 
-	result := ProcessBitmap(src, 2, 2, 12, true, 0)
+	result := ProcessBitmap(src, 2, 2, 12, true, 0, false)
 	if result != nil {
 		t.Error("ProcessBitmap should return nil for unsupported bpp")
 	}
@@ -174,7 +174,7 @@ func TestProcessBitmapPlanar(t *testing.T) {
 	// First byte is format header
 	src := []byte{0x00} // Reserved bits 0 = planar format
 
-	result := ProcessBitmap(src, 2, 2, 32, true, 0)
+	result := ProcessBitmap(src, 2, 2, 32, true, 0, false)
 	// May fail decompression but should try planar path
 	_ = result
 }
@@ -183,7 +183,7 @@ func TestProcessBitmapPlanar(t *testing.T) {
 func TestProcessBitmapEmptySource(t *testing.T) {
 	src := []byte{}
 
-	result := ProcessBitmap(src, 2, 2, 24, false, 0)
+	result := ProcessBitmap(src, 2, 2, 24, false, 0, false)
 	// Should handle gracefully
 	if result == nil {
 		t.Error("ProcessBitmap should handle empty source for uncompressed")

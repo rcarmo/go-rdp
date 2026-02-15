@@ -369,14 +369,17 @@ export const GraphicsMixin = {
         const bytesPerPixel = bpp / 8;
         const rowDelta = width * bytesPerPixel;
         const isCompressed = bitmapData.isCompressed();
-        const encoding = isCompressed ? 'RLE/Planar' : 'Raw Bitmap';
+        // NO_BITMAP_COMPRESSION_HDR flag means RDP6 compression (Planar codec for 32bpp)
+        // Without it, 32bpp compressed uses old interleaved 24-bit RLE
+        const noHdr = bitmapData.hasNoBitmapCompressionHDR();
+        const encoding = isCompressed ? (noHdr ? 'Planar/RDP6' : 'RLE') : 'Raw Bitmap';
         
         let rgba = new Uint8ClampedArray(size * 4);
         const srcData = new Uint8Array(bitmapData.bitmapDataStream);
         
         // Try WASM first (fast path)
         if (WASMCodec.isReady()) {
-            const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta);
+            const result = WASMCodec.processBitmap(srcData, width, height, bpp, isCompressed, rgba, rowDelta, noHdr);
             
             if (result) {
                 if (!this._imageEncodingLogged) {
@@ -794,16 +797,19 @@ export const GraphicsMixin = {
 
         const rgba = new Uint8ClampedArray(width * height * 4);
 
-        if (WASMCodec.isReady() && cmd.bpp >= 24) {
-            // Try NSCodec decoder first
+        // Try NSCodec decoder (data starts with 20-byte NSCodec header)
+        if (WASMCodec.isReady() && cmd.bpp >= 24 && data.length >= 20) {
             if (WASMCodec.decodeNSCodec(data, width, height, rgba)) {
                 this.renderer.drawRGBA(cmd.destLeft, cmd.destTop, width, height, rgba);
                 return;
             }
         }
 
-        // Fallback: treat as raw BGRA (codecID=0 or unknown codec)
-        if (data.length >= width * height * 4) {
+        // Only use raw BGRA/BGR if the data size EXACTLY matches uncompressed pixels.
+        // If size doesn't match, this is compressed data we can't decode — skip it.
+        const rawBGRA = width * height * 4;
+        const rawBGR = width * height * 3;
+        if (data.length === rawBGRA) {
             for (let i = 0; i < width * height; i++) {
                 rgba[i * 4]     = data[i * 4 + 2]; // R←B
                 rgba[i * 4 + 1] = data[i * 4 + 1]; // G
@@ -811,8 +817,7 @@ export const GraphicsMixin = {
                 rgba[i * 4 + 3] = 255;
             }
             this.renderer.drawRGBA(cmd.destLeft, cmd.destTop, width, height, rgba);
-        } else if (data.length >= width * height * 3) {
-            // Raw BGR24
+        } else if (data.length === rawBGR) {
             for (let i = 0; i < width * height; i++) {
                 rgba[i * 4]     = data[i * 3 + 2];
                 rgba[i * 4 + 1] = data[i * 3 + 1];
@@ -821,7 +826,7 @@ export const GraphicsMixin = {
             }
             this.renderer.drawRGBA(cmd.destLeft, cmd.destTop, width, height, rgba);
         } else {
-            Logger.warn("Surface", `Unknown codec data: ${data.length} bytes for ${width}x${height}`);
+            Logger.warn("Surface", `Cannot decode surface: ${data.length} bytes for ${width}x${height} (expected ${rawBGRA} or NSCodec)`);
         }
     },
 

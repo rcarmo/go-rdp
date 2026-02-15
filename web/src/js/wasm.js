@@ -200,11 +200,12 @@ export const WASMCodec = {
      * @param {boolean} isCompressed
      * @param {Uint8Array} dst - Output RGBA buffer
      * @param {number} rowDelta
+     * @param {boolean} [noHdr=false] - NO_BITMAP_COMPRESSION_HDR flag (RDP6/Planar for 32bpp)
      * @returns {boolean}
      */
-    processBitmap(src, width, height, bpp, isCompressed, dst, rowDelta) {
+    processBitmap(src, width, height, bpp, isCompressed, dst, rowDelta, noHdr) {
         if (!this.isReady()) return false;
-        return goRLE.processBitmap(src, width, height, bpp, isCompressed, dst, rowDelta);
+        return goRLE.processBitmap(src, width, height, bpp, isCompressed, dst, rowDelta, !!noHdr);
     },
     
     /**

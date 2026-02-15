@@ -231,15 +231,15 @@ func BGRA32ToRGBA(src []byte, dst []byte) {
 
 // ProcessBitmap handles decompression, flip, and color conversion in one call.
 // Returns the RGBA output buffer on success, nil on failure.
-// Note: MS-RDPBCGR RLE only supports up to 24-bit. For 32-bit color depth,
-// xrdp uses RDP6 Planar codec (separate color planes with RLE).
-func ProcessBitmap(src []byte, width, height, bpp int, isCompressed bool, rowDelta int) []byte {
+// The noHdr flag indicates NO_BITMAP_COMPRESSION_HDR was set — for 32bpp compressed,
+// this means RDP6 Planar codec; without it, 32bpp uses 24-bit interleaved RLE.
+func ProcessBitmap(src []byte, width, height, bpp int, isCompressed bool, rowDelta int, noHdr bool) []byte {
 	pixelCount := width * height
 
-	// For 32-bit compressed, check if it's planar codec (first byte has format header)
-	if isCompressed && bpp == 32 && len(src) > 0 {
+	// For 32-bit compressed with NO_BITMAP_COMPRESSION_HDR (RDP6), try Planar codec
+	if isCompressed && bpp == 32 && noHdr && len(src) > 0 {
 		formatHeader := src[0]
-		// Planar: reserved bits clear, and at least one known flag may be set
+		// Planar: reserved bits 7-6 must be zero
 		if formatHeader&0xC0 == 0 {
 			rgba := DecompressPlanar(src, width, height)
 			if rgba != nil {
