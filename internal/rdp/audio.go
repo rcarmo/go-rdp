@@ -125,8 +125,9 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 
 	h.serverFormats = serverFormats.Formats
 
-	// Find a format we support - PCM preferred (lower latency), MP3 as fallback (bandwidth savings)
+	// Find a format we support - PCM preferred (lower latency), AAC/MP3 for bandwidth savings
 	selectedIndex := -1
+	aacIndex := -1
 	mp3Index := -1
 	for i, format := range serverFormats.Formats {
 		logging.Debug("Audio:   Format %d: %s", i, format.String())
@@ -140,6 +141,12 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 				selectedIndex = i
 			}
 		}
+		// AAC: excellent quality and compression (Web Audio decodeAudioData)
+		if format.FormatTag == audio.WAVE_FORMAT_AAC {
+			if aacIndex == -1 {
+				aacIndex = i
+			}
+		}
 		// MP3 can be decoded via Web Audio decodeAudioData() - use as fallback
 		if format.FormatTag == audio.WAVE_FORMAT_MPEGLAYER3 {
 			if mp3Index == -1 {
@@ -148,14 +155,17 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 		}
 	}
 
-	// Fall back to MP3 if no PCM available
-	if selectedIndex == -1 && mp3Index != -1 {
+	// Fallback priority: PCM → AAC → MP3
+	if selectedIndex == -1 && aacIndex != -1 {
+		selectedIndex = aacIndex
+		logging.Info("Audio: No PCM formats available, using AAC")
+	} else if selectedIndex == -1 && mp3Index != -1 {
 		selectedIndex = mp3Index
-		logging.Info("Audio: No PCM formats available, using MP3")
+		logging.Info("Audio: No PCM/AAC formats available, using MP3")
 	}
 
 	if selectedIndex == -1 {
-		logging.Warn("Audio: No supported formats offered by server (need PCM or MP3); audio disabled")
+		logging.Warn("Audio: No supported formats offered by server (need PCM/AAC/MP3); audio disabled")
 		h.selectedFormat = -1
 		h.serverFormats = nil
 		h.Disable()
@@ -174,17 +184,19 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 
 // sendClientFormats sends SNDC_FORMATS response to server
 func (h *AudioHandler) sendClientFormats(formats []audio.AudioFormat, version uint16) error {
-	// Echo back formats we support (PCM and MP3)
+	// Echo back formats we support (PCM, AAC, MP3)
 	var supportedFormats []audio.AudioFormat
 	for _, format := range formats {
-		if format.FormatTag == audio.WAVE_FORMAT_PCM || format.FormatTag == audio.WAVE_FORMAT_MPEGLAYER3 {
+		if format.FormatTag == audio.WAVE_FORMAT_PCM || 
+		   format.FormatTag == audio.WAVE_FORMAT_AAC ||
+		   format.FormatTag == audio.WAVE_FORMAT_MPEGLAYER3 {
 			supportedFormats = append(supportedFormats, format)
 		}
 	}
 
 	// If no supported formats, disable audio
 	if len(supportedFormats) == 0 {
-		logging.Warn("Audio: No supported formats to send (need PCM or MP3); audio disabled")
+		logging.Warn("Audio: No supported formats to send (need PCM/AAC/MP3); audio disabled")
 		h.Disable()
 		return nil
 	}

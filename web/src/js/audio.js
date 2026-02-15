@@ -5,6 +5,7 @@ import { Logger } from './logger.js';
 
 // Audio format tags (matching WAVE format identifiers from backend)
 const WAVE_FORMAT_PCM = 0x0001;
+const WAVE_FORMAT_AAC = 0x00FF;
 const WAVE_FORMAT_MPEGLAYER3 = 0x0055;
 
 // Minimum PCM bytes to accumulate before scheduling playback (~100ms at 44100Hz stereo 16bit)
@@ -137,7 +138,8 @@ const AudioMixin = {
 
             if (!this._audioEncodingLogged) {
                 this._audioEncodingLogged = true;
-                const formatName = formatTag === WAVE_FORMAT_MPEGLAYER3 ? 'MP3' : 'PCM';
+                const formatName = formatTag === WAVE_FORMAT_AAC ? 'AAC' :
+                                   formatTag === WAVE_FORMAT_MPEGLAYER3 ? 'MP3' : 'PCM';
                 const encoding = `${formatName} ${sampleRate}Hz ${channels}ch ${bitsPerSample}bit`;
                 console.info('%c[RDP Session] Audio encoding', 'color: #03A9F4; font-weight: bold', encoding);
             }
@@ -158,8 +160,9 @@ const AudioMixin = {
         const audioData = data.slice(offset);
         if (audioData.length === 0) return;
 
-        if (this.audioFormatTag === WAVE_FORMAT_MPEGLAYER3) {
-            this._playMP3(audioData);
+        // Route to appropriate decoder
+        if (this.audioFormatTag === WAVE_FORMAT_AAC || this.audioFormatTag === WAVE_FORMAT_MPEGLAYER3) {
+            this._playCompressed(audioData);
         } else {
             this._accumulatePCM(audioData);
         }
@@ -267,15 +270,18 @@ const AudioMixin = {
         };
     },
 
-    _playMP3(mp3Data) {
-        const arrayBuffer = mp3Data.buffer.slice(mp3Data.byteOffset, mp3Data.byteOffset + mp3Data.byteLength);
+    /**
+     * Decode and play compressed audio (AAC or MP3).
+     */
+    _playCompressed(audioData) {
+        const arrayBuffer = audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength);
         this.audioContext.decodeAudioData(arrayBuffer)
             .then((audioBuffer) => {
                 if (!this.audioEnabled || !this.audioContext || this.audioContext.state === 'closed') return;
                 this._scheduleBuffer(audioBuffer);
             })
             .catch((e) => {
-                Logger.warn('Audio', `MP3 decode failed: ${e.message}`);
+                Logger.warn('Audio', `Decode failed: ${e.message}`);
             });
     },
 
