@@ -184,7 +184,12 @@ func setupRDPClient(creds *connectionRequest, params *connectionParams) (*rdp.Cl
 	// Enable audio if requested
 	if params.enableAudio {
 		rdpClient.EnableAudio()
-		logging.Info("Audio redirection enabled")
+		if cfg.RDP.PreferPCMAudio {
+			rdpClient.GetAudioHandler().SetPreferPCM(true)
+			logging.Info("Audio redirection enabled (prefer PCM for quality)")
+		} else {
+			logging.Info("Audio redirection enabled (prefer compressed for bandwidth)")
+		}
 	}
 
 	// Enable display control for dynamic resize

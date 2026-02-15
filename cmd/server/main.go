@@ -38,15 +38,16 @@ func main() {
 
 // parsedArgs holds the parsed command line arguments
 type parsedArgs struct {
-	host          string
-	port          string
-	logLevel      string
-	skipTLS       bool
-	allowAnyTLS   bool
-	tlsServerName string
-	useNLA        *bool
-	enableRFX     *bool // nil = use default, non-nil = override
-	enableUDP     *bool // nil = use default, non-nil = override
+	host             string
+	port             string
+	logLevel         string
+	skipTLS          bool
+	allowAnyTLS      bool
+	tlsServerName    string
+	useNLA           *bool
+	enableRFX        *bool // nil = use default, non-nil = override
+	enableUDP        *bool // nil = use default, non-nil = override
+	preferPCMAudio   *bool // nil = use default, non-nil = override
 }
 
 // parseFlags parses command line flags and returns the parsed args.
@@ -68,6 +69,7 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 	useNLA := fs.Bool("nla", false, "enable Network Level Authentication (NLA/CredSSP)")
 	noRFX := fs.Bool("no-rfx", false, "disable RemoteFX codec support")
 	enableUDP := fs.Bool("udp", false, "enable UDP transport (experimental)")
+	preferPCMAudio := fs.Bool("prefer-pcm-audio", false, "prefer PCM audio (best quality, high bandwidth) over compressed formats")
 	helpFlag := fs.Bool("help", false, "show help")
 	versionFlag := fs.Bool("version", false, "show version")
 
@@ -97,6 +99,13 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 		enableUDPPtr = &udpValue
 	}
 
+	// Handle audio quality flag - only set if explicitly enabled
+	var preferPCMAudioPtr *bool
+	if *preferPCMAudio {
+		pcmValue := true
+		preferPCMAudioPtr = &pcmValue
+	}
+
 	var useNLAPtr *bool
 	if *useNLA {
 		nlaValue := true
@@ -104,15 +113,16 @@ func parseFlagsWithArgs(args []string) (parsedArgs, string) {
 	}
 
 	return parsedArgs{
-		host:          strings.TrimSpace(*hostFlag),
-		port:          strings.TrimSpace(*portFlag),
-		logLevel:      strings.TrimSpace(*logLevelFlag),
-		skipTLS:       *skipTLS,
-		allowAnyTLS:   *allowAnyTLS,
-		tlsServerName: strings.TrimSpace(*tlsServerName),
-		useNLA:        useNLAPtr,
-		enableRFX:     enableRFXPtr,
-		enableUDP:     enableUDPPtr,
+		host:           strings.TrimSpace(*hostFlag),
+		port:           strings.TrimSpace(*portFlag),
+		logLevel:       strings.TrimSpace(*logLevelFlag),
+		skipTLS:        *skipTLS,
+		allowAnyTLS:    *allowAnyTLS,
+		tlsServerName:  strings.TrimSpace(*tlsServerName),
+		useNLA:         useNLAPtr,
+		enableRFX:      enableRFXPtr,
+		enableUDP:      enableUDPPtr,
+		preferPCMAudio: preferPCMAudioPtr,
 	}, ""
 }
 
@@ -128,6 +138,7 @@ func run(args parsedArgs) error {
 		UseNLA:            args.useNLA,
 		EnableRFX:         args.enableRFX,
 		EnableUDP:         args.enableUDP,
+		PreferPCMAudio:    args.preferPCMAudio,
 	}
 
 	cfg, err := config.LoadWithOverrides(opts)
@@ -339,18 +350,19 @@ func showHelp() {
 	fmt.Println(appName)
 	fmt.Println("USAGE: rdp-html5 [options]")
 	fmt.Println("OPTIONS:")
-	fmt.Println("  -host               Set server listen host (default 0.0.0.0)")
-	fmt.Println("  -port               Set server listen port (default 8080)")
-	fmt.Println("  -log-level          Set log level (debug, info, warn, error)")
+	fmt.Println("  -host                      Set server listen host (default 0.0.0.0)")
+	fmt.Println("  -port                      Set server listen port (default 8080)")
+	fmt.Println("  -log-level                 Set log level (debug, info, warn, error)")
 	fmt.Println("  -tls-skip-verify           Skip TLS certificate validation")
 	fmt.Println("  -tls-server-name           Override TLS server name (SNI)")
 	fmt.Println("  -tls-allow-any-server-name Allow connecting without enforcing SNI (lab/testing only)")
-	fmt.Println("  -nla                Enable Network Level Authentication")
-	fmt.Println("  -no-rfx             Disable RemoteFX codec support")
-	fmt.Println("  -udp                Enable UDP transport (experimental)")
-	fmt.Println("  -version            Show version information")
-	fmt.Println("  -help               Show this help message")
-	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, TLS_SKIP_VERIFY, TLS_SERVER_NAME, TLS_ALLOW_ANY_SERVER_NAME, USE_NLA, RDP_ENABLE_RFX, RDP_ENABLE_UDP")
+	fmt.Println("  -nla                       Enable Network Level Authentication")
+	fmt.Println("  -no-rfx                    Disable RemoteFX codec support")
+	fmt.Println("  -udp                       Enable UDP transport (experimental)")
+	fmt.Println("  -prefer-pcm-audio          Prefer PCM audio (best quality, high bandwidth)")
+	fmt.Println("  -version                   Show version information")
+	fmt.Println("  -help                      Show this help message")
+	fmt.Println("ENVIRONMENT VARIABLES: SERVER_HOST, SERVER_PORT, LOG_LEVEL, TLS_SKIP_VERIFY, TLS_SERVER_NAME, TLS_ALLOW_ANY_SERVER_NAME, USE_NLA, RDP_ENABLE_RFX, RDP_ENABLE_UDP, RDP_PREFER_PCM_AUDIO")
 	fmt.Println("EXAMPLES: rdp-html5 -host 0.0.0.0 -port 8080")
 }
 

@@ -16,6 +16,7 @@ type AudioHandler struct {
 	client           *Client
 	callback         AudioCallback
 	enabled          bool
+	preferPCM        bool // If true, prefer PCM over compressed; if false, prefer AAC/MP3
 	serverFormats    []audio.AudioFormat
 	clientFormats    []audio.AudioFormat // formats we sent back to server (FormatNo indexes this)
 	selectedFormat   int
@@ -34,6 +35,11 @@ func NewAudioHandler(client *Client) *AudioHandler {
 // SetCallback sets the function to call when audio data is available
 func (h *AudioHandler) SetCallback(cb AudioCallback) {
 	h.callback = cb
+}
+
+// SetPreferPCM sets whether to prefer PCM (best quality) over compressed formats (best bandwidth)
+func (h *AudioHandler) SetPreferPCM(prefer bool) {
+	h.preferPCM = prefer
 }
 
 // Enable enables audio redirection
@@ -125,29 +131,27 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 
 	h.serverFormats = serverFormats.Formats
 
-	// Find a format we support - PCM preferred (lower latency), AAC/MP3 for bandwidth savings
-	selectedIndex := -1
+	// Find formats we support
+	pcmIndex := -1
+	pcmPreferredIndex := -1 // 16-bit stereo 44100 Hz
 	aacIndex := -1
 	mp3Index := -1
+
 	for i, format := range serverFormats.Formats {
 		logging.Debug("Audio:   Format %d: %s", i, format.String())
-		// We can handle PCM directly in Web Audio (preferred for low latency)
 		if format.FormatTag == audio.WAVE_FORMAT_PCM {
-			if selectedIndex == -1 {
-				selectedIndex = i
+			if pcmIndex == -1 {
+				pcmIndex = i
 			}
-			// Prefer 16-bit stereo 44100 Hz
 			if format.BitsPerSample == 16 && format.Channels == 2 && format.SamplesPerSec == 44100 {
-				selectedIndex = i
+				pcmPreferredIndex = i
 			}
 		}
-		// AAC: excellent quality and compression (Web Audio decodeAudioData)
 		if format.FormatTag == audio.WAVE_FORMAT_AAC {
 			if aacIndex == -1 {
 				aacIndex = i
 			}
 		}
-		// MP3 can be decoded via Web Audio decodeAudioData() - use as fallback
 		if format.FormatTag == audio.WAVE_FORMAT_MPEGLAYER3 {
 			if mp3Index == -1 {
 				mp3Index = i
@@ -155,13 +159,32 @@ func (h *AudioHandler) handleServerFormats(body []byte) error {
 		}
 	}
 
-	// Fallback priority: PCM → AAC → MP3
-	if selectedIndex == -1 && aacIndex != -1 {
-		selectedIndex = aacIndex
-		logging.Info("Audio: No PCM formats available, using AAC")
-	} else if selectedIndex == -1 && mp3Index != -1 {
-		selectedIndex = mp3Index
-		logging.Info("Audio: No PCM/AAC formats available, using MP3")
+	// Select format based on preference
+	selectedIndex := -1
+	if h.preferPCM {
+		// Quality mode: PCM → AAC → MP3
+		if pcmPreferredIndex != -1 {
+			selectedIndex = pcmPreferredIndex
+		} else if pcmIndex != -1 {
+			selectedIndex = pcmIndex
+		} else if aacIndex != -1 {
+			selectedIndex = aacIndex
+			logging.Info("Audio: No PCM available, using AAC")
+		} else if mp3Index != -1 {
+			selectedIndex = mp3Index
+			logging.Info("Audio: No PCM/AAC available, using MP3")
+		}
+	} else {
+		// Bandwidth mode: AAC → MP3 → PCM
+		if aacIndex != -1 {
+			selectedIndex = aacIndex
+		} else if mp3Index != -1 {
+			selectedIndex = mp3Index
+		} else if pcmPreferredIndex != -1 {
+			selectedIndex = pcmPreferredIndex
+		} else if pcmIndex != -1 {
+			selectedIndex = pcmIndex
+		}
 	}
 
 	if selectedIndex == -1 {

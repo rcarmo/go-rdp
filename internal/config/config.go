@@ -38,6 +38,7 @@ type LoadOptions struct {
 	UseNLA            *bool
 	EnableRFX         *bool // nil = use env/default, non-nil = override
 	EnableUDP         *bool // nil = use env/default, non-nil = override
+	PreferPCMAudio    *bool // nil = use env/default, non-nil = override
 }
 
 // ServerConfig holds server-specific configuration
@@ -51,14 +52,15 @@ type ServerConfig struct {
 
 // RDPConfig holds RDP-specific configuration
 type RDPConfig struct {
-	DefaultWidth  int           `json:"defaultWidth" env:"RDP_DEFAULT_WIDTH" default:"1024"`
-	DefaultHeight int           `json:"defaultHeight" env:"RDP_DEFAULT_HEIGHT" default:"768"`
-	MaxWidth      int           `json:"maxWidth" env:"RDP_MAX_WIDTH" default:"3840"`
-	MaxHeight     int           `json:"maxHeight" env:"RDP_MAX_HEIGHT" default:"2160"`
-	BufferSize    int           `json:"bufferSize" env:"RDP_BUFFER_SIZE" default:"65536"`
-	Timeout       time.Duration `json:"timeout" env:"RDP_TIMEOUT" default:"10s"`
-	EnableRFX     bool          `json:"enableRFX" env:"RDP_ENABLE_RFX" default:"true"`
-	EnableUDP     bool          `json:"enableUDP" env:"RDP_ENABLE_UDP" default:"false"`
+	DefaultWidth   int           `json:"defaultWidth" env:"RDP_DEFAULT_WIDTH" default:"1024"`
+	DefaultHeight  int           `json:"defaultHeight" env:"RDP_DEFAULT_HEIGHT" default:"768"`
+	MaxWidth       int           `json:"maxWidth" env:"RDP_MAX_WIDTH" default:"3840"`
+	MaxHeight      int           `json:"maxHeight" env:"RDP_MAX_HEIGHT" default:"2160"`
+	BufferSize     int           `json:"bufferSize" env:"RDP_BUFFER_SIZE" default:"65536"`
+	Timeout        time.Duration `json:"timeout" env:"RDP_TIMEOUT" default:"10s"`
+	EnableRFX      bool          `json:"enableRFX" env:"RDP_ENABLE_RFX" default:"true"`
+	EnableUDP      bool          `json:"enableUDP" env:"RDP_ENABLE_UDP" default:"false"`
+	PreferPCMAudio bool          `json:"preferPCMAudio" env:"RDP_PREFER_PCM_AUDIO" default:"false"`
 }
 
 // SecurityConfig holds security-related configuration
@@ -119,6 +121,12 @@ func LoadWithOverrides(opts LoadOptions) (*Config, error) {
 		config.RDP.EnableUDP = *opts.EnableUDP
 	} else {
 		config.RDP.EnableUDP = getBoolWithDefault("RDP_ENABLE_UDP", false)
+	}
+	// Prefer compressed audio by default; use --prefer-pcm-audio or RDP_PREFER_PCM_AUDIO=true for quality
+	if opts.PreferPCMAudio != nil {
+		config.RDP.PreferPCMAudio = *opts.PreferPCMAudio
+	} else {
+		config.RDP.PreferPCMAudio = getBoolWithDefault("RDP_PREFER_PCM_AUDIO", false)
 	}
 
 	// Security config
