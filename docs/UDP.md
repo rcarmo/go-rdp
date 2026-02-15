@@ -29,7 +29,7 @@ UDP is disabled by default. Enable it via:
 export RDP_ENABLE_UDP=true
 
 # Or command-line flag
-./rdp-html5 -udp
+./go-rdp -udp
 ```
 
 When disabled, the client automatically declines server UDP transport requests with `E_ABORT` (0x80004004).

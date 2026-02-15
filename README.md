@@ -27,7 +27,7 @@ Then open http://localhost:8080 in your browser.
 
 ```bash
 git clone https://github.com/rcarmo/go-rdp.git
-cd rdp-html5
+cd go-rdp
 docker-compose up -d
 ```
 
@@ -46,7 +46,7 @@ make deps    # Install dependencies
 make build   # Build everything (WASM + JS + binary)
 
 # Run
-./bin/rdp-html5
+./bin/go-rdp
 ```
 
 ## Configuration

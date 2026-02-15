@@ -52,7 +52,7 @@ COPY --from=js-builder /app/web/dist/js/client.bundle.min.js ./web/dist/js/clien
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags="-s -w" -o rdp-html5 cmd/server/main.go
+    go build -ldflags="-s -w" -o go-rdp cmd/server/main.go
 
 # Final stage: Runtime image
 FROM alpine:latest
@@ -64,14 +64,14 @@ RUN apk --no-cache add ca-certificates tzdata curl && \
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=go-builder /app/rdp-html5 ./rdp-html5
+COPY --from=go-builder /app/go-rdp ./go-rdp
 
 # Copy static files including built frontend assets
 COPY --from=go-builder /app/web ./web
 
 # Set permissions
 RUN chown -R appuser:appuser /app && \
-    chmod +x ./rdp-html5
+    chmod +x ./go-rdp
 
 # Switch to non-root user
 USER appuser
@@ -92,4 +92,4 @@ ENV TLS_SKIP_VERIFY=false \
     LOG_LEVEL=info
 
 # Run the binary
-CMD ["./rdp-html5"]
+CMD ["./go-rdp"]

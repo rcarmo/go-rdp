@@ -348,7 +348,7 @@ func startServer(server *http.Server, _ *config.Config) error {
 
 func showHelp() {
 	fmt.Println(appName)
-	fmt.Println("USAGE: rdp-html5 [options]")
+	fmt.Println("USAGE: go-rdp [options]")
 	fmt.Println("")
 	fmt.Println("OPTIONS:")
 	fmt.Println("  Server:")
@@ -383,9 +383,9 @@ func showHelp() {
 	fmt.Println("  USE_NLA, RDP_ENABLE_RFX, RDP_ENABLE_UDP, RDP_PREFER_PCM_AUDIO")
 	fmt.Println("")
 	fmt.Println("EXAMPLES:")
-	fmt.Println("  rdp-html5")
-	fmt.Println("  rdp-html5 -host 0.0.0.0 -port 8080 -log-level debug")
-	fmt.Println("  rdp-html5 -tls-skip-verify -prefer-pcm-audio")
+	fmt.Println("  go-rdp")
+	fmt.Println("  go-rdp -host 0.0.0.0 -port 8080 -log-level debug")
+	fmt.Println("  go-rdp -tls-skip-verify -prefer-pcm-audio")
 	fmt.Println("")
 	fmt.Println("DOCUMENTATION:")
 	fmt.Println("  See docs/configuration.md for full configuration reference")

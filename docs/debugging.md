@@ -11,7 +11,7 @@ Set via environment variable:
 ```bash
 # Options: debug, info, warn, error (default: info)
 export LOG_LEVEL=debug
-./bin/rdp-html5
+./bin/go-rdp
 ```
 
 Or with Docker:
@@ -141,7 +141,7 @@ Logger.getLevel();     // Returns current level string
 
 Debug UDP negotiation:
 ```bash
-LOG_LEVEL=debug ./rdp-html5 -udp
+LOG_LEVEL=debug ./go-rdp -udp
 ```
 
 Look for these log messages:

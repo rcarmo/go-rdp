@@ -239,7 +239,7 @@ To disable RemoteFX and fall back to simpler codecs:
 
 # Environment variable
 export RDP_ENABLE_RFX=false
-./rdp-html5
+./go-rdp
 
 # Docker
 docker run -e RDP_ENABLE_RFX=false -p 8080:8080 ghcr.io/rcarmo/go-rdp:latest

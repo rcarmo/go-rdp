@@ -27,7 +27,7 @@ export LOG_FORMAT=text
 export LOG_ENABLE_CALLER=false
 
 # Log to file instead of stdout (optional)
-export LOG_FILE=/var/log/rdp-html5.log
+export LOG_FILE=/var/log/go-rdp.log
 ```
 
 The log level is automatically synchronized to the browser client when a connection is established.
@@ -96,7 +96,7 @@ export RDP_PREFER_PCM_AUDIO=false
 The server also accepts command-line flags that override environment variables:
 
 ```bash
-./rdp-html5 [options]
+./go-rdp [options]
 
 Options:
   -host                      Server listen host (default: 0.0.0.0)
@@ -182,19 +182,19 @@ Options:
 Example:
 ```bash
 # Run with RFX disabled for testing
-./rdp-html5 -port 8080 -no-rfx -log-level debug
+./go-rdp -port 8080 -no-rfx -log-level debug
 
 # Run with PCM audio for best quality in high-bandwidth LAN
-./rdp-html5 -prefer-pcm-audio
+./go-rdp -prefer-pcm-audio
 
 # Run with UDP transport (experimental)
-./rdp-html5 -udp -log-level debug
+./go-rdp -udp -log-level debug
 
 # Run with self-signed cert and debug logging
-./rdp-html5 -tls-skip-verify -log-level debug
+./go-rdp -tls-skip-verify -log-level debug
 
 # Run with custom TLS server name
-./rdp-html5 -tls-server-name rdp.example.com
+./go-rdp -tls-server-name rdp.example.com
 ```
 
 ## Docker Configuration

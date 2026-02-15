@@ -486,7 +486,7 @@ The client supports optional UDP transport for improved performance over high-la
 export RDP_ENABLE_UDP=true
 
 # Command-line flag
-./rdp-html5 -udp
+./go-rdp -udp
 ```
 
 ### Connection Flow
@@ -1005,14 +1005,14 @@ FastPath reduces per-update overhead:
 FROM golang:1.23-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN go build -o rdp-html5 ./cmd/server
+RUN go build -o go-rdp ./cmd/server
 
 FROM alpine:latest
-COPY --from=builder /app/rdp-html5 /app/
+COPY --from=builder /app/go-rdp /app/
 COPY --from=builder /app/web /app/web
 ENV TLS_SKIP_VERIFY=true
 EXPOSE 8080
-CMD ["/app/rdp-html5"]
+CMD ["/app/go-rdp"]
 ```
 
 ### Environment Variables

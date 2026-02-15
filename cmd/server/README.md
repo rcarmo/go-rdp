@@ -116,7 +116,7 @@ go run ./cmd/server -prefer-pcm-audio
 
 # Build and run
 make build
-./bin/rdp-html5 -port 8080
+./bin/go-rdp -port 8080
 ```
 
 ## Related Packages

@@ -2,7 +2,7 @@
 
 # Variables
 .DEFAULT_GOAL := help
-BINARY_NAME=rdp-html5
+BINARY_NAME=go-rdp
 BUILD_DIR=bin
 GO_VERSION=1.22
 LINTER=golangci-lint
