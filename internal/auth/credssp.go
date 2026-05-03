@@ -4,17 +4,20 @@ package auth
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
+	"unicode/utf16"
 )
 
 // TSRequest represents a decoded CredSSP request
 type TSRequest struct {
-	Version      int
-	NegoTokens   []NegoToken
-	AuthInfo     []byte
-	PubKeyAuth   []byte
-	ClientNonce  []byte // For version 5+
-	ErrorCode    uint32 // For version 3+
-	ServerNonce  []byte // Received from server in version 5+
+	Version     int
+	NegoTokens  []NegoToken
+	AuthInfo    []byte
+	PubKeyAuth  []byte
+	ClientNonce []byte // For version 5+
+	ErrorCode   uint32 // For version 3+
+	ServerNonce []byte // Received from server in version 5+
 }
 
 // Magic strings for CredSSP version 5+ public key hashing (includes null terminator)
@@ -194,6 +197,12 @@ func DecodeTSRequest(data []byte) (*TSRequest, error) {
 //	   userName   [1] OCTET STRING,
 //	   password   [2] OCTET STRING
 //	}
+type PasswordCredentials struct {
+	Domain   string
+	Username string
+	Password string
+}
+
 func EncodeCredentials(domain, username, password []byte) []byte {
 	// Encode TSPasswordCreds
 	passCreds := &bytes.Buffer{}
@@ -208,6 +217,69 @@ func EncodeCredentials(domain, username, password []byte) []byte {
 	creds.Write(encodeContextTag(1, encodeOctetString(passCredsSeq)))
 
 	return encodeSequence(creds.Bytes())
+}
+
+// DecodeCredentials decodes CredSSP TSCredentials containing TSPasswordCreds.
+func DecodeCredentials(data []byte) (*PasswordCredentials, error) {
+	_, content, err := parseTag(data)
+	if err != nil {
+		return nil, err
+	}
+	var credType int
+	var credentials []byte
+	for off := 0; off < len(content); off += tagLen(content[off:]) {
+		tag, value, err := parseTag(content[off:])
+		if err != nil {
+			return nil, err
+		}
+		switch tag & 0x1f {
+		case 0:
+			credType = parseInteger(value)
+		case 1:
+			_, credentials, err = parseTag(value)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if credType != 1 {
+		return nil, fmt.Errorf("unsupported CredSSP credential type %d", credType)
+	}
+	_, passContent, err := parseTag(credentials)
+	if err != nil {
+		return nil, err
+	}
+	var fields [3]string
+	for off := 0; off < len(passContent); off += tagLen(passContent[off:]) {
+		tag, value, err := parseTag(passContent[off:])
+		if err != nil {
+			return nil, err
+		}
+		ctx := int(tag & 0x1f)
+		if ctx < 0 || ctx > 2 {
+			continue
+		}
+		_, octets, err := parseTag(value)
+		if err != nil {
+			return nil, err
+		}
+		fields[ctx] = decodeUTF16LE(octets)
+	}
+	return &PasswordCredentials{Domain: fields[0], Username: fields[1], Password: fields[2]}, nil
+}
+
+func decodeUTF16LE(data []byte) string {
+	if len(data)%2 != 0 {
+		data = data[:len(data)-1]
+	}
+	if len(data) == 0 {
+		return ""
+	}
+	u16 := make([]uint16, len(data)/2)
+	for i := range u16 {
+		u16[i] = binary.LittleEndian.Uint16(data[i*2:])
+	}
+	return string(utf16.Decode(u16))
 }
 
 // ASN.1 DER encoding helpers

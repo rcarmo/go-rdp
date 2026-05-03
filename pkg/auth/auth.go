@@ -7,6 +7,11 @@ type TSRequest = internalauth.TSRequest
 type NegoToken = internalauth.NegoToken
 type NTLMv2 = internalauth.NTLMv2
 type ChallengeMessage = internalauth.ChallengeMessage
+type Security = internalauth.Security
+type PasswordCredentials = internalauth.PasswordCredentials
+type NTLMNegotiateMessage = internalauth.NTLMNegotiateMessage
+type NTLMAuthenticateMessage = internalauth.NTLMAuthenticateMessage
+type ServerNTLMv2 = internalauth.ServerNTLMv2
 
 var ClientServerHashMagic = internalauth.ClientServerHashMagic
 var ServerClientHashMagic = internalauth.ServerClientHashMagic
@@ -54,4 +59,22 @@ func EncodeTSRequestWithVersion(version int, ntlmMessages [][]byte, authInfo []b
 func DecodeTSRequest(data []byte) (*TSRequest, error) { return internalauth.DecodeTSRequest(data) }
 func EncodeCredentials(domain, username, password []byte) []byte {
 	return internalauth.EncodeCredentials(domain, username, password)
+}
+func DecodeCredentials(data []byte) (*PasswordCredentials, error) {
+	return internalauth.DecodeCredentials(data)
+}
+func NewServerNTLMv2(domain, computer string) (*ServerNTLMv2, error) {
+	return internalauth.NewServerNTLMv2(domain, computer)
+}
+func ParseNegotiateMessage(data []byte) (*NTLMNegotiateMessage, error) {
+	return internalauth.ParseNegotiateMessage(data)
+}
+func ParseAuthenticateMessage(data []byte) (*NTLMAuthenticateMessage, error) {
+	return internalauth.ParseAuthenticateMessage(data)
+}
+func BuildTargetInfo(domain, computer string) []byte {
+	return internalauth.BuildTargetInfo(domain, computer)
+}
+func ComputeServerPubKeyAuth(version int, pubKey, nonce []byte) []byte {
+	return internalauth.ComputeServerPubKeyAuth(version, pubKey, nonce)
 }
