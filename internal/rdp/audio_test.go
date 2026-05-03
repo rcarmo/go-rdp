@@ -164,157 +164,157 @@ func TestGetAudioHandler(t *testing.T) {
 }
 
 func TestAudioHandler_HandleChannelData_EmptyData(t *testing.T) {
-client := &Client{
-channelIDMap: make(map[string]uint16),
-}
-handler := NewAudioHandler(client)
-handler.Enable()
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
 
-// Short data will return an error from ParseChannelData
-err := handler.HandleChannelData([]byte{0x01, 0x02})
-// Error is expected since data is too short
-if err == nil {
-t.Log("HandleChannelData() returned nil for short data (may be implementation-specific)")
-}
+	// Short data will return an error from ParseChannelData
+	err := handler.HandleChannelData([]byte{0x01, 0x02})
+	// Error is expected since data is too short
+	if err == nil {
+		t.Log("HandleChannelData() returned nil for short data (may be implementation-specific)")
+	}
 }
 
 func TestAudioHandler_HandleChannelData_ServerFormats(t *testing.T) {
-client := &Client{
-channelIDMap: make(map[string]uint16),
-}
-handler := NewAudioHandler(client)
-handler.Enable()
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
 
-// Build a valid server formats message with at least one format
-// Channel PDU header: length (4) + flags (4) + RDPSND header (4) + body
-channelData := []byte{
-// Channel header: totalLength=48, flags=0x03 (first+last)
-0x30, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-	// RDPSND header: msgType=0x07 (SND_FORMATS), reserved=0, bodySize=44
-	0x07, 0x00, 0x2C, 0x00,
-	// ServerFormats: dwFlags=0, dwVolume=0xFFFFFFFF, dwPitch=0, wDGramPort=0, wNumberOfFormats=1, cLastBlockConfirmed=0, wVersion=6, bPad=0
-	0x00, 0x00, 0x00, 0x00,
-	0xFF, 0xFF, 0xFF, 0xFF,
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, // wDGramPort=0
-	0x01, 0x00, // wNumberOfFormats=1
-	0x00,       // cLastBlockConfirmed
-	0x06, 0x00, // wVersion=6
-	0x00,       // bPad
-// Format: wFormatTag=1 (PCM), nChannels=2, nSamplesPerSec=44100, nAvgBytesPerSec=176400, nBlockAlign=4, wBitsPerSample=16, cbSize=0
-0x01, 0x00, // FormatTag=PCM
-0x02, 0x00, // Channels=2
-0x44, 0xAC, 0x00, 0x00, // SamplesPerSec=44100
-0x10, 0xB1, 0x02, 0x00, // AvgBytesPerSec=176400
-0x04, 0x00, // BlockAlign=4
-0x10, 0x00, // BitsPerSample=16
-0x00, 0x00, // cbSize=0
-}
+	// Build a valid server formats message with at least one format
+	// Channel PDU header: length (4) + flags (4) + RDPSND header (4) + body
+	channelData := []byte{
+		// Channel header: totalLength=48, flags=0x03 (first+last)
+		0x30, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0x07 (SND_FORMATS), reserved=0, bodySize=44
+		0x07, 0x00, 0x2C, 0x00,
+		// ServerFormats: dwFlags=0, dwVolume=0xFFFFFFFF, dwPitch=0, wDGramPort=0, wNumberOfFormats=1, cLastBlockConfirmed=0, wVersion=6, bPad=0
+		0x00, 0x00, 0x00, 0x00,
+		0xFF, 0xFF, 0xFF, 0xFF,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, // wDGramPort=0
+		0x01, 0x00, // wNumberOfFormats=1
+		0x00,       // cLastBlockConfirmed
+		0x06, 0x00, // wVersion=6
+		0x00, // bPad
+		// Format: wFormatTag=1 (PCM), nChannels=2, nSamplesPerSec=44100, nAvgBytesPerSec=176400, nBlockAlign=4, wBitsPerSample=16, cbSize=0
+		0x01, 0x00, // FormatTag=PCM
+		0x02, 0x00, // Channels=2
+		0x44, 0xAC, 0x00, 0x00, // SamplesPerSec=44100
+		0x10, 0xB1, 0x02, 0x00, // AvgBytesPerSec=176400
+		0x04, 0x00, // BlockAlign=4
+		0x10, 0x00, // BitsPerSample=16
+		0x00, 0x00, // cbSize=0
+	}
 
-// This exercises the code path but may error due to missing connection
-err := handler.HandleChannelData(channelData)
-_ = err
+	// This exercises the code path but may error due to missing connection
+	err := handler.HandleChannelData(channelData)
+	_ = err
 }
 
 func TestAudioHandler_HandleChannelData_Wave2(t *testing.T) {
-client := &Client{
-channelIDMap: make(map[string]uint16),
-}
-handler := NewAudioHandler(client)
-handler.Enable()
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
 
-// Set up some server formats first
-handler.serverFormats = []audio.AudioFormat{
-{FormatTag: audio.WAVE_FORMAT_PCM, Channels: 2, SamplesPerSec: 44100, BitsPerSample: 16},
-}
-handler.selectedFormat = 0
+	// Set up some server formats first
+	handler.serverFormats = []audio.AudioFormat{
+		{FormatTag: audio.WAVE_FORMAT_PCM, Channels: 2, SamplesPerSec: 44100, BitsPerSample: 16},
+	}
+	handler.selectedFormat = 0
 
-var callbackCalled bool
-var receivedData []byte
-handler.SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) {
-callbackCalled = true
-receivedData = data
-})
+	var callbackCalled bool
+	var receivedData []byte
+	handler.SetCallback(func(data []byte, format *audio.AudioFormat, timestamp uint16) {
+		callbackCalled = true
+		receivedData = data
+	})
 
-// Build a valid WAVE2 message
-channelData := []byte{
-// Channel header: totalLength=16, flags=0x03
-0x10, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-// RDPSND header: msgType=0x0D (SND_WAVE2), reserved=0, bodySize=8
-0x0D, 0x00, 0x08, 0x00,
-// Wave2: wTimeStamp=1234, wFormatNo=0, cBlockNo=1, bPad=0, PCM data
-0xD2, 0x04, 0x00, 0x00, 0x01, 0x00, 0xAA, 0xBB,
-}
+	// Build a valid WAVE2 message
+	channelData := []byte{
+		// Channel header: totalLength=16, flags=0x03
+		0x10, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0x0D (SND_WAVE2), reserved=0, bodySize=8
+		0x0D, 0x00, 0x08, 0x00,
+		// Wave2: wTimeStamp=1234, wFormatNo=0, cBlockNo=1, bPad=0, PCM data
+		0xD2, 0x04, 0x00, 0x00, 0x01, 0x00, 0xAA, 0xBB,
+	}
 
-err := handler.HandleChannelData(channelData)
-// Callback may or may not be called depending on implementation
-_ = err
-_ = callbackCalled
-_ = receivedData
+	err := handler.HandleChannelData(channelData)
+	// Callback may or may not be called depending on implementation
+	_ = err
+	_ = callbackCalled
+	_ = receivedData
 }
 
 func TestAudioHandler_HandleChannelData_Training(t *testing.T) {
-client := &Client{
-channelIDMap: make(map[string]uint16),
-}
-handler := NewAudioHandler(client)
-handler.Enable()
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
 
-// Build a training message
-channelData := []byte{
-// Channel header: totalLength=12, flags=0x03
-0x0C, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-// RDPSND header: msgType=0x06 (SND_TRAINING), reserved=0, bodySize=4
-0x06, 0x00, 0x04, 0x00,
-// Training: wTimeStamp=1234, wPackSize=8
-0xD2, 0x04, 0x08, 0x00,
-}
+	// Build a training message
+	channelData := []byte{
+		// Channel header: totalLength=12, flags=0x03
+		0x0C, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0x06 (SND_TRAINING), reserved=0, bodySize=4
+		0x06, 0x00, 0x04, 0x00,
+		// Training: wTimeStamp=1234, wPackSize=8
+		0xD2, 0x04, 0x08, 0x00,
+	}
 
-err := handler.HandleChannelData(channelData)
-// May return error due to missing connection for response
-_ = err
+	err := handler.HandleChannelData(channelData)
+	// May return error due to missing connection for response
+	_ = err
 }
 
 func TestAudioHandler_HandleChannelData_Close(t *testing.T) {
-client := &Client{
-channelIDMap: make(map[string]uint16),
-}
-handler := NewAudioHandler(client)
-handler.Enable()
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
 
-// Build a close message
-channelData := []byte{
-// Channel header: totalLength=12, flags=0x03
-0x0C, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-	// RDPSND header: msgType=0x01 (SND_CLOSE), reserved=0, bodySize=0
-	0x01, 0x00, 0x00, 0x00,
-}
+	// Build a close message
+	channelData := []byte{
+		// Channel header: totalLength=12, flags=0x03
+		0x0C, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0x01 (SND_CLOSE), reserved=0, bodySize=0
+		0x01, 0x00, 0x00, 0x00,
+	}
 
-err := handler.HandleChannelData(channelData)
-if err != nil {
-t.Errorf("HandleChannelData() error = %v for close message", err)
-}
+	err := handler.HandleChannelData(channelData)
+	if err != nil {
+		t.Errorf("HandleChannelData() error = %v for close message", err)
+	}
 }
 
 func TestAudioHandler_HandleChannelData_Unknown(t *testing.T) {
-client := &Client{
-channelIDMap: make(map[string]uint16),
-}
-handler := NewAudioHandler(client)
-handler.Enable()
+	client := &Client{
+		channelIDMap: make(map[string]uint16),
+	}
+	handler := NewAudioHandler(client)
+	handler.Enable()
 
-// Build a message with unknown type
-channelData := []byte{
-// Channel header: totalLength=12, flags=0x03
-0x0C, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-// RDPSND header: msgType=0xFF (unknown), reserved=0, bodySize=0
-0xFF, 0x00, 0x00, 0x00,
-}
+	// Build a message with unknown type
+	channelData := []byte{
+		// Channel header: totalLength=12, flags=0x03
+		0x0C, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+		// RDPSND header: msgType=0xFF (unknown), reserved=0, bodySize=0
+		0xFF, 0x00, 0x00, 0x00,
+	}
 
-err := handler.HandleChannelData(channelData)
-if err != nil {
-t.Errorf("HandleChannelData() error = %v for unknown message type", err)
-}
+	err := handler.HandleChannelData(channelData)
+	if err != nil {
+		t.Errorf("HandleChannelData() error = %v for unknown message type", err)
+	}
 }
 
 func TestAudioHandler_GetSelectedFormat_MP3(t *testing.T) {
@@ -360,7 +360,7 @@ func TestAudioHandler_HandleChannelData_ServerFormats_MP3Only(t *testing.T) {
 		0x01, 0x00, // wNumberOfFormats=1
 		0x00,       // cLastBlockConfirmed
 		0x06, 0x00, // wVersion=6
-		0x00,       // bPad
+		0x00, // bPad
 		// Format: wFormatTag=0x55 (MP3), nChannels=2, nSamplesPerSec=44100, nAvgBytesPerSec=16000, nBlockAlign=1, wBitsPerSample=0, cbSize=0
 		0x55, 0x00, // FormatTag=MP3
 		0x02, 0x00, // Channels=2
@@ -391,6 +391,7 @@ func TestAudioHandler_HandleChannelData_ServerFormats_PCMPreferredOverMP3(t *tes
 		channelIDMap: make(map[string]uint16),
 	}
 	handler := NewAudioHandler(client)
+	handler.SetPreferPCM(true)
 	handler.Enable()
 
 	// Build a server formats message with both MP3 and PCM (MP3 first)
@@ -407,7 +408,7 @@ func TestAudioHandler_HandleChannelData_ServerFormats_PCMPreferredOverMP3(t *tes
 		0x02, 0x00, // wNumberOfFormats=2
 		0x00,       // cLastBlockConfirmed
 		0x06, 0x00, // wVersion=6
-		0x00,       // bPad
+		0x00, // bPad
 		// Format 0: MP3
 		0x55, 0x00, // FormatTag=MP3
 		0x02, 0x00, // Channels=2
@@ -461,7 +462,7 @@ func TestAudioHandler_HandleChannelData_ServerFormats_NoSupportedFormats(t *test
 		0x01, 0x00, // wNumberOfFormats=1
 		0x00,       // cLastBlockConfirmed
 		0x06, 0x00, // wVersion=6
-		0x00,       // bPad
+		0x00, // bPad
 		// Format: ADPCM (unsupported)
 		0x02, 0x00, // FormatTag=ADPCM
 		0x02, 0x00, // Channels=2

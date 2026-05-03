@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -309,11 +310,10 @@ func TestShowHelp(t *testing.T) {
 	_ = w.Close()
 
 	// Read captured output
-	output := make([]byte, 1024)
-	n, _ := r.Read(output)
+	output, _ := io.ReadAll(r)
 
 	// Verify help contains expected content
-	captured := string(output[:n])
+	captured := string(output)
 	assert.Contains(t, captured, "Go RDP Client")
 	assert.Contains(t, captured, "USAGE:")
 	assert.Contains(t, captured, "OPTIONS:")
@@ -335,11 +335,10 @@ func TestShowVersion(t *testing.T) {
 	_ = w.Close()
 
 	// Read captured output
-	output := make([]byte, 1024)
-	n, _ := r.Read(output)
+	output, _ := io.ReadAll(r)
 
 	// Verify version contains expected content
-	captured := string(output[:n])
+	captured := string(output)
 	assert.Contains(t, captured, "Go RDP Client "+appVersion)
 	assert.Contains(t, captured, "Built with Go")
 	assert.Contains(t, captured, "Protocol: RDP 10.x")
