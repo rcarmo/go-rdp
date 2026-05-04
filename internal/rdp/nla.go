@@ -24,7 +24,7 @@ func readNLAMessage(r io.Reader, maxSize int) ([]byte, error) {
 	buf := make([]byte, 0, 4096)
 	tmp := make([]byte, 4096)
 	total := 0
-	
+
 	for {
 		n, err := r.Read(tmp)
 		if n > 0 {
@@ -90,6 +90,8 @@ func (c *Client) StartNLA() error {
 		return fmt.Errorf("NLA: failed to decode challenge: %w", err)
 	}
 	logging.Debug("NLA: Server version=%d, errorCode=%d", tsResp.Version, tsResp.ErrorCode)
+	bindingNonce := auth.CredSSPBindingNonce(tsResp, clientNonce)
+	logging.Debug("NLA: Using CredSSP binding nonce len=%d (serverNonce=%t)", len(bindingNonce), len(tsResp.ServerNonce) > 0)
 
 	if len(tsResp.NegoTokens) == 0 {
 		return fmt.Errorf("NLA: no challenge token received from server")
@@ -108,11 +110,12 @@ func (c *Client) StartNLA() error {
 	}
 	logging.Debug("NLA: Got TLS SubjectPublicKey (%d bytes)", len(pubKey))
 
-	// For version 5+, compute hash-based pubKeyAuth
-	// SHA256(ClientServerHashMagic || clientNonce || publicKey)
+	// For version 5+, compute hash-based pubKeyAuth.
+	// SHA256(ClientServerHashMagic || selectedNonce || publicKey), where
+	// selectedNonce is the server nonce from the challenge when present.
 	var pubKeyData []byte
 	if tsResp.Version >= 5 {
-		pubKeyData = auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, clientNonce)
+		pubKeyData = auth.ComputeClientPubKeyAuth(tsResp.Version, pubKey, bindingNonce)
 		logging.Debug("NLA: Using version %d hash-based pubKeyAuth", tsResp.Version)
 	} else {
 		pubKeyData = pubKey
@@ -149,8 +152,9 @@ func (c *Client) StartNLA() error {
 		}
 		logging.Debug("NLA: Decrypted server pubKeyAuth (%d bytes)", len(decryptedPubKeyAuth))
 
-		// Verify the server's response
-		if !auth.VerifyServerPubKeyAuth(tsResp.Version, decryptedPubKeyAuth, pubKey, clientNonce) {
+		// Verify the server's response using the same binding nonce selected for
+		// the client-to-server pubKeyAuth.
+		if !auth.VerifyServerPubKeyAuth(tsResp.Version, decryptedPubKeyAuth, pubKey, bindingNonce) {
 			return fmt.Errorf("NLA: server pubKeyAuth verification failed")
 		}
 		logging.Debug("NLA: Server pubKeyAuth verified successfully")

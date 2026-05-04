@@ -1,6 +1,9 @@
 package auth
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestServerNTLMv2ChallengeAndVerify(t *testing.T) {
 	client := NewNTLMv2("DOMAIN", "User", "Password")
@@ -74,5 +77,30 @@ func TestComputeServerPubKeyAuth(t *testing.T) {
 	}
 	if got := ComputeServerPubKeyAuth(6, pub, []byte("nonce")); len(got) != 32 {
 		t.Fatalf("unexpected v6 pubkey response length %d", len(got))
+	}
+}
+
+func TestCredSSPBindingNoncePrefersServerNonce(t *testing.T) {
+	clientNonce := []byte("client nonce")
+	serverNonce := []byte("server nonce")
+	got := CredSSPBindingNonce(&TSRequest{ServerNonce: serverNonce}, clientNonce)
+	if !bytes.Equal(got, serverNonce) {
+		t.Fatalf("CredSSPBindingNonce = %q, want server nonce %q", got, serverNonce)
+	}
+	serverNonce[0] = 'S'
+	if bytes.Equal(got, serverNonce) {
+		t.Fatal("CredSSPBindingNonce returned aliased server nonce")
+	}
+}
+
+func TestCredSSPBindingNonceFallsBackToClientNonce(t *testing.T) {
+	clientNonce := []byte("client nonce")
+	got := CredSSPBindingNonce(&TSRequest{}, clientNonce)
+	if !bytes.Equal(got, clientNonce) {
+		t.Fatalf("CredSSPBindingNonce = %q, want client nonce %q", got, clientNonce)
+	}
+	clientNonce[0] = 'C'
+	if bytes.Equal(got, clientNonce) {
+		t.Fatal("CredSSPBindingNonce returned aliased client nonce")
 	}
 }

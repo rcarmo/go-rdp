@@ -1,11 +1,39 @@
 package rdp
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/rcarmo/go-rdp/internal/auth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCredSSPPubKeyBindingUsesServerNonce(t *testing.T) {
+	clientNonce := bytes.Repeat([]byte{0x11}, 32)
+	serverNonce := bytes.Repeat([]byte{0x22}, 32)
+	pubKey := []byte("tls-subject-public-key")
+	tsReq := &auth.TSRequest{Version: 6, ServerNonce: serverNonce}
+
+	bindingNonce := auth.CredSSPBindingNonce(tsReq, clientNonce)
+	if !bytes.Equal(bindingNonce, serverNonce) {
+		t.Fatalf("binding nonce = %x, want server nonce %x", bindingNonce, serverNonce)
+	}
+
+	clientAuth := auth.ComputeClientPubKeyAuth(tsReq.Version, pubKey, bindingNonce)
+	clientNonceAuth := auth.ComputeClientPubKeyAuth(tsReq.Version, pubKey, clientNonce)
+	if bytes.Equal(clientAuth, clientNonceAuth) {
+		t.Fatal("client pubKeyAuth unexpectedly used the client nonce")
+	}
+
+	serverAuth := auth.ComputeServerPubKeyAuth(tsReq.Version, pubKey, bindingNonce)
+	if !auth.VerifyServerPubKeyAuth(tsReq.Version, serverAuth, pubKey, bindingNonce) {
+		t.Fatal("server pubKeyAuth did not verify with selected binding nonce")
+	}
+	if auth.VerifyServerPubKeyAuth(tsReq.Version, serverAuth, pubKey, clientNonce) {
+		t.Fatal("server pubKeyAuth unexpectedly verified with stale client nonce")
+	}
+}
 
 func TestClient_parseDomainUser(t *testing.T) {
 	tests := []struct {

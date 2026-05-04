@@ -47,6 +47,9 @@ func ComputeClientPubKeyAuth(version int, pubKey, nonce []byte) []byte {
 func VerifyServerPubKeyAuth(version int, serverPubKeyAuth, clientPubKey, nonce []byte) bool {
 	return internalauth.VerifyServerPubKeyAuth(version, serverPubKeyAuth, clientPubKey, nonce)
 }
+func CredSSPBindingNonce(req *TSRequest, clientNonce []byte) []byte {
+	return internalauth.CredSSPBindingNonce(req, clientNonce)
+}
 func EncodeTSRequest(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte) []byte {
 	return internalauth.EncodeTSRequest(ntlmMessages, authInfo, pubKeyAuth)
 }

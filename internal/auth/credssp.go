@@ -15,9 +15,9 @@ type TSRequest struct {
 	NegoTokens  []NegoToken
 	AuthInfo    []byte
 	PubKeyAuth  []byte
-	ClientNonce []byte // For version 5+
+	ClientNonce []byte // For version 5+ (reserved for callers that keep a direction-specific copy)
 	ErrorCode   uint32 // For version 3+
-	ServerNonce []byte // Received from server in version 5+
+	ServerNonce []byte // Context tag [5]; serverNonce in a challenge, clientNonce in a client request
 }
 
 // Magic strings for CredSSP version 5+ public key hashing (includes null terminator)
@@ -26,13 +26,16 @@ var (
 	ServerClientHashMagic = []byte("CredSSP Server-To-Client Binding Hash\x00")
 )
 
-// ComputeClientPubKeyAuth computes the pubKeyAuth for the client
-// For version 2-4: just encrypt the public key
-// For version 5+: compute SHA256(magic || nonce || pubKey) and encrypt
+// ComputeClientPubKeyAuth computes the client-to-server CredSSP pubKeyAuth value.
+// For version 2-4: just encrypt the public key.
+// For version 5+: compute SHA256(magic || nonce || pubKey) and encrypt.
+// The nonce is the binding nonce selected for this handshake; for modern servers
+// that send a serverNonce in the challenge, use that server nonce rather than
+// the client's initial nonce.
 func ComputeClientPubKeyAuth(version int, pubKey, nonce []byte) []byte {
 	if version >= 5 && len(nonce) > 0 {
-		// Version 5+: Hash-based binding
-		// Per FreeRDP: SHA256(ClientServerHashMagic || ClientNonce || SubjectPublicKey)
+		// Version 5+: Hash-based binding.
+		// SHA256(ClientServerHashMagic || selectedNonce || SubjectPublicKey)
 		h := sha256.New()
 		h.Write(ClientServerHashMagic)
 		h.Write(nonce)
@@ -43,9 +46,10 @@ func ComputeClientPubKeyAuth(version int, pubKey, nonce []byte) []byte {
 	return pubKey
 }
 
-// VerifyServerPubKeyAuth verifies the server's pubKeyAuth response
-// For version 2-4: server sends pubKey with first byte incremented by 1
-// For version 5+: server sends SHA256(ServerClientHashMagic || nonce || pubKey)
+// VerifyServerPubKeyAuth verifies the server's pubKeyAuth response.
+// For version 2-4: server sends pubKey with first byte incremented by 1.
+// For version 5+: server sends SHA256(ServerClientHashMagic || nonce || pubKey),
+// using the same selected binding nonce as the client-to-server pubKeyAuth.
 func VerifyServerPubKeyAuth(version int, serverPubKeyAuth, clientPubKey, nonce []byte) bool {
 	if version >= 5 && len(nonce) > 0 {
 		// Version 5+: Hash-based verification
@@ -64,6 +68,17 @@ func VerifyServerPubKeyAuth(version int, serverPubKeyAuth, clientPubKey, nonce [
 	copy(expected, clientPubKey)
 	expected[0]++
 	return bytes.Equal(serverPubKeyAuth, expected)
+}
+
+// CredSSPBindingNonce returns the nonce that should be used for CredSSP v5+
+// public-key binding. If the server sent a serverNonce in its challenge, that
+// nonce is authoritative; otherwise callers fall back to their locally generated
+// client nonce for compatibility with older or incomplete peers.
+func CredSSPBindingNonce(req *TSRequest, clientNonce []byte) []byte {
+	if req != nil && len(req.ServerNonce) > 0 {
+		return append([]byte(nil), req.ServerNonce...)
+	}
+	return append([]byte(nil), clientNonce...)
 }
 
 // NegoToken wraps an NTLM message
