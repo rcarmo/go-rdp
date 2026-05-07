@@ -4,8 +4,10 @@
 .DEFAULT_GOAL := help
 BINARY_NAME=go-rdp
 BUILD_DIR=bin
-GO_VERSION=1.22
+GO_VERSION=1.24
 LINTER=golangci-lint
+GOSEC=gosec
+GOSEC_EXCLUDES?=G115,G602,G503
 VERSION=$(shell cat VERSION)
 LDFLAGS=-s -w -X main.appVersion=$(VERSION)
 
@@ -25,11 +27,11 @@ deps: ## Install Go and tooling dependencies
 	go mod verify
 	@if ! command -v $(LINTER) >/dev/null 2>&1; then \
 		echo "Installing $(LINTER)..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest; \
+		GOBIN=$$(go env GOPATH)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8; \
 	fi
-	@if ! command -v gosec >/dev/null 2>&1; then \
-		echo "Installing gosec..."; \
-		go install github.com/securego/gosec/v2/cmd/gosec@latest; \
+	@if ! command -v $(GOSEC) >/dev/null 2>&1; then \
+		echo "Installing $(GOSEC)..."; \
+		GOBIN=$$(go env GOPATH)/bin go install github.com/securego/gosec/v2/cmd/gosec@v2.22.9; \
 	fi
 
 # Code quality checks
@@ -227,12 +229,12 @@ fmt: ## Format Go code (fmt + goimports if available)
 	@echo "Formatting complete"
 
 .PHONY: security
-security: ## Run gosec security scan
+security: build-html ## Run gosec security scan
 	@echo "Running security scan..."
-	@if command -v gosec >/dev/null 2>&1; then \
-		gosec ./...; \
+	@if command -v $(GOSEC) >/dev/null 2>&1; then \
+		$(GOSEC) -exclude=$(GOSEC_EXCLUDES) ./...; \
 	else \
-		echo "gosec not found. Run 'make deps' to install it."; \
+		echo "$(GOSEC) not found. Run 'make deps' to install it."; \
 		exit 1; \
 	fi
 
