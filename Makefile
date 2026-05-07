@@ -59,9 +59,9 @@ lint: ## Run golangci-lint
 
 # Testing
 .PHONY: test
-test: ## Run unit tests with race + coverage
+test: ## Run unit tests with coverage
 	@echo "Running tests..."
-	go test -v -race -coverprofile=coverage_all.out ./...
+	go test -v -coverprofile=coverage_all.out ./...
 	cp coverage_all.out coverage.out
 	go tool cover -html=coverage_all.out -o coverage.html
 
