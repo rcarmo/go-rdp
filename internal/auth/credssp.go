@@ -105,8 +105,9 @@ func EncodeTSRequest(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte) 
 	return EncodeTSRequestWithNonce(ntlmMessages, authInfo, pubKeyAuth, nil)
 }
 
-// EncodeTSRequestWithNonce encodes a TSRequest with optional client nonce (version 5+)
-// The version parameter should be set by the caller to match the negotiated version
+// EncodeTSRequestWithNonce encodes a TSRequest with optional client nonce using
+// the default modern CredSSP version (6). Use EncodeTSRequestWithVersion when
+// matching a server-negotiated version explicitly.
 func EncodeTSRequestWithNonce(ntlmMessages [][]byte, authInfo []byte, pubKeyAuth []byte, clientNonce []byte) []byte {
 	return EncodeTSRequestWithVersion(6, ntlmMessages, authInfo, pubKeyAuth, clientNonce)
 }

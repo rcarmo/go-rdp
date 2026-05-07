@@ -24,6 +24,27 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, 64*1024, len(p.updatePDUData))
 }
 
+type shortChunkReader struct {
+	data []byte
+	chunk int
+}
+
+func (r *shortChunkReader) Read(p []byte) (int, error) {
+	if len(r.data) == 0 {
+		return 0, io.EOF
+	}
+	n := r.chunk
+	if n <= 0 || n > len(p) {
+		n = len(p)
+	}
+	if n > len(r.data) {
+		n = len(r.data)
+	}
+	copy(p, r.data[:n])
+	r.data = r.data[n:]
+	return n, nil
+}
+
 // =============================================================================
 // InputEventPDU tests (send.go)
 // =============================================================================
@@ -290,6 +311,50 @@ func TestUpdatePDU_Deserialize_WithPreallocatedData(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 5, len(pdu.Data))
 	assert.Equal(t, []byte{0x01, 0x02, 0x03, 0x04, 0x05}, pdu.Data)
+}
+
+func TestUpdatePDU_Deserialize_ReadFullOnChunkedReader(t *testing.T) {
+	payload := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
+	reader := &shortChunkReader{
+		data: append([]byte{0x00, byte(len(payload))}, payload...),
+		chunk: 1,
+	}
+	pdu := &UpdatePDU{}
+	err := pdu.Deserialize(reader)
+	require.NoError(t, err)
+	assert.Equal(t, payload, pdu.Data)
+	assert.Equal(t, 0, len(reader.data))
+}
+
+func TestUpdatePDU_Deserialize_TruncatedPayload(t *testing.T) {
+	reader := &shortChunkReader{
+		data: []byte{0x00, 0x05, 0xAA, 0xBB},
+		chunk: 1,
+	}
+	pdu := &UpdatePDU{}
+	err := pdu.Deserialize(reader)
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+}
+
+func TestUpdate_Deserialize_ReadFullOnChunkedReader(t *testing.T) {
+	reader := &shortChunkReader{
+		data: []byte{0x01, 0x03, 0x00, 0xAA, 0xBB, 0xCC},
+		chunk: 1,
+	}
+	var update Update
+	err := update.Deserialize(reader)
+	require.NoError(t, err)
+	assert.Equal(t, 0, len(reader.data))
+}
+
+func TestUpdate_Deserialize_TruncatedPayload(t *testing.T) {
+	reader := &shortChunkReader{
+		data: []byte{0x01, 0x05, 0x00, 0xAA, 0xBB},
+		chunk: 1,
+	}
+	var update Update
+	err := update.Deserialize(reader)
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
 
 func TestProtocol_Receive(t *testing.T) {

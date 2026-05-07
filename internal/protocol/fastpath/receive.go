@@ -94,7 +94,7 @@ func (u *Update) Deserialize(wire io.Reader) error {
 	//}
 
 	d := make([]byte, u.size)
-	_, err = wire.Read(d)
+	_, err = io.ReadFull(wire, d)
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func (pdu *UpdatePDU) Deserialize(wire io.Reader) error {
 		pdu.Data = make([]byte, length)
 	}
 
-	_, err = wire.Read(pdu.Data)
+	_, err = io.ReadFull(wire, pdu.Data)
 	if err != nil {
 		return err
 	}

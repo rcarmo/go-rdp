@@ -370,6 +370,8 @@ func ReadChannelID(data []byte, cbChID uint8) (channelID uint32, remaining []byt
 		size = 2
 	case 2:
 		size = 4
+	default:
+		return 0, nil, fmt.Errorf("invalid channel ID size selector %d", cbChID)
 	}
 
 	if len(data) < size {

@@ -347,6 +347,12 @@ func TestReadChannelID(t *testing.T) {
 			cbChID:      1,
 			expectError: true,
 		},
+		{
+			name:        "invalid cbChID",
+			data:        []byte{0x01, 0x02},
+			cbChID:      3,
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {

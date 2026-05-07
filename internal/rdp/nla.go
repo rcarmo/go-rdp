@@ -90,6 +90,10 @@ func (c *Client) StartNLA() error {
 		return fmt.Errorf("NLA: failed to decode challenge: %w", err)
 	}
 	logging.Debug("NLA: Server version=%d, errorCode=%d", tsResp.Version, tsResp.ErrorCode)
+	negotiatedVersion := tsResp.Version
+	if negotiatedVersion <= 0 {
+		negotiatedVersion = 6
+	}
 	bindingNonce := auth.CredSSPBindingNonce(tsResp, clientNonce)
 	logging.Debug("NLA: Using CredSSP binding nonce len=%d (serverNonce=%t)", len(bindingNonce), len(tsResp.ServerNonce) > 0)
 
@@ -125,8 +129,13 @@ func (c *Client) StartNLA() error {
 	encryptedPubKey := ntlmSec.GssEncrypt(pubKeyData)
 	logging.Debug("NLA: Encrypted pubKeyAuth len=%d", len(encryptedPubKey))
 
-	// Send authenticate message with encrypted public key and client nonce
-	tsReq = auth.EncodeTSRequestWithNonce([][]byte{authMsg}, nil, encryptedPubKey, clientNonce)
+	// Send authenticate message with encrypted public key and optional client nonce.
+	// clientNonce is a version 5+ field and should only be sent when negotiated.
+	authClientNonce := []byte(nil)
+	if negotiatedVersion >= 5 {
+		authClientNonce = clientNonce
+	}
+	tsReq = auth.EncodeTSRequestWithVersion(negotiatedVersion, [][]byte{authMsg}, nil, encryptedPubKey, authClientNonce)
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send authenticate message: %w", err)
 	}
@@ -167,7 +176,7 @@ func (c *Client) StartNLA() error {
 	encryptedCreds := ntlmSec.GssEncrypt(credentials)
 	logging.Debug("NLA: Sending encrypted credentials")
 
-	tsReq = auth.EncodeTSRequest(nil, encryptedCreds, nil)
+	tsReq = auth.EncodeTSRequestWithVersion(negotiatedVersion, nil, encryptedCreds, nil, nil)
 	if _, err := c.conn.Write(tsReq); err != nil {
 		return fmt.Errorf("NLA: failed to send credentials: %w", err)
 	}
@@ -192,13 +201,12 @@ func (c *Client) StartNLA() error {
 			}
 			return nil
 		}
-		// Other errors might indicate authentication failure
+		// Any non-timeout read error here indicates authentication/session failure.
 		logging.Debug("NLA: Error reading final response: %v", err)
-		// Try to continue anyway - some servers don't send a final response
 		if setter, ok := c.conn.(interface{ SetReadDeadline(time.Time) error }); ok {
 			_ = setter.SetReadDeadline(time.Time{})
 		}
-		return nil
+		return fmt.Errorf("NLA: failed to read final response: %w", err)
 	}
 
 	// Clear the deadline

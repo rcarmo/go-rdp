@@ -1174,6 +1174,38 @@ func TestEncodeTSRequest(t *testing.T) {
 	}
 }
 
+func TestEncodeTSRequestWithVersionAndNonce(t *testing.T) {
+	nonce := bytes.Repeat([]byte{0x5A}, 32)
+
+	t.Run("version 2 without nonce", func(t *testing.T) {
+		encoded := EncodeTSRequestWithVersion(2, [][]byte{{0x01}}, nil, nil, nil)
+		decoded, err := DecodeTSRequest(encoded)
+		if err != nil {
+			t.Fatalf("decode failed: %v", err)
+		}
+		if decoded.Version != 2 {
+			t.Fatalf("version = %d, want 2", decoded.Version)
+		}
+		if len(decoded.ServerNonce) != 0 {
+			t.Fatalf("server nonce unexpectedly present: %x", decoded.ServerNonce)
+		}
+	})
+
+	t.Run("version 5 with nonce", func(t *testing.T) {
+		encoded := EncodeTSRequestWithVersion(5, [][]byte{{0x01}}, nil, nil, nonce)
+		decoded, err := DecodeTSRequest(encoded)
+		if err != nil {
+			t.Fatalf("decode failed: %v", err)
+		}
+		if decoded.Version != 5 {
+			t.Fatalf("version = %d, want 5", decoded.Version)
+		}
+		if !bytes.Equal(decoded.ServerNonce, nonce) {
+			t.Fatalf("nonce = %x, want %x", decoded.ServerNonce, nonce)
+		}
+	})
+}
+
 func TestDecodeTSRequest(t *testing.T) {
 	tests := []struct {
 		name        string
