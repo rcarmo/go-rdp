@@ -2,6 +2,7 @@
 # Stage 1: Build frontend assets (WASM + JS)
 FROM tinygo/tinygo:0.39.0 AS wasm-builder
 
+USER root
 WORKDIR /app
 
 # Copy WASM source and Go packages referenced by the WASM module
