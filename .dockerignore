@@ -17,8 +17,6 @@ coverage.out
 coverage.html
 
 # Go
-*.mod
-*.sum
 vendor/
 
 # OS

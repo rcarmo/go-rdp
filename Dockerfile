@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for RDP HTML5 Client
 # Stage 1: Build frontend assets (WASM + JS)
-FROM tinygo/tinygo:0.34.0 AS wasm-builder
+FROM tinygo/tinygo:0.39.0 AS wasm-builder
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ RUN npm install --silent
 RUN npm run build:min
 
 # Stage 3: Build Go backend
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.24-alpine AS go-builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata

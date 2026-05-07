@@ -125,7 +125,7 @@ jobs:
     - name: Install TinyGo
       uses: acifani/setup-tinygo@v2
       with:
-        tinygo-version: '0.34.0'
+        tinygo-version: '0.39.0'
 
     - name: Build all platforms
       run: make build-all
