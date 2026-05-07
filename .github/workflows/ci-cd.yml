@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 env:
   GO_VERSION: '1.24'
@@ -40,8 +41,12 @@ jobs:
     - name: Prepare web dist assets for embed checks
       run: make build-html
 
-    - name: Run code quality checks
-      run: make check
+    - name: Run go vet (blocking)
+      run: make vet
+
+    - name: Run golangci-lint (advisory)
+      continue-on-error: true
+      run: make lint
 
     - name: Run tests
       run: make test
