@@ -41,6 +41,13 @@ jobs:
     - name: Prepare web dist assets for embed checks
       run: make build-html
 
+    - name: Seed placeholder frontend artifacts for web unit checks
+      run: |
+        mkdir -p web/dist/js/rle
+        : > web/dist/js/client.bundle.min.js
+        : > web/dist/js/rle/wasm_exec.js
+        : > web/dist/js/rle/rle.wasm
+
     - name: Run go vet (blocking)
       run: make vet
 
