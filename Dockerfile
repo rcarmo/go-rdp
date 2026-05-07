@@ -4,8 +4,9 @@ FROM tinygo/tinygo:0.39.0 AS wasm-builder
 
 WORKDIR /app
 
-# Copy WASM source
+# Copy WASM source and Go packages referenced by the WASM module
 COPY web/src/wasm ./web/src/wasm
+COPY internal ./internal
 COPY go.mod go.sum ./
 
 # Download dependencies and build WASM
