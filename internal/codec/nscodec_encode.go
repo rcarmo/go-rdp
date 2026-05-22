@@ -37,7 +37,7 @@ func encodeNSCodecRaw(pixels []byte, width, height, stride int, bgra bool) ([]by
 		return nil, false
 	}
 	planeSize := width * height
-	if planeSize > int(^uint32(0)) || 20 > maxInt-3*planeSize {
+	if uint64(planeSize) > uint64(^uint32(0)) || 20 > maxInt-3*planeSize {
 		return nil, false
 	}
 	luma := make([]byte, planeSize)
