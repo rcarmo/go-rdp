@@ -20,6 +20,16 @@ func TestBitmapCodecGUIDName(t *testing.T) {
 	}
 }
 
+func TestEncodeNSCodecRawBGRA(t *testing.T) {
+	encoded, ok := EncodeNSCodecRawBGRA([]byte{0x20, 0x40, 0x60, 0xff}, 1, 1, 4)
+	if !ok {
+		t.Fatal("EncodeNSCodecRawBGRA ok = false")
+	}
+	if len(encoded) != 23 {
+		t.Fatalf("encoded len = %d, want 23", len(encoded))
+	}
+}
+
 func TestRDPGFXCodecName(t *testing.T) {
 	if got := RDPGFXCodecName(RDPGFXCodecClearCodec); got != "ClearCodec" {
 		t.Fatalf("ClearCodec name = %q", got)

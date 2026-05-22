@@ -1,6 +1,9 @@
 package codec
 
-import internalpdu "github.com/rcarmo/go-rdp/internal/protocol/pdu"
+import (
+	internalcodec "github.com/rcarmo/go-rdp/internal/codec"
+	internalpdu "github.com/rcarmo/go-rdp/internal/protocol/pdu"
+)
 
 // Bitmap codec GUIDs in little-endian RDP wire form.
 var (
@@ -20,6 +23,16 @@ const (
 
 // BitmapCodecGUIDName returns a stable symbolic name for known bitmap codec GUIDs.
 func BitmapCodecGUIDName(guid [16]byte) string { return internalpdu.BitmapCodecGUIDName(guid) }
+
+// EncodeNSCodecRawBGRA encodes top-down BGRA pixels as raw-plane NSCodec.
+func EncodeNSCodecRawBGRA(pixels []byte, width, height, stride int) ([]byte, bool) {
+	return internalcodec.EncodeNSCodecRawBGRA(pixels, width, height, stride)
+}
+
+// EncodeNSCodecRawRGBA encodes top-down RGBA pixels as raw-plane NSCodec.
+func EncodeNSCodecRawRGBA(pixels []byte, width, height, stride int) ([]byte, bool) {
+	return internalcodec.EncodeNSCodecRawRGBA(pixels, width, height, stride)
+}
 
 // RDPGFX codec identifiers used by WireToSurface PDUs (MS-RDPEGFX).
 const (
