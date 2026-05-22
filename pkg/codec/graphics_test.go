@@ -28,6 +28,13 @@ func TestEncodeNSCodecRawBGRA(t *testing.T) {
 	if len(encoded) != 23 {
 		t.Fatalf("encoded len = %d, want 23", len(encoded))
 	}
+	decoded, err := DecodeNSCodec(encoded, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded) != 4 {
+		t.Fatalf("decoded len = %d, want 4", len(decoded))
+	}
 }
 
 func TestRDPGFXCodecName(t *testing.T) {

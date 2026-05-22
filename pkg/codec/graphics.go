@@ -24,6 +24,11 @@ const (
 // BitmapCodecGUIDName returns a stable symbolic name for known bitmap codec GUIDs.
 func BitmapCodecGUIDName(guid [16]byte) string { return internalpdu.BitmapCodecGUIDName(guid) }
 
+// DecodeNSCodec decodes an NSCodec bitmap stream to RGBA pixels.
+func DecodeNSCodec(data []byte, width, height int) ([]byte, error) {
+	return internalcodec.Decode(data, width, height)
+}
+
 // EncodeNSCodecRawBGRA encodes top-down BGRA pixels as raw-plane NSCodec.
 func EncodeNSCodecRawBGRA(pixels []byte, width, height, stride int) ([]byte, bool) {
 	return internalcodec.EncodeNSCodecRawBGRA(pixels, width, height, stride)
