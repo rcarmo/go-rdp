@@ -1,9 +1,9 @@
 package pdu
 
 import (
-"bytes"
-"encoding/binary"
-"io"
+	"bytes"
+	"encoding/binary"
+	"io"
 )
 
 // MultifragmentUpdateCapabilitySet represents the Multifragment Update Capability Set (MS-RDPBCGR 2.2.7.2.6).
@@ -222,10 +222,50 @@ func (s *BitmapCodecsCapabilitySet) Serialize() []byte {
 	return buf.Bytes()
 }
 
+// RemoteFXGUID is the GUID for RemoteFX/RFX (76772F12-BD72-4463-AFB3-B73C9C6F7886).
+// Stored in little-endian wire format as per MS-RDPBCGR.
+var RemoteFXGUID = [16]byte{
+	0x12, 0x2F, 0x77, 0x76, 0x72, 0xBD, 0x63, 0x44,
+	0xAF, 0xB3, 0xB7, 0x3C, 0x9C, 0x6F, 0x78, 0x86,
+}
+
 // RemoteFXImageGUID is the GUID for RemoteFX-Image (2744CCD4-9D8A-4E74-803C-0ECBEEA19C54).
+// Stored in little-endian wire format as per MS-RDPBCGR.
 var RemoteFXImageGUID = [16]byte{
 	0xD4, 0xCC, 0x44, 0x27, 0x8A, 0x9D, 0x74, 0x4E,
 	0x80, 0x3C, 0x0E, 0xCB, 0xEE, 0xA1, 0x9C, 0x54,
+}
+
+// JPEGCodecGUID is the GUID for the JPEG bitmap codec (430C9EED-1BAF-4CE6-869A-CB8B37B66237).
+// Stored in little-endian wire format as per MS-RDPBCGR.
+var JPEGCodecGUID = [16]byte{
+	0xED, 0x9E, 0x0C, 0x43, 0xAF, 0x1B, 0xE6, 0x4C,
+	0x86, 0x9A, 0xCB, 0x8B, 0x37, 0xB6, 0x62, 0x37,
+}
+
+// Known bitmap codec names used in Bitmap Codecs Capability Sets.
+const (
+	BitmapCodecNameNSCodec       = "NSCodec"
+	BitmapCodecNameRemoteFX      = "RemoteFX"
+	BitmapCodecNameRemoteFXImage = "RemoteFXImage"
+	BitmapCodecNameJPEG          = "JPEG"
+	BitmapCodecNameUnknown       = "Unknown"
+)
+
+// BitmapCodecGUIDName returns a stable symbolic name for known bitmap codec GUIDs.
+func BitmapCodecGUIDName(guid [16]byte) string {
+	switch guid {
+	case NSCodecGUID:
+		return BitmapCodecNameNSCodec
+	case RemoteFXGUID:
+		return BitmapCodecNameRemoteFX
+	case RemoteFXImageGUID:
+		return BitmapCodecNameRemoteFXImage
+	case JPEGCodecGUID:
+		return BitmapCodecNameJPEG
+	default:
+		return BitmapCodecNameUnknown
+	}
 }
 
 // NewBitmapCodecsCapabilitySet creates a capability set advertising NSCodec support

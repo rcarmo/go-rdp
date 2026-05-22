@@ -913,6 +913,21 @@ func Test_BitmapCodecsCapabilitySet_Deserialize(t *testing.T) {
 	require.Equal(t, NSCodecGUID, deserialized.BitmapCodecArray[0].CodecGUID)
 }
 
+func Test_BitmapCodecGUIDName(t *testing.T) {
+	cases := map[[16]byte]string{
+		NSCodecGUID:       BitmapCodecNameNSCodec,
+		RemoteFXGUID:      BitmapCodecNameRemoteFX,
+		RemoteFXImageGUID: BitmapCodecNameRemoteFXImage,
+		JPEGCodecGUID:     BitmapCodecNameJPEG,
+		{}:                BitmapCodecNameUnknown,
+	}
+	for guid, want := range cases {
+		if got := BitmapCodecGUIDName(guid); got != want {
+			t.Fatalf("BitmapCodecGUIDName(%x) = %q, want %q", guid, got, want)
+		}
+	}
+}
+
 func Test_BitmapCodecsWithRFXCapabilitySet_Deserialize(t *testing.T) {
 	set := NewBitmapCodecsWithRFXCapabilitySet()
 	serialized := set.Serialize()
@@ -1261,11 +1276,11 @@ func TestS1_CapabilityExchange_GeneralCapabilitySet(t *testing.T) {
 
 	// Extra flags per MS-RDPBCGR 2.2.7.1.1
 	const (
-		FASTPATH_OUTPUT_SUPPORTED    = 0x0001
-		NO_BITMAP_COMPRESSION_HDR    = 0x0400
-		LONG_CREDENTIALS_SUPPORTED   = 0x0004
-		AUTORECONNECT_SUPPORTED      = 0x0008
-		ENC_SALTED_CHECKSUM          = 0x0010
+		FASTPATH_OUTPUT_SUPPORTED  = 0x0001
+		NO_BITMAP_COMPRESSION_HDR  = 0x0400
+		LONG_CREDENTIALS_SUPPORTED = 0x0004
+		AUTORECONNECT_SUPPORTED    = 0x0008
+		ENC_SALTED_CHECKSUM        = 0x0010
 	)
 
 	tests := []struct {
@@ -1371,14 +1386,14 @@ func TestS1_CapabilityExchange_OrderCapabilitySet(t *testing.T) {
 func TestS1_CapabilityExchange_InputCapabilitySet(t *testing.T) {
 	// Input flags per MS-RDPBCGR 2.2.7.1.6
 	const (
-		INPUT_FLAG_SCANCODES      = 0x0001
-		INPUT_FLAG_MOUSEX         = 0x0004
-		INPUT_FLAG_FASTPATH_INPUT = 0x0008
-		INPUT_FLAG_UNICODE        = 0x0010
+		INPUT_FLAG_SCANCODES       = 0x0001
+		INPUT_FLAG_MOUSEX          = 0x0004
+		INPUT_FLAG_FASTPATH_INPUT  = 0x0008
+		INPUT_FLAG_UNICODE         = 0x0010
 		INPUT_FLAG_FASTPATH_INPUT2 = 0x0020
-		INPUT_FLAG_UNUSED1        = 0x0040
-		INPUT_FLAG_MOUSE_HWHEEL   = 0x0100
-		INPUT_FLAG_QOE_TIMESTAMPS = 0x0200
+		INPUT_FLAG_UNUSED1         = 0x0040
+		INPUT_FLAG_MOUSE_HWHEEL    = 0x0100
+		INPUT_FLAG_QOE_TIMESTAMPS  = 0x0200
 	)
 
 	tests := []struct {
@@ -1407,9 +1422,9 @@ func TestS1_CapabilityExchange_InputCapabilitySet(t *testing.T) {
 func TestS1_CapabilityExchange_VirtualChannelCapabilitySet(t *testing.T) {
 	// Virtual channel compression flags per MS-RDPBCGR 2.2.7.1.10
 	const (
-		VCCAPS_NO_COMPR      = 0x00000000
-		VCCAPS_COMPR_SC      = 0x00000001 // Server-to-client compression
-		VCCAPS_COMPR_CS_8K   = 0x00000002 // Client-to-server 8K compression
+		VCCAPS_NO_COMPR    = 0x00000000
+		VCCAPS_COMPR_SC    = 0x00000001 // Server-to-client compression
+		VCCAPS_COMPR_CS_8K = 0x00000002 // Client-to-server 8K compression
 	)
 
 	tests := []struct {
@@ -1426,7 +1441,7 @@ func TestS1_CapabilityExchange_VirtualChannelCapabilitySet(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			hasServerCompression := (tc.flags & VCCAPS_COMPR_SC) != 0
 			hasClientCompression := (tc.flags & VCCAPS_COMPR_CS_8K) != 0
-			
+
 			if tc.name == "Both" {
 				require.True(t, hasServerCompression && hasClientCompression)
 			}
