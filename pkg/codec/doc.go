@@ -1,0 +1,13 @@
+// Package codec exposes reusable RDP codec and graphics wire helpers.
+//
+// The exported capability parsers and PDU builders are aligned with the
+// Microsoft protocol reference material used by this repository:
+//   - MS-RDPBCGR 2.2.7.2.10 Bitmap Codecs Capability Set
+//   - MS-RDPBCGR 2.2.9.2.1.2.1 Set Surface Bits Command
+//   - MS-RDPEGFX 2.2.2 RDPGFX capability and frame/SurfaceToWire PDUs
+//
+// Helpers in this package are deliberately protocol-level data-in/data-out
+// functions. Product policy such as codec preference, Android capture format,
+// environment-variable gates, client allowlists, and release defaults should
+// live in applications that consume go-rdp rather than in this package.
+package codec
