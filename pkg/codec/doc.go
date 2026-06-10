@@ -12,6 +12,7 @@
 //   - MS-RDPEGFX Planar codec payload semantics for no-alpha RLE frames
 //   - MS-RDPEGFX ClearCodec operations supported by the documented minimal subset
 //   - MS-RDPEGFX Progressive and ProgressiveV2 payload layout helpers
+//   - MS-RDPEGFX AVC420, AVC444, and AVC444v2 bitmap stream wire formats
 //   - MS-RDPRFX RemoteFX tile/message structures, YCoCg, DWT 5/3, quantization, and RLGR
 //
 // Helpers in this package are deliberately protocol-level data-in/data-out
