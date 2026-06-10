@@ -10,6 +10,7 @@
 //   - MS-RDPEGFX 2.2.2 RDPGFX capability and frame/SurfaceToWire PDUs
 //   - MS-RDPEGFX uncompressed codec ID and XRGB payload expectations
 //   - MS-RDPEGFX Planar codec payload semantics for no-alpha RLE frames
+//   - MS-RDPRFX RemoteFX tile/message structures, YCoCg, DWT 5/3, quantization, and RLGR
 //
 // Helpers in this package are deliberately protocol-level data-in/data-out
 // functions. Product policy such as codec preference, Android capture format,
