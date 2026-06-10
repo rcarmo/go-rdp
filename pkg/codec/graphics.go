@@ -39,6 +39,26 @@ func EncodeNSCodecRawRGBA(pixels []byte, width, height, stride int) ([]byte, boo
 	return internalcodec.EncodeNSCodecRawRGBA(pixels, width, height, stride)
 }
 
+// RLEDecompress8 decompresses classic 8-bpp interleaved RLE bitmap data.
+func RLEDecompress8(src []byte, dst []byte, rowDelta int) bool {
+	return internalcodec.RLEDecompress8(src, dst, rowDelta)
+}
+
+// RLEDecompress15 decompresses classic 15-bpp interleaved RLE bitmap data.
+func RLEDecompress15(src []byte, dst []byte, rowDelta int) bool {
+	return internalcodec.RLEDecompress15(src, dst, rowDelta)
+}
+
+// RLEDecompress16 decompresses classic 16-bpp interleaved RLE bitmap data.
+func RLEDecompress16(src []byte, dst []byte, rowDelta int) bool {
+	return internalcodec.RLEDecompress16(src, dst, rowDelta)
+}
+
+// RLEDecompress24 decompresses classic 24-bpp interleaved RLE bitmap data.
+func RLEDecompress24(src []byte, dst []byte, rowDelta int) bool {
+	return internalcodec.RLEDecompress24(src, dst, rowDelta)
+}
+
 // RDPGFX codec identifiers used by WireToSurface PDUs (MS-RDPEGFX).
 const (
 	RDPGFXCodecUncompressed    uint16 = 0x0000
