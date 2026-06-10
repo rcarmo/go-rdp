@@ -7,6 +7,7 @@
 //   - MS-RDPBCGR 2.2.9.1.1.3.1.2.4 Interleaved RLE Bitmap Compression
 //   - MS-RDPBCGR 2.2.9.2.1.2.1 Set Surface Bits Command
 //   - MS-RDPEGFX 2.2.2 RDPGFX capability and frame/SurfaceToWire PDUs
+//   - MS-RDPEGFX uncompressed codec ID and XRGB payload expectations
 //   - MS-RDPEGFX Planar codec payload semantics for no-alpha RLE frames
 //
 // Helpers in this package are deliberately protocol-level data-in/data-out
