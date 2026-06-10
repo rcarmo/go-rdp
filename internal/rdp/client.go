@@ -4,6 +4,7 @@ package rdp
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -112,7 +113,8 @@ func NewClient(
 
 	var err error
 
-	c.conn, err = net.DialTimeout("tcp", hostname, tcpConnectionTimeout)
+	dialer := net.Dialer{Timeout: tcpConnectionTimeout}
+	c.conn, err = dialer.DialContext(context.Background(), "tcp", hostname)
 	if err != nil {
 		return nil, fmt.Errorf("tcp connect: %w", err)
 	}
@@ -125,6 +127,44 @@ func NewClient(
 	c.fastPath = fastpath.New(&c)
 
 	return &c, nil
+}
+
+// NewClientWithDialContext creates a new RDP client using a caller-supplied TCP dialer.
+func NewClientWithDialContext(
+	ctx context.Context,
+	dialContext func(ctx context.Context, network, address string) (net.Conn, error),
+	hostname, username, password string,
+	desktopWidth, desktopHeight int,
+	colorDepth int,
+) (*Client, error) {
+	if !strings.Contains(hostname, ":") {
+		hostname = hostname + ":3389"
+	}
+	if dialContext == nil {
+		return nil, fmt.Errorf("tcp connect: missing dialer")
+	}
+	c := &Client{
+		domain:            "",
+		username:          username,
+		password:          password,
+		desktopWidth:      uint16(desktopWidth),
+		desktopHeight:     uint16(desktopHeight),
+		colorDepth:        colorDepth,
+		selectedProtocol:  pdu.NegotiationProtocolSSL,
+		skipTLSValidation: false,
+		tlsServerName:     "",
+	}
+	var err error
+	c.conn, err = dialContext(ctx, "tcp", hostname)
+	if err != nil {
+		return nil, fmt.Errorf("tcp connect: %w", err)
+	}
+	c.buffReader = bufio.NewReaderSize(c.conn, readBufferSize)
+	c.tpktLayer = tpkt.New(c)
+	c.x224Layer = x224.New(c.tpktLayer)
+	c.mcsLayer = mcs.New(c.x224Layer)
+	c.fastPath = fastpath.New(c)
+	return c, nil
 }
 
 // SetTLSConfig allows setting TLS configuration for the RDP client
@@ -233,8 +273,8 @@ func (c *Client) GetServerCapabilities() *ServerCapabilityInfo {
 		case pdu.CapabilitySetTypeBitmap:
 			if capSet.BitmapCapabilitySet != nil {
 				info.ColorDepth = int(capSet.BitmapCapabilitySet.PreferredBitsPerPixel)
-				info.DesktopSize = fmt.Sprintf("%dx%d", 
-					capSet.BitmapCapabilitySet.DesktopWidth, 
+				info.DesktopSize = fmt.Sprintf("%dx%d",
+					capSet.BitmapCapabilitySet.DesktopWidth,
 					capSet.BitmapCapabilitySet.DesktopHeight)
 			}
 		case pdu.CapabilitySetTypeGeneral:
