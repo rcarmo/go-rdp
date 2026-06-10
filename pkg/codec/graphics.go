@@ -59,6 +59,11 @@ func RLEDecompress24(src []byte, dst []byte, rowDelta int) bool {
 	return internalcodec.RLEDecompress24(src, dst, rowDelta)
 }
 
+// DecodePlanar decodes RDP6/RDPGFX Planar codec data to RGBA pixels.
+func DecodePlanar(src []byte, width, height int) []byte {
+	return internalcodec.DecompressPlanar(src, width, height)
+}
+
 // RDPGFX codec identifiers used by WireToSurface PDUs (MS-RDPEGFX).
 const (
 	RDPGFXCodecUncompressed    uint16 = 0x0000
