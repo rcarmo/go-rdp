@@ -133,12 +133,14 @@ jobs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 7
         name: go-rdp-binaries
         path: bin/
 
     - name: Upload frontend assets
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 7
         name: frontend-assets
         path: |
           web/dist/js/rle/rle.wasm
@@ -283,6 +285,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/v')
       uses: actions/upload-artifact@v4
       with:
+        retention-days: 7
         name: sbom
         path: sbom.json
 
