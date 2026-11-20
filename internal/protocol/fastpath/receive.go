@@ -157,6 +157,7 @@ func (pdu *UpdatePDU) Deserialize(wire io.Reader) error {
 	}
 
 	length = uint16(length1)
+	headerLength := uint16(2)
 
 	if length1&0x80 == 0x80 {
 		err = binary.Read(wire, binary.LittleEndian, &length2)
@@ -167,11 +168,14 @@ func (pdu *UpdatePDU) Deserialize(wire io.Reader) error {
 		length1 -= 0x80
 
 		length = binary.BigEndian.Uint16([]byte{length1, length2})
+		headerLength++
 	}
 
 	if length > 0x7FFF {
 		return errors.New("too big packet")
 	}
+	// MS-RDPBCGR length includes the header, not just the update payload.
+	length -= headerLength
 
 	if len(pdu.Data) != 0 {
 		pdu.Data = pdu.Data[:length]

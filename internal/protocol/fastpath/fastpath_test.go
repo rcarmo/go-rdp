@@ -209,8 +209,8 @@ func TestUpdatePDU_Deserialize(t *testing.T) {
 	}{
 		{
 			name: "fastpath update with 1-byte length",
-			// header: 0x00 (action=0, flags=0), length: 0x05, data: 0x01,0x02,0x03,0x04,0x05
-			input:          []byte{0x00, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05},
+			// header: 0x00 (action=0, flags=0), overall length: 0x07 (1 header + 1 length + 5 data)
+			input:          []byte{0x00, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05},
 			expectedAction: UpdatePDUActionFastPath,
 			expectedFlags:  0,
 			expectedLen:    5,
@@ -218,8 +218,8 @@ func TestUpdatePDU_Deserialize(t *testing.T) {
 		},
 		{
 			name: "fastpath update with 2-byte length",
-			// header: 0x00, length: 0x80 0x85 (2-byte length = 0x0085 = 133)
-			input:          append([]byte{0x00, 0x80, 0x85}, make([]byte, 133)...),
+			// header: 0x00, overall length: 0x0088 = 136 (1 header + 2 length + 133 data)
+			input:          append([]byte{0x00, 0x80, 0x88}, make([]byte, 133)...),
 			expectedAction: UpdatePDUActionFastPath,
 			expectedFlags:  0,
 			expectedLen:    133,
@@ -300,7 +300,7 @@ func TestUpdatePDU_Deserialize_TooLargePacket(t *testing.T) {
 }
 
 func TestUpdatePDU_Deserialize_WithPreallocatedData(t *testing.T) {
-	input := []byte{0x00, 0x05, 0x01, 0x02, 0x03, 0x04, 0x05}
+	input := []byte{0x00, 0x07, 0x01, 0x02, 0x03, 0x04, 0x05}
 	buf := bytes.NewBuffer(input)
 
 	pdu := &UpdatePDU{
@@ -316,7 +316,7 @@ func TestUpdatePDU_Deserialize_WithPreallocatedData(t *testing.T) {
 func TestUpdatePDU_Deserialize_ReadFullOnChunkedReader(t *testing.T) {
 	payload := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
 	reader := &shortChunkReader{
-		data: append([]byte{0x00, byte(len(payload))}, payload...),
+		data: append([]byte{0x00, byte(len(payload) + 2)}, payload...),
 		chunk: 1,
 	}
 	pdu := &UpdatePDU{}
@@ -360,7 +360,7 @@ func TestUpdate_Deserialize_TruncatedPayload(t *testing.T) {
 func TestProtocol_Receive(t *testing.T) {
 	// Create valid fastpath update
 	data := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
-	input := append([]byte{0x00, 0x05}, data...)
+	input := append([]byte{0x00, byte(len(data) + 2)}, data...)
 
 	buf := bytes.NewBuffer(input)
 	p := New(buf)
@@ -1447,14 +1447,14 @@ func TestRoundTrip_UpdatePDU(t *testing.T) {
 	}{
 		{
 			name:    "bitmap update",
-			data:    append([]byte{0x00, 0x08}, make([]byte, 8)...), // action=0, len=8, 8 bytes data
+			data:    append([]byte{0x00, 0x0A}, make([]byte, 8)...), // action=0, overall len=10 (2 header + 8 data)
 			action:  UpdatePDUActionFastPath,
 			flags:   0,
 			dataLen: 8,
 		},
 		{
 			name:    "synchronize update",
-			data:    []byte{0x00, 0x02, 0x00, 0x00}, // action=0, len=2, empty sync
+			data:    []byte{0x00, 0x04, 0x00, 0x00}, // action=0, overall len=4 (2 header + 2 data)
 			action:  UpdatePDUActionFastPath,
 			flags:   0,
 			dataLen: 2,
@@ -1660,4 +1660,17 @@ func TestS10_FastPathOutput_PointerUpdates(t *testing.T) {
 				"Pointer update type 0x%02X out of expected range", pu.updateType)
 		})
 	}
+}
+
+func TestReceiveConsecutivePackets(t *testing.T) {
+	// Independently encoded short and long fast-path lengths include their headers.
+	wire := bytes.NewBuffer([]byte{0, 5, 6, 0, 0, 0, 0x80, 6, 5, 0, 0})
+	client := New(wire)
+	first, err := client.Receive()
+	assert.NoError(t, err)
+	assert.Equal(t, []byte{6, 0, 0}, first.Data)
+	second, err := client.Receive()
+	assert.NoError(t, err)
+	assert.Equal(t, []byte{5, 0, 0}, second.Data)
+	assert.Zero(t, wire.Len())
 }
