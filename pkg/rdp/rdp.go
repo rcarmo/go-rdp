@@ -1,7 +1,10 @@
 // Package rdp exposes the embeddable RDP client API.
 package rdp
 
-import internal "github.com/rcarmo/go-rdp/internal/rdp"
+import (
+	internallogging "github.com/rcarmo/go-rdp/internal/logging"
+	internal "github.com/rcarmo/go-rdp/internal/rdp"
+)
 
 type (
 	Client               = internal.Client
@@ -16,3 +19,9 @@ var ErrUnsupportedRequestedProtocol = internal.ErrUnsupportedRequestedProtocol
 
 var NewClient = internal.NewClient
 var NewClientWithDialContext = internal.NewClientWithDialContext
+
+// SetLogLevel sets the library's log verbosity: "debug", "info", "warn", or
+// "error". The library logs to stderr at info level by default.
+func SetLogLevel(level string) {
+	internallogging.Default().SetLevelFromString(level)
+}
